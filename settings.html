@@ -6,41 +6,455 @@
     <title>MatrixMarket - Settings</title>
     <link rel="stylesheet" href="style.css">
     <style>
-        body{margin:0;font-family:"Poppins",sans-serif;background:#f5f7fb;color:#1f2937}
-        header{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;background:#ffffff;border-bottom:1px solid #e5e7eb;box-shadow:0 2px 10px rgba(15,23,42,.06);position:sticky;top:0;z-index:1000}
-        .logo{font-size:1.4rem;font-weight:800;color:#111827}nav{display:flex;gap:12px;flex-wrap:wrap}nav a{color:#374151;text-decoration:none;font-weight:600}
-        .page{width:min(1160px,100% - 16px);margin:16px auto 26px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
-        .card{background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;padding:12px;box-shadow:0 8px 20px rgba(15,23,42,.05)}
-        h1,h2,h3,p{margin:0}.title{color:#111827;margin-bottom:10px}
-        .grid{display:grid;gap:8px}input,select,textarea{width:100%;border:1px solid #d1d5db;background:#ffffff;color:#111827;border-radius:10px;padding:10px;font:inherit}
-        textarea{min-height:82px;resize:vertical}
-        .row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-        .btn{border:1px solid #1d4ed8;border-radius:10px;padding:10px 12px;font-weight:700;cursor:pointer;background:#2563eb;color:#fff}
-        .btn.alt{background:#ffffff;border:1px solid #d1d5db;color:#1f2937}
-        .btn.danger{background:linear-gradient(135deg,#ef4444,#dc2626)}
-        .wallet{background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:10px;font-weight:700;color:#1d4ed8}
-        .hint{font-size:.82rem;color:#6b7280}
-        .chips{display:flex;gap:6px;flex-wrap:wrap}
-        .chip{font-size:.78rem;border:1px solid #d1d5db;border-radius:999px;padding:4px 8px;background:#f8fafc;color:#374151}
-        .req-list{display:grid;gap:8px;max-height:260px;overflow:auto}
-        .req{background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:8px;display:grid;gap:4px}
-        .req .meta{font-size:.82rem;color:#6b7280}
-        .status{font-size:.78rem;border-radius:999px;padding:2px 8px;display:inline-flex;width:max-content}
-        .status.pending{background:#fff7ed;color:#c2410c}.status.approved{background:#ecfdf3;color:#166534}.status.declined{background:#fef2f2;color:#b91c1c}
+        :root{
+            --bg:#f4efe5;
+            --bg-accent:#fff7ec;
+            --surface:rgba(255,255,255,.82);
+            --surface-strong:#ffffff;
+            --border:rgba(148,163,184,.24);
+            --text:#172033;
+            --muted:#667085;
+            --brand:#c96d2d;
+            --brand-deep:#93461b;
+            --brand-soft:#fff1e4;
+            --good:#166534;
+            --good-soft:#ecfdf3;
+            --warn:#b45309;
+            --warn-soft:#fff7ed;
+            --bad:#b42318;
+            --bad-soft:#fef3f2;
+            --shadow:0 24px 60px rgba(15,23,42,.08);
+            --radius-xl:28px;
+            --radius-lg:20px;
+            --radius-md:14px;
+        }
+        *{box-sizing:border-box}
+        html{scroll-behavior:smooth}
+        body{
+            margin:0;
+            font-family:"Poppins",sans-serif;
+            color:var(--text);
+            background:
+                radial-gradient(circle at top left, rgba(255,210,167,.55), transparent 30%),
+                radial-gradient(circle at top right, rgba(247,181,114,.28), transparent 24%),
+                linear-gradient(180deg, #fcf8f1 0%, #f3ede2 48%, #efe6d8 100%);
+            min-height:100vh;
+        }
+        body::before{
+            content:"";
+            position:fixed;
+            inset:0;
+            pointer-events:none;
+            background:
+                linear-gradient(120deg, rgba(255,255,255,.32), transparent 32%),
+                radial-gradient(circle at 20% 20%, rgba(255,255,255,.22), transparent 18%);
+            opacity:.9;
+        }
+        header{
+            position:sticky;
+            top:0;
+            z-index:20;
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            gap:1rem;
+            padding:1rem 1.25rem;
+            backdrop-filter:blur(20px);
+            background:rgba(255,250,243,.78);
+            border-bottom:1px solid rgba(201,109,45,.12);
+            box-shadow:0 10px 35px rgba(148,101,53,.08);
+        }
+        .logo{
+            display:flex;
+            flex-direction:column;
+            gap:.15rem;
+            font-size:1.45rem;
+            font-weight:800;
+            color:var(--brand-deep);
+            letter-spacing:-.03em;
+        }
+        .logo small{
+            font-size:.72rem;
+            font-weight:700;
+            letter-spacing:.16em;
+            text-transform:uppercase;
+            color:rgba(147,70,27,.68);
+        }
+        nav{
+            display:flex;
+            gap:.65rem;
+            flex-wrap:wrap;
+            align-items:center;
+        }
+        nav a{
+            color:#5b4636;
+            text-decoration:none;
+            font-weight:700;
+            padding:.72rem 1rem;
+            border-radius:999px;
+            transition:.2s ease;
+        }
+        nav a:hover,
+        nav a[href="settings.html"]{
+            background:rgba(201,109,45,.12);
+            color:var(--brand-deep);
+        }
+        .shell{
+            width:min(1240px, calc(100% - 1.4rem));
+            margin:1.2rem auto 2.5rem;
+            position:relative;
+            z-index:1;
+        }
+        .hero{
+            display:grid;
+            grid-template-columns:1.35fr .9fr;
+            gap:1rem;
+            margin-bottom:1rem;
+        }
+        .hero-card,
+        .hero-side,
+        .card{
+            background:var(--surface);
+            border:1px solid var(--border);
+            backdrop-filter:blur(16px);
+            box-shadow:var(--shadow);
+            border-radius:var(--radius-xl);
+        }
+        .hero-card{
+            padding:1.45rem;
+            position:relative;
+            overflow:hidden;
+            min-height:240px;
+            background:
+                radial-gradient(circle at top right, rgba(201,109,45,.14), transparent 28%),
+                linear-gradient(135deg, rgba(255,255,255,.88), rgba(255,247,236,.88));
+        }
+        .hero-card::after{
+            content:"";
+            position:absolute;
+            width:220px;
+            height:220px;
+            right:-50px;
+            top:-60px;
+            border-radius:50%;
+            background:radial-gradient(circle, rgba(201,109,45,.18), transparent 68%);
+        }
+        .eyebrow{
+            display:inline-flex;
+            align-items:center;
+            gap:.45rem;
+            font-size:.78rem;
+            font-weight:800;
+            text-transform:uppercase;
+            letter-spacing:.16em;
+            color:var(--brand-deep);
+            padding:.45rem .75rem;
+            border-radius:999px;
+            background:rgba(201,109,45,.1);
+            border:1px solid rgba(201,109,45,.14);
+        }
+        .hero-card h1{
+            margin:.9rem 0 .7rem;
+            font-size:clamp(2rem, 4vw, 3.35rem);
+            line-height:1;
+            letter-spacing:-.05em;
+            max-width:11ch;
+        }
+        .hero-card p{
+            max-width:58ch;
+            color:#5f6472;
+            font-size:1rem;
+            line-height:1.7;
+        }
+        .hero-metrics{
+            margin-top:1.2rem;
+            display:grid;
+            grid-template-columns:repeat(3, minmax(0,1fr));
+            gap:.8rem;
+        }
+        .metric{
+            padding:1rem;
+            border-radius:1.15rem;
+            background:rgba(255,255,255,.74);
+            border:1px solid rgba(148,163,184,.16);
+            min-height:92px;
+        }
+        .metric strong{
+            display:block;
+            font-size:1.25rem;
+            color:var(--brand-deep);
+            margin-bottom:.25rem;
+        }
+        .metric span{
+            display:block;
+            font-size:.84rem;
+            color:var(--muted);
+            line-height:1.45;
+        }
+        .hero-side{
+            padding:1.2rem;
+            display:grid;
+            gap:.9rem;
+            align-content:start;
+        }
+        .hero-side-card{
+            padding:1rem;
+            border-radius:1.15rem;
+            background:rgba(255,255,255,.72);
+            border:1px solid rgba(148,163,184,.14);
+        }
+        .hero-side-card h3{
+            margin:0 0 .35rem;
+            font-size:1rem;
+        }
+        .hero-side-card p{
+            margin:0;
+            color:var(--muted);
+            font-size:.9rem;
+            line-height:1.6;
+        }
+        .page{
+            display:grid;
+            grid-template-columns:1.1fr .95fr;
+            gap:1rem;
+            align-items:start;
+        }
+        .column{
+            display:grid;
+            gap:1rem;
+        }
+        .card{
+            padding:1.25rem;
+        }
+        .card-head{
+            display:flex;
+            justify-content:space-between;
+            gap:1rem;
+            align-items:flex-start;
+            margin-bottom:1rem;
+        }
+        .card-head h2,
+        .card-head h3,
+        .title{
+            margin:0;
+            color:#111827;
+            letter-spacing:-.03em;
+        }
+        .card-head p{
+            margin:.35rem 0 0;
+            color:var(--muted);
+            font-size:.92rem;
+            line-height:1.6;
+        }
+        .title{
+            margin-bottom:.85rem;
+            font-size:1.05rem;
+        }
+        .section-stack{
+            display:grid;
+            gap:1rem;
+        }
+        .grid{display:grid;gap:.85rem}
+        .row{display:grid;grid-template-columns:1fr 1fr;gap:.85rem}
+        .field{
+            display:grid;
+            gap:.42rem;
+        }
+        .field label{
+            font-size:.84rem;
+            font-weight:700;
+            color:#475467;
+        }
+        input,select,textarea{
+            width:100%;
+            border:1px solid rgba(148,163,184,.32);
+            background:rgba(255,255,255,.9);
+            color:var(--text);
+            border-radius:1rem;
+            padding:.96rem 1rem;
+            font:inherit;
+            box-shadow:inset 0 1px 0 rgba(255,255,255,.55);
+            transition:border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+        }
+        input:focus,select:focus,textarea:focus{
+            outline:none;
+            border-color:rgba(201,109,45,.65);
+            box-shadow:0 0 0 4px rgba(201,109,45,.12);
+            transform:translateY(-1px);
+        }
+        textarea{min-height:112px;resize:vertical}
+        .btn{
+            appearance:none;
+            border:1px solid rgba(201,109,45,.28);
+            border-radius:1rem;
+            padding:.92rem 1.05rem;
+            font-weight:800;
+            letter-spacing:.01em;
+            cursor:pointer;
+            color:#fff;
+            background:linear-gradient(135deg, var(--brand), #d88b46);
+            box-shadow:0 12px 26px rgba(201,109,45,.2);
+            transition:transform .2s ease, box-shadow .2s ease, filter .2s ease;
+        }
+        .btn:hover{transform:translateY(-1px);box-shadow:0 18px 32px rgba(201,109,45,.24)}
+        .btn.alt{
+            background:rgba(255,255,255,.88);
+            color:var(--text);
+            border-color:rgba(148,163,184,.26);
+            box-shadow:none;
+        }
+        .btn.danger{
+            border-color:rgba(185,35,24,.2);
+            background:linear-gradient(135deg,#ef4444,#b42318);
+            box-shadow:0 12px 26px rgba(185,35,24,.2);
+        }
+        .toggle-row{
+            display:flex;
+            align-items:center;
+            gap:.6rem;
+            font-size:.9rem;
+            color:#475467;
+            font-weight:600;
+        }
+        .toggle-row input{width:auto;margin:0}
+        .wallet{
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:1rem;
+            padding:1.05rem 1.1rem;
+            font-weight:800;
+            font-size:1.02rem;
+            color:#0f5132;
+            background:linear-gradient(135deg, #effdf5, #f8fffb);
+            border:1px solid rgba(34,197,94,.18);
+            border-radius:1.2rem;
+            box-shadow:inset 0 1px 0 rgba(255,255,255,.7);
+        }
+        .wallet::after{
+            content:"Live wallet";
+            font-size:.76rem;
+            font-weight:800;
+            letter-spacing:.1em;
+            text-transform:uppercase;
+            color:#15803d;
+            padding:.4rem .65rem;
+            border-radius:999px;
+            background:rgba(34,197,94,.1);
+        }
+        .hint{
+            font-size:.84rem;
+            color:var(--muted);
+            line-height:1.6;
+        }
+        .chips{
+            display:flex;
+            gap:.6rem;
+            flex-wrap:wrap;
+        }
+        .chip{
+            font-size:.8rem;
+            border:1px solid rgba(148,163,184,.22);
+            border-radius:999px;
+            padding:.48rem .8rem;
+            background:rgba(255,255,255,.78);
+            color:#475467;
+            font-weight:700;
+        }
+        .req-list{
+            display:grid;
+            gap:.85rem;
+            max-height:420px;
+            overflow:auto;
+            padding-right:.2rem;
+        }
+        .req{
+            background:rgba(255,255,255,.82);
+            border:1px solid rgba(148,163,184,.18);
+            border-radius:1.15rem;
+            padding:1rem;
+            display:grid;
+            gap:.45rem;
+            box-shadow:0 10px 26px rgba(15,23,42,.04);
+        }
+        .req strong{
+            font-size:.98rem;
+            color:#142032;
+        }
+        .req .meta{
+            font-size:.83rem;
+            color:var(--muted);
+            line-height:1.55;
+        }
+        .status{
+            font-size:.78rem;
+            font-weight:800;
+            letter-spacing:.02em;
+            border-radius:999px;
+            padding:.38rem .7rem;
+            display:inline-flex;
+            width:max-content;
+        }
+        .status.pending{background:var(--warn-soft);color:var(--warn)}
+        .status.approved{background:var(--good-soft);color:var(--good)}
+        .status.declined{background:var(--bad-soft);color:var(--bad)}
         .status.cancelled{background:#f3f4f6;color:#4b5563}
-        .msg{display:none;border-radius:10px;padding:10px;margin-top:8px;font-size:.9rem}
+        .msg{
+            display:none;
+            border-radius:1.1rem;
+            padding:1rem 1.05rem;
+            margin-top:8px;
+            font-size:.94rem;
+            box-shadow:0 14px 28px rgba(15,23,42,.05);
+        }
         .msg.ok{background:#ecfdf3;border:1px solid #86efac;color:#166534}
         .msg.err{background:#fef2f2;border:1px solid #fecaca;color:#b91c1c}
-        .tools{display:flex;gap:8px;flex-wrap:wrap}
-        .empty{text-align:center;color:#6b7280;border:1px dashed #d1d5db;border-radius:10px;padding:12px}
-        @media (max-width:980px){.page{grid-template-columns:1fr}.row{grid-template-columns:1fr}}
+        .tools{display:flex;gap:.75rem;flex-wrap:wrap}
+        .empty{
+            text-align:center;
+            color:var(--muted);
+            border:1px dashed rgba(148,163,184,.34);
+            border-radius:1rem;
+            padding:1rem;
+            background:rgba(255,255,255,.55);
+        }
+        .subcard{
+            padding:1rem;
+            border-radius:1.15rem;
+            background:rgba(255,255,255,.64);
+            border:1px solid rgba(148,163,184,.16);
+        }
+        .subcard + .subcard{margin-top:1rem}
+        .message-wrap{
+            width:min(1240px, calc(100% - 1.4rem));
+            margin:0 auto 2rem;
+            position:relative;
+            z-index:1;
+        }
+        code{
+            padding:.18rem .42rem;
+            border-radius:.45rem;
+            background:rgba(148,163,184,.12);
+            font-size:.86em;
+        }
+        @media (max-width:1100px){
+            .hero,.page{grid-template-columns:1fr}
+        }
+        @media (max-width:720px){
+            header{padding:.95rem 1rem;align-items:flex-start;flex-direction:column}
+            .shell{width:min(1240px, calc(100% - 1rem))}
+            .hero-card,.hero-side,.card{border-radius:1.35rem}
+            .hero-metrics,.row{grid-template-columns:1fr}
+            .wallet{align-items:flex-start;flex-direction:column}
+            .message-wrap{width:min(1240px, calc(100% - 1rem))}
+        }
     </style>
     <link rel="stylesheet" href="upgrade.css">
     <script src="firebase-online-storage.js"></script>
 </head>
 <body>
     <header>
-        <div class="logo">MatrixMarket</div>
+        <div class="logo">MatrixMarket<small>Settings Workspace</small></div>
         <nav>
             <a href="index.html">Home</a>
             <a href="shop.html">Shop</a>
@@ -49,88 +463,213 @@
         </nav>
     </header>
 
-    <main class="page">
-        <section class="card">
-            <h2 class="title">Account Profile</h2>
-            <div class="grid">
-                <input id="fullName" type="text" placeholder="Full Name">
-                <input id="email" type="email" placeholder="Email Address">
-                <input id="phone" type="text" placeholder="Phone Number">
-                <textarea id="address" placeholder="Address"></textarea>
-            </div>
-            <div class="row" style="margin-top:8px;">
-                <button id="saveProfileBtn" class="btn" type="button">Save Profile</button>
-                <button id="logoutBtn" class="btn alt" type="button">Logout</button>
-            </div>
-
-            <h3 class="title" style="margin-top:12px;">Security</h3>
-            <div class="grid">
-                <input id="newPassword" type="password" placeholder="New Password">
-                <input id="confirmPassword" type="password" placeholder="Confirm Password">
-                <label class="hint"><input id="showPass" type="checkbox" style="width:auto; margin-right:6px;">Show password fields</label>
-                <button id="savePasswordBtn" class="btn alt" type="button">Update Password</button>
-            </div>
-
-            <h3 class="title" style="margin-top:12px;">Preferences</h3>
-            <div class="grid">
-                <select id="themeSelect">
-                    <option value="dark">Dark Theme</option>
-                    <option value="light">Light Theme</option>
-                </select>
-                <label class="hint"><input id="notifyEmail" type="checkbox" style="width:auto; margin-right:6px;">Email notifications</label>
-                <label class="hint"><input id="notifyDeals" type="checkbox" style="width:auto; margin-right:6px;">Deals and promotions</label>
-                <button id="savePrefsBtn" class="btn alt" type="button">Save Preferences</button>
-            </div>
+    <div class="shell">
+        <section class="hero">
+            <article class="hero-card">
+                <span class="eyebrow">Account Center</span>
+                <h1>Upgrade your MatrixMarket settings.</h1>
+                <p>Manage profile details, secure your account, monitor wallet activity, and keep your buyer setup polished from one cleaner control space.</p>
+                <div class="hero-metrics">
+                    <div class="metric">
+                        <strong>Profile</strong>
+                        <span>Keep your checkout and order identity accurate.</span>
+                    </div>
+                    <div class="metric">
+                        <strong>Wallet</strong>
+                        <span>Track payment requests and stay ready for the next purchase.</span>
+                    </div>
+                    <div class="metric">
+                        <strong>Privacy</strong>
+                        <span>Export your data or remove your account when you need control.</span>
+                    </div>
+                </div>
+            </article>
+            <aside class="hero-side">
+                <div class="hero-side-card">
+                    <h3>Fast wallet workflow</h3>
+                    <p>Top-up presets, request tracking, and admin-visible payment records are grouped together so balance management feels lighter.</p>
+                </div>
+                <div class="hero-side-card">
+                    <h3>Safer account edits</h3>
+                    <p>Profile, password, and notification controls now live in a cleaner settings structure that is easier to scan on desktop and mobile.</p>
+                </div>
+                <div class="hero-side-card">
+                    <h3>Built for continuity</h3>
+                    <p>The existing IDs and logic stay intact, so your current flows keep working while the page looks and feels more intentional.</p>
+                </div>
+            </aside>
         </section>
 
-        <section class="card">
-            <h2 class="title">Wallet & Payment Requests</h2>
-            <div class="wallet" id="walletBox">Balance: 0.00 GMD</div>
-            <div class="grid" style="margin-top:8px;">
-                <select id="method">
-                    <option value="Wave (6785316)">Wave (6785316)</option>
-                    <option value="Comcash (6785316)">Comcash (6785316)</option>
-                    <option value="Bank Transfer">Bank Transfer</option>
-                </select>
-                <input id="amount" type="number" min="1" step="0.01" placeholder="Amount">
-                <div class="chips">
-                    <button class="btn alt preset-btn" type="button" data-amt="100">+100</button>
-                    <button class="btn alt preset-btn" type="button" data-amt="250">+250</button>
-                    <button class="btn alt preset-btn" type="button" data-amt="500">+500</button>
-                    <button class="btn alt preset-btn" type="button" data-amt="1000">+1000</button>
-                </div>
-                <div class="row">
-                    <button id="topupBtn" class="btn" type="button">Request Top-Up</button>
-                    <button id="withdrawBtn" class="btn alt" type="button">Request Withdrawal</button>
-                </div>
-                <p class="hint">Requests are stored in <code>pendingRequests</code> and visible to admin.</p>
+        <main class="page">
+            <div class="column">
+                <section class="card">
+                    <div class="card-head">
+                        <div>
+                            <h2>Account Profile</h2>
+                            <p>Update the buyer information used across checkout, orders, and account recovery.</p>
+                        </div>
+                    </div>
+                    <div class="grid">
+                        <div class="field">
+                            <label for="fullName">Full name</label>
+                            <input id="fullName" type="text" placeholder="Enter your full name">
+                        </div>
+                        <div class="field">
+                            <label for="email">Email address</label>
+                            <input id="email" type="email" placeholder="Enter your email address">
+                        </div>
+                        <div class="field">
+                            <label for="phone">Phone number</label>
+                            <input id="phone" type="text" placeholder="Enter your phone number">
+                        </div>
+                        <div class="field">
+                            <label for="address">Address</label>
+                            <textarea id="address" placeholder="Enter your delivery or billing address"></textarea>
+                        </div>
+                    </div>
+                    <div class="row" style="margin-top:1rem;">
+                        <button id="saveProfileBtn" class="btn" type="button">Save Profile</button>
+                        <button id="logoutBtn" class="btn alt" type="button">Logout</button>
+                    </div>
+                </section>
+
+                <section class="card">
+                    <div class="card-head">
+                        <div>
+                            <h2>Security & Access</h2>
+                            <p>Refresh your password and keep your account protected before problems show up.</p>
+                        </div>
+                    </div>
+                    <div class="subcard">
+                        <h3 class="title">Password update</h3>
+                        <div class="grid">
+                            <div class="field">
+                                <label for="newPassword">New password</label>
+                                <input id="newPassword" type="password" placeholder="Enter a stronger password">
+                            </div>
+                            <div class="field">
+                                <label for="confirmPassword">Confirm password</label>
+                                <input id="confirmPassword" type="password" placeholder="Confirm the new password">
+                            </div>
+                            <label class="toggle-row" for="showPass">
+                                <input id="showPass" type="checkbox">
+                                Show password fields
+                            </label>
+                            <button id="savePasswordBtn" class="btn alt" type="button">Update Password</button>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="card">
+                    <div class="card-head">
+                        <div>
+                            <h2>Preferences</h2>
+                            <p>Choose how your account behaves and which updates deserve your attention.</p>
+                        </div>
+                    </div>
+                    <div class="grid">
+                        <div class="field">
+                            <label for="themeSelect">Theme mode</label>
+                            <select id="themeSelect">
+                                <option value="dark">Dark Theme</option>
+                                <option value="light">Light Theme</option>
+                            </select>
+                        </div>
+                        <label class="toggle-row" for="notifyEmail">
+                            <input id="notifyEmail" type="checkbox">
+                            Email notifications
+                        </label>
+                        <label class="toggle-row" for="notifyDeals">
+                            <input id="notifyDeals" type="checkbox">
+                            Deals and promotions
+                        </label>
+                        <button id="savePrefsBtn" class="btn alt" type="button">Save Preferences</button>
+                    </div>
+                </section>
             </div>
 
-            <h3 class="title" style="margin-top:10px;">My Requests</h3>
-            <div class="row" style="margin-top:6px;">
-                <select id="reqFilter">
-                    <option value="all">All Statuses</option>
-                    <option value="pending">Pending</option>
-                    <option value="approved">Approved</option>
-                    <option value="declined">Declined</option>
-                    <option value="cancelled">Cancelled</option>
-                </select>
-                <input id="reqSearch" type="text" placeholder="Search request">
-            </div>
-            <div class="chips" id="walletStats" style="margin-top:8px;"></div>
-            <div id="requestList" class="req-list"></div>
+            <div class="column">
+                <section class="card">
+                    <div class="card-head">
+                        <div>
+                            <h2>Wallet & Payment Requests</h2>
+                            <p>Manage wallet top-ups, withdrawal requests, and the request queue that admins review.</p>
+                        </div>
+                    </div>
+                    <div class="wallet" id="walletBox">Balance: 0.00 GMD</div>
+                    <div class="grid" style="margin-top:1rem;">
+                        <div class="field">
+                            <label for="method">Payment method</label>
+                            <select id="method">
+                                <option value="Wave (6785316)">Wave (6785316)</option>
+                                <option value="Comcash (6785316)">Comcash (6785316)</option>
+                                <option value="Bank Transfer">Bank Transfer</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label for="amount">Amount</label>
+                            <input id="amount" type="number" min="1" step="0.01" placeholder="Enter amount">
+                        </div>
+                        <div class="chips">
+                            <button class="btn alt preset-btn" type="button" data-amt="100">+100</button>
+                            <button class="btn alt preset-btn" type="button" data-amt="250">+250</button>
+                            <button class="btn alt preset-btn" type="button" data-amt="500">+500</button>
+                            <button class="btn alt preset-btn" type="button" data-amt="1000">+1000</button>
+                        </div>
+                        <div class="row">
+                            <button id="topupBtn" class="btn" type="button">Request Top-Up</button>
+                            <button id="withdrawBtn" class="btn alt" type="button">Request Withdrawal</button>
+                        </div>
+                        <p class="hint">Requests are stored in <code>pendingRequests</code> so the admin team can review them with the same website data flow.</p>
+                    </div>
+                </section>
 
-            <h3 class="title" style="margin-top:10px;">Data Tools</h3>
-            <div class="tools">
-                <button id="exportReqBtn" class="btn alt" type="button">Export Requests CSV</button>
-                <button id="exportBtn" class="btn alt" type="button">Export My Data</button>
-                <button id="deleteBtn" class="btn danger" type="button">Delete Account</button>
-            </div>
-            <p class="hint" style="margin-top:6px;">Deleting account removes your entry from <code>users</code> and clears <code>currentUser</code>.</p>
-        </section>
-    </main>
+                <section class="card">
+                    <div class="card-head">
+                        <div>
+                            <h2>My Requests</h2>
+                            <p>Filter your payment history, inspect approval state, and cancel anything still pending.</p>
+                        </div>
+                    </div>
+                    <div class="row" style="margin-bottom:.85rem;">
+                        <div class="field">
+                            <label for="reqFilter">Status filter</label>
+                            <select id="reqFilter">
+                                <option value="all">All Statuses</option>
+                                <option value="pending">Pending</option>
+                                <option value="approved">Approved</option>
+                                <option value="declined">Declined</option>
+                                <option value="cancelled">Cancelled</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label for="reqSearch">Search requests</label>
+                            <input id="reqSearch" type="text" placeholder="Search request">
+                        </div>
+                    </div>
+                    <div class="chips" id="walletStats" style="margin-bottom:.85rem;"></div>
+                    <div id="requestList" class="req-list"></div>
+                </section>
 
-    <div style="width:min(1160px,100% - 16px); margin:0 auto 20px;">
+                <section class="card">
+                    <div class="card-head">
+                        <div>
+                            <h2>Data Tools</h2>
+                            <p>Take your records with you, or permanently remove your account when you need to reset.</p>
+                        </div>
+                    </div>
+                    <div class="tools">
+                        <button id="exportReqBtn" class="btn alt" type="button">Export Requests CSV</button>
+                        <button id="exportBtn" class="btn alt" type="button">Export My Data</button>
+                        <button id="deleteBtn" class="btn danger" type="button">Delete Account</button>
+                    </div>
+                    <p class="hint" style="margin-top:.8rem;">Deleting account removes your entry from <code>users</code> and clears <code>currentUser</code>.</p>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <div class="message-wrap">
         <div id="okMsg" class="msg ok"></div>
         <div id="errMsg" class="msg err"></div>
     </div>
@@ -141,6 +680,8 @@
         function byId(id){ return document.getElementById(id); }
         function num(v){ const n = Number(v); return Number.isFinite(n) ? n : 0; }
         function money(v){ return num(v).toFixed(2) + " GMD"; }
+        function cleanEmail(v){ return String(v || "").trim().toLowerCase(); }
+        function balanceMirrorKey(email){ const target = cleanEmail(email); return target ? ("userBalanceByEmail:" + target) : ""; }
         function read(key, fallback){ try { const d = JSON.parse(MMStorage.getItem(key)||"null"); return d ?? fallback; } catch(_){ return fallback; } }
         function write(key, value){ MMStorage.setItem(key, JSON.stringify(value)); }
         function normalizeStatus(v){ return String(v || "Pending").trim().toLowerCase(); }
@@ -191,12 +732,16 @@
             });
             MMStorage.removeItem("userBalance");
             MMStorage.removeItem("balance");
+            MMStorage.removeItem("buyerInfo");
+            MMStorage.removeItem("buyerInfoDraft");
         }
 
         function syncWalletMirrors(){
             const amount = num(state.user && state.user.balance);
             MMStorage.setItem("userBalance", String(amount));
             MMStorage.setItem("balance", String(amount));
+            const mirrorKey = balanceMirrorKey(state.user && state.user.email);
+            if (mirrorKey) MMStorage.setItem(mirrorKey, String(amount));
         }
 
         function getMyRequests(){
@@ -204,6 +749,55 @@
             return Array.isArray(requests)
                 ? requests.filter(function(r){ return r && r.email === state.user.email; }).sort(function(a,b){ return String(b.createdAt||"").localeCompare(String(a.createdAt||"")); })
                 : [];
+        }
+
+        function requestTs(row){
+            const direct = new Date(row && (row.updatedAt || row.createdAt || row.date || "")).getTime();
+            if (Number.isFinite(direct) && direct > 0) return direct;
+            const fallback = num(row && row.id);
+            return fallback > 1000000000 ? fallback : 0;
+        }
+
+        function requestStatusWeight(status){
+            const s = String(status || "").trim().toLowerCase();
+            if (s === "approved" || s === "paid" || s === "success") return 3;
+            if (s === "declined" || s === "cancelled" || s === "canceled") return 2;
+            if (s === "pending" || !s) return 1;
+            return 0;
+        }
+
+        function mergeRequestRows(baseRows, nextRows){
+            const map = new Map();
+            const initial = Array.isArray(baseRows) ? baseRows.slice() : [];
+            initial.forEach(function(row, idx){
+                const key = String((row && row.id) || ("row:" + idx));
+                map.set(key, row && typeof row === "object" ? { ...row } : row);
+            });
+            const incoming = Array.isArray(nextRows) ? nextRows.slice() : [];
+            incoming.forEach(function(row, idx){
+                const key = String((row && row.id) || ("row:" + idx));
+                const prev = map.get(key);
+                if (!prev || typeof prev !== "object" || !row || typeof row !== "object") {
+                    map.set(key, row);
+                    return;
+                }
+                const prevWeight = requestStatusWeight(prev.status || prev.paymentStatus || "");
+                const nextWeight = requestStatusWeight(row.status || row.paymentStatus || "");
+                const prevTs = requestTs(prev);
+                const nextTs = requestTs(row);
+                const winner = nextWeight > prevWeight
+                    ? { ...prev, ...row }
+                    : (nextWeight < prevWeight
+                        ? { ...row, ...prev }
+                        : (nextTs >= prevTs ? { ...prev, ...row } : { ...row, ...prev }));
+                map.set(key, winner);
+            });
+            return Array.from(map.values()).sort(function(a,b){ return requestTs(b) - requestTs(a); });
+        }
+
+        function writeRequests(nextRows){
+            const current = read("pendingRequests", []);
+            write("pendingRequests", mergeRequestRows(current, nextRows));
         }
 
         function showError(text){ byId("okMsg").style.display = "none"; byId("errMsg").textContent = text; byId("errMsg").style.display = "block"; }
@@ -287,7 +881,7 @@
                 if (r && r.email === oldEmail) return { ...r, email: newEmail };
                 return r;
             }) : [];
-            write("pendingRequests", mapped);
+            writeRequests(mapped);
         }
 
         function saveProfile(){
@@ -315,6 +909,20 @@
             upsertSellerInList(nextUser);
             updateEmailReferences(email);
             persistSessionUser(nextUser);
+            write("buyerInfo", {
+                fullName: fullName,
+                name: fullName,
+                email: email,
+                phone: phone,
+                address: address
+            });
+            write("buyerInfoDraft", {
+                fullName: fullName,
+                name: fullName,
+                email: email,
+                phone: phone,
+                address: address
+            });
             state.user = nextUser;
             state.oldEmail = email;
             fillForm();
@@ -392,7 +1000,7 @@
                 status: "Pending",
                 createdAt: new Date().toISOString()
             });
-            write("pendingRequests", requests);
+            writeRequests(requests);
             byId("amount").value = "";
             renderRequests();
             showSuccess(type + " request submitted.");
@@ -406,7 +1014,7 @@
                 }
                 return r;
             });
-            write("pendingRequests", updated);
+            writeRequests(updated);
             renderRequests();
             showSuccess("Request cancelled.");
         }
@@ -536,7 +1144,7 @@
 
             const requests = read("pendingRequests", []);
             const nextRequests = Array.isArray(requests) ? requests.filter(function(r){ return !(r && r.email === state.user.email); }) : [];
-            write("pendingRequests", nextRequests);
+            writeRequests(nextRequests);
 
             clearSessionUser();
             MMStorage.removeItem("buyerInfo");

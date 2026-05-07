@@ -49,7 +49,7 @@
         <div class="adm-foot">Withdrawal charges are applied on approval at GMD 2 per GMD 10 requested.</div>
     </main>
 
-    <script src="admin-core.js?v=20260222c"></script>
+    <script src="admin-core.js?v=20260509o"></script>
     <script>
         const state = { rows: [], filtered: [] };
 
@@ -99,7 +99,7 @@
         }
 
         function rowButtons(r) {
-            const safe = String(r.index);
+            const safe = encodeURIComponent(String(r.id || ("REQ-" + r.index)));
             if (r.status.toLowerCase() !== "pending") {
                 return '<button class="btn-adm" data-action="pending" data-id="' + safe + '">Set Pending</button>';
             }
@@ -145,12 +145,12 @@
             renderTable();
         }
 
-        function decide(index, to) {
-            const i = Number(index);
-            if (!Number.isInteger(i)) return;
+        function decide(target, to) {
+            const key = decodeURIComponent(String(target || ""));
+            if (!key) return;
             const map = { approve: "Approved", decline: "Declined", pending: "Pending" };
             const status = map[to] || "Pending";
-            AdminCore.applyPaymentDecision(i, status);
+            AdminCore.applyPaymentDecision(key, status);
             refresh();
         }
 
@@ -173,7 +173,7 @@
 
             document.getElementById("bulkApproveBtn").addEventListener("click", function () {
                 const pending = state.rows.filter(function (r) { return r.status.toLowerCase() === "pending"; });
-                pending.forEach(function (r) { AdminCore.applyPaymentDecision(r.index, "Approved"); });
+                pending.forEach(function (r) { AdminCore.applyPaymentDecision(r.id, "Approved"); });
                 AdminCore.log("bulk_payment_approved", { count: pending.length });
                 refresh();
             });

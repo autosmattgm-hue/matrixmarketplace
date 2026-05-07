@@ -131,6 +131,30 @@
     return !email || email === 'guest@matrixmarket.local';
   }
 
+  function isSellerUser(user) {
+    return !!(user && (user.isSeller || str(user.accountType || user.role).toLowerCase() === 'seller'));
+  }
+
+  function cleanEmail(value) {
+    return str(value).trim().toLowerCase();
+  }
+
+  function balanceMirrorKey(email) {
+    const target = cleanEmail(email);
+    return target ? ('userBalanceByEmail:' + target) : '';
+  }
+
+  function isBalanceStorageEvent(key) {
+    const target = str(key);
+    if (!target) return false;
+    if (target === KEYS.USER || target === 'loggedInUser' || target === 'currentSeller' || target === KEYS.USER_BALANCE || target === KEYS.BALANCE) return true;
+    if (target === 'users' || target === 'sellers') return true;
+    if (target.indexOf('userBalanceByEmail:') === 0) return true;
+    const activeUser = readActiveUser() || {};
+    const mirrorKey = balanceMirrorKey(activeUser.email);
+    return !!(mirrorKey && target === mirrorKey);
+  }
+
   function readActiveUser() {
     const adapter = getStorageAdapter();
     const keys = [KEYS.USER, 'loggedInUser', 'currentSeller'];
@@ -163,6 +187,9 @@
     if (cachedUserScope) return cachedUserScope;
     cachedUserScope = resolveUserScopeToken();
     return cachedUserScope;
+  }
+  function isGuestScope() {
+    return userScopeToken() === 'guest';
   }
 
   function invalidateUserScopeToken() {
@@ -199,12 +226,12 @@
       if (shouldUseScopedKey(key)) {
         const scoped = readParsedValue(scopedStorageKey(key), null);
         if (scoped != null) return scoped;
-        if (LEGACY_READ_THROUGH_KEYS.has(str(key))) {
+        if (LEGACY_READ_THROUGH_KEYS.has(str(key)) && isGuestScope()) {
           const guestScoped = readParsedValue(guestScopedStorageKey(key), null);
           if (guestScoped != null) return guestScoped;
           return readParsedValue(key, fallback);
         }
-        if (userScopeToken() !== 'guest') return fallback;
+        if (!isGuestScope()) return fallback;
       }
       return readParsedValue(key, fallback);
     } catch (_) {
@@ -460,15 +487,172 @@
   function readWalletBalance() {
     const user = readActiveUser();
     if (user && typeof user === 'object' && !isGuestSessionUser(user)) {
-      if (user.balance != null) return num(user.balance);
-      const raw = getStorageAdapter().getItem(KEYS.USER_BALANCE) || getStorageAdapter().getItem(KEYS.BALANCE) || 0;
-      return num(raw);
+      const email = cleanEmail(user && user.email);
+      const canonical = resolveCanonicalAccount(user);
+      const mirrorKey = balanceMirrorKey(email);
+      const mirrorRaw = mirrorKey ? getStorageAdapter().getItem(mirrorKey) : null;
+      const rawFallback = getStorageAdapter().getItem(KEYS.USER_BALANCE) || getStorageAdapter().getItem(KEYS.BALANCE) || 0;
+      const seedBalance = canonical && canonical.balance != null
+        ? num(canonical.balance)
+        : (user.balance != null ? num(user.balance) : num(mirrorRaw || rawFallback));
+      const recovered = reconcileApprovedWalletTopups(canonical || user, seedBalance);
+      if (recovered != null) return recovered;
+      if (mirrorRaw != null && mirrorRaw !== '') {
+        const mirrored = num(mirrorRaw);
+        syncWalletMirrors(mirrored, email);
+        return mirrored;
+      }
+      if (canonical && canonical.balance != null) {
+        syncSessionAccount(canonical);
+        return num(canonical.balance);
+      }
+      if (user.balance != null) {
+        syncWalletMirrors(user.balance, email);
+        return num(user.balance);
+      }
+      return num(rawFallback);
     }
     return 0;
   }
 
+  function normalizeAccountRows(raw) {
+    if (Array.isArray(raw)) return raw.slice();
+    if (raw && typeof raw === 'object') {
+      return Object.keys(raw).map(function (key) {
+        const row = raw[key];
+        if (row && typeof row === 'object') return { id: row.id || key, ...row };
+        return { id: key, value: row };
+      });
+    }
+    return [];
+  }
+
+  function readAccountRows(key) {
+    return normalizeAccountRows(readParsedValue(getStorageAdapter().getItem(key), []));
+  }
+
+  function resolveCanonicalAccount(user) {
+    const email = cleanEmail(user && user.email);
+    if (!email) return null;
+    const preferred = isSellerUser(user) ? ['sellers', 'users'] : ['users', 'sellers'];
+    for (let i = 0; i < preferred.length; i += 1) {
+      const rows = readAccountRows(preferred[i]);
+      const match = rows.find(function (row) {
+        return cleanEmail(row && row.email) === email;
+      });
+      if (match) return match;
+    }
+    return null;
+  }
+
+  function readPaymentRows() {
+    return normalizeAccountRows(readParsedValue(getStorageAdapter().getItem('pendingRequests'), []));
+  }
+
+  function writePaymentRows(rows) {
+    try {
+      getStorageAdapter().setItem('pendingRequests', JSON.stringify(Array.isArray(rows) ? rows : []));
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function persistResolvedBalance(user, nextBalance) {
+    const email = cleanEmail(user && user.email);
+    if (!email) return null;
+    const adapter = getStorageAdapter();
+    ['users', 'sellers'].forEach(function (key) {
+      const rows = readAccountRows(key);
+      let changed = false;
+      const nextRows = rows.map(function (row) {
+        if (cleanEmail(row && row.email) !== email) return row;
+        changed = true;
+        return { ...row, balance: nextBalance, paymentStatus: 'Paid', status: row.status || 'Approved' };
+      });
+      if (!changed) return;
+      try { adapter.setItem(key, JSON.stringify(nextRows)); } catch (_) {}
+    });
+    syncSessionAccount({ ...user, balance: nextBalance, paymentStatus: 'Paid' });
+    return nextBalance;
+  }
+
+  function reconcileApprovedWalletTopups(user, baselineBalance) {
+    const email = cleanEmail(user && user.email);
+    if (!email) return null;
+
+    const currentBalance = Math.max(0, num(baselineBalance));
+    if (currentBalance > 0) return null;
+
+    const rows = readPaymentRows();
+    if (!rows.length) return null;
+
+    let nextBalance = currentBalance;
+    let changed = false;
+
+    rows.forEach(function (row, idx) {
+      if (cleanEmail(row && row.email) !== email) return;
+      const type = str(row && (row.type || row.requestType || row.plan || '')).toLowerCase();
+      if (type.indexOf('top') < 0) return;
+      const status = str(row && (row.status || row.paymentStatus || '')).toLowerCase();
+      if (status === 'approved' || status === 'paid' || status === 'success') {
+        if (row && !row.walletCreditedAt) {
+          const amount = Math.max(0, num(row.amount));
+          if (amount > 0) {
+            nextBalance += amount;
+            rows[idx] = { ...row, status: 'Approved', paymentStatus: 'Paid', walletCreditedAt: new Date().toISOString() };
+            changed = true;
+          }
+        }
+      }
+    });
+
+    if (!changed || nextBalance <= 0) return null;
+    writePaymentRows(rows);
+    persistResolvedBalance(user, nextBalance);
+    return nextBalance;
+  }
+
+  function syncWalletMirrors(amount, email) {
+    try {
+      const adapter = getStorageAdapter();
+      const next = String(num(amount));
+      adapter.setItem(KEYS.USER_BALANCE, next);
+      adapter.setItem(KEYS.BALANCE, next);
+      const mirrorKey = balanceMirrorKey(email || (readActiveUser() && readActiveUser().email));
+      if (mirrorKey) adapter.setItem(mirrorKey, next);
+    } catch (_) {}
+  }
+
+  function syncSessionAccount(account) {
+    if (!account || typeof account !== 'object') return null;
+    const email = cleanEmail(account.email);
+    if (!email) return null;
+    const adapter = getStorageAdapter();
+    const keys = [KEYS.USER, 'loggedInUser', 'currentSeller'];
+    let mergedUser = null;
+
+    keys.forEach(function (key) {
+      const existing = parseStoredJson(adapter.getItem(key), null);
+      if (!existing || typeof existing !== 'object') return;
+      if (cleanEmail(existing.email) !== email) return;
+      const nextUser = { ...existing, ...account };
+      if (key === 'currentSeller' && !isSellerUser(nextUser)) {
+        try { adapter.removeItem(key); } catch (_) {}
+        return;
+      }
+      try { adapter.setItem(key, JSON.stringify(nextUser)); } catch (_) {}
+      if (!mergedUser) mergedUser = nextUser;
+    });
+
+    syncWalletMirrors(account.balance, email);
+    return mergedUser || { ...account };
+  }
+
   function updateHeaderUser() {
-    const user = readActiveUser() || {};
+    const activeUser = readActiveUser() || {};
+    const canonical = (!isGuestSessionUser(activeUser) && resolveCanonicalAccount(activeUser)) || null;
+    const user = canonical ? (syncSessionAccount(canonical) || { ...activeUser, ...canonical }) : activeUser;
     const loggedIn = !isGuestSessionUser(user);
     byId('userChip').textContent = 'Hi, ' + str(loggedIn ? (user.fullName || user.name || user.email) : 'Guest');
     const wallet = byId('walletBalanceChip');
@@ -1843,13 +2027,21 @@
         renderHeroHighlights();
       }
       if (keyMatchesStorageEvent(key, KEYS.CART) || keyMatchesStorageEvent(key, KEYS.CART_ITEMS)) updateCartCount();
-      if (!key || key === KEYS.USER || key === 'loggedInUser' || key === 'currentSeller' || key === KEYS.USER_BALANCE || key === KEYS.BALANCE) {
+      if (!key || isBalanceStorageEvent(key)) {
         invalidateUserScopeToken();
         loadPrefs();
         updateHeaderUser();
         updateCartCount();
         applyFilters(true);
       }
+    });
+
+    window.addEventListener('focus', function () {
+      try { reconcileHydratedState(); } catch (_) {}
+    });
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState !== 'visible') return;
+      try { reconcileHydratedState(); } catch (_) {}
     });
 
     document.addEventListener('keydown', function (e) {
@@ -1863,6 +2055,17 @@
         }
       }
     });
+  }
+
+  function reconcileHydratedState() {
+    invalidateUserScopeToken();
+    loadPrefs();
+    updateHeaderUser();
+    updateCartCount();
+    computeHeroHighlights();
+    renderHeroHighlights();
+    if (!booted) return;
+    applyFilters(true);
   }
 
   function init() {
@@ -1896,6 +2099,10 @@
     setInterval(function () {
       if (state.autoSync && !document.hidden) refreshProducts(true);
     }, 30000);
+    setInterval(function () {
+      if (document.hidden) return;
+      try { updateHeaderUser(); } catch (_) {}
+    }, 5000);
   }
 
   function start() {
@@ -1912,10 +2119,22 @@
       }
     }
 
+    function hydrateReady() {
+      if (!booted) {
+        boot();
+        return;
+      }
+      try {
+        reconcileHydratedState();
+      } catch (err) {
+        console.error('Home hydration refresh failed.', err);
+      }
+    }
+
     const ready = window.MMStorage && window.MMStorage.ready;
     if (ready && typeof ready.then === 'function') {
       setTimeout(boot, 2500);
-      ready.finally(boot);
+      ready.finally(hydrateReady);
       return;
     }
     boot();

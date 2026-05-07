@@ -903,6 +903,53 @@
         return [];
       }
 
+      function requestTimestamp(row) {
+        const direct = new Date(row && (row.updatedAt || row.createdAt || row.date || "")).getTime();
+        if (Number.isFinite(direct) && direct > 0) return direct;
+        const fallback = num(row && row.id);
+        return fallback > 1000000000 ? fallback : 0;
+      }
+
+      function requestStatusWeight(status) {
+        const s = str(status || "").toLowerCase();
+        if (s === "approved" || s === "paid" || s === "success") return 3;
+        if (s === "declined" || s === "cancelled" || s === "canceled") return 2;
+        if (s === "pending" || !s) return 1;
+        return 0;
+      }
+
+      function mergeRequests(baseRows, nextRows) {
+        const map = new Map();
+        normalizeRequests(baseRows).forEach(function (row, idx) {
+          const key = str(row && row.id) || ("row:" + idx);
+          map.set(key, row && typeof row === "object" ? { ...row } : row);
+        });
+        normalizeRequests(nextRows).forEach(function (row, idx) {
+          const key = str(row && row.id) || ("row:" + idx);
+          const prev = map.get(key);
+          if (!prev || typeof prev !== "object" || !row || typeof row !== "object") {
+            map.set(key, row);
+            return;
+          }
+          const prevWeight = requestStatusWeight(prev.status || prev.paymentStatus || "");
+          const nextWeight = requestStatusWeight(row.status || row.paymentStatus || "");
+          const prevTs = requestTimestamp(prev);
+          const nextTs = requestTimestamp(row);
+          const winner = nextWeight > prevWeight
+            ? { ...prev, ...row }
+            : (nextWeight < prevWeight
+              ? { ...row, ...prev }
+              : (nextTs >= prevTs ? { ...prev, ...row } : { ...row, ...prev }));
+          map.set(key, winner);
+        });
+        return Array.from(map.values()).sort(function (a, b) { return requestTimestamp(b) - requestTimestamp(a); });
+      }
+
+      function writeRequests(nextRows) {
+        const current = normalizeRequests(readJson("pendingRequests", []));
+        writeJson("pendingRequests", mergeRequests(current, nextRows));
+      }
+
       function submitRequest(event) {
         event.preventDefault();
 
@@ -961,7 +1008,7 @@
         };
 
         requests.push(request);
-        writeJson("pendingRequests", requests);
+        writeRequests(requests);
 
         user.paymentStatus = "Pending";
         user.status = "Pending";

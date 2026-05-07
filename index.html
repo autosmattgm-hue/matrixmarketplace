@@ -12,10 +12,10 @@
   <link rel="dns-prefetch" href="//identitytoolkit.googleapis.com" />
   <link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin />
   <link rel="preload" as="image" href="matrixx.png" />
-  <link rel="preload" as="style" href="index-home.css?v=20260509a" />
-  <link rel="preload" as="script" href="index-home.js?v=20260509a" />
+  <link rel="preload" as="style" href="index-home.css?v=20260509m" />
+  <link rel="preload" as="script" href="index-home.js?v=20260509m" />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" />
-  <link rel="stylesheet" href="index-home.css?v=20260509a" />
+  <link rel="stylesheet" href="index-home.css?v=20260509m" />
   <style>
     .mm-skip-link {
       position: fixed;
@@ -769,12 +769,12 @@
           </svg>
         </button>
       </div>
-      <p class="mm-ai-drawer-copy">Customers can open this panel and ask product, order, checkout, or seller questions without leaving the home page.</p>
+      <p class="mm-ai-drawer-copy">Customers can open this panel and ask product, order, checkout, or seller questions without leaving the home page. You can also open the full <a href="matrix-market-ai.html">Matrix Market AI page</a>.</p>
       <div class="mm-ai-frame-shell">
         <iframe
           class="mm-ai-frame"
           id="aiAssistantFrame"
-          src="agent-page.html"
+          src="matrix-market-ai.html"
           title="MatrixMarket AI assistant"
           loading="lazy"
           referrerpolicy="strict-origin-when-cross-origin"
@@ -783,7 +783,183 @@
     </aside>
   </div>
 
-  <script defer src="index-home.js?v=20260509a"></script>
+  <script>
+    (function () {
+      function storageRef() {
+        if (window.MMStorage && typeof window.MMStorage.getItem === 'function') return window.MMStorage;
+        try {
+          if (window.localStorage && typeof window.localStorage.getItem === 'function') return window.localStorage;
+        } catch (_) {}
+        return null;
+      }
+
+      function parseJson(raw, fallback) {
+        try {
+          if (raw == null || raw === '') return fallback;
+          return JSON.parse(raw);
+        } catch (_) {
+          return fallback;
+        }
+      }
+
+      function str(value) {
+        return String(value == null ? '' : value).trim();
+      }
+
+      function num(value) {
+        var next = Number(value);
+        return Number.isFinite(next) ? next : 0;
+      }
+
+      function cleanEmail(value) {
+        return str(value).toLowerCase();
+      }
+
+      function money(value) {
+        return num(value).toFixed(2) + ' GMD';
+      }
+
+      function balanceMirrorKey(email) {
+        var target = cleanEmail(email);
+        return target ? ('userBalanceByEmail:' + target) : '';
+      }
+
+      function resolveCurrentUser(store) {
+        var keys = ['loggedInUser', 'currentUser', 'currentSeller'];
+        for (var i = 0; i < keys.length; i += 1) {
+          var user = parseJson(store.getItem(keys[i]), null);
+          if (user && typeof user === 'object' && cleanEmail(user.email) && cleanEmail(user.email) !== 'guest@matrixmarket.local') return user;
+        }
+        return parseJson(store.getItem('loggedInUser'), null) || parseJson(store.getItem('currentUser'), null) || parseJson(store.getItem('currentSeller'), null) || null;
+      }
+
+      function normalizeRows(raw) {
+        if (Array.isArray(raw)) return raw.slice();
+        if (raw && typeof raw === 'object') {
+          return Object.keys(raw).map(function (key) {
+            var row = raw[key];
+            if (row && typeof row === 'object') return Object.assign({ id: row.id || key }, row);
+            return { id: key, value: row };
+          });
+        }
+        return [];
+      }
+
+      function updateSessionBalance(store, user, amount) {
+        var email = cleanEmail(user && user.email);
+        if (!email) return;
+        var next = String(num(amount));
+        ['loggedInUser', 'currentUser', 'currentSeller'].forEach(function (key) {
+          var existing = parseJson(store.getItem(key), null);
+          if (!existing || typeof existing !== 'object') return;
+          if (cleanEmail(existing.email) !== email) return;
+          try {
+            store.setItem(key, JSON.stringify(Object.assign({}, existing, { balance: num(amount) })));
+          } catch (_) {}
+        });
+        try { store.setItem('userBalance', next); } catch (_) {}
+        try { store.setItem('balance', next); } catch (_) {}
+        var mirrorKey = balanceMirrorKey(email);
+        if (mirrorKey) {
+          try { store.setItem(mirrorKey, next); } catch (_) {}
+        }
+      }
+
+      function findAccountBalance(store, email) {
+        var lists = ['users', 'sellers'];
+        for (var i = 0; i < lists.length; i += 1) {
+          var rows = normalizeRows(parseJson(store.getItem(lists[i]), []));
+          for (var j = 0; j < rows.length; j += 1) {
+            if (cleanEmail(rows[j] && rows[j].email) === email) return num(rows[j].balance);
+          }
+        }
+        return null;
+      }
+
+      function recoverApprovedPaymentBalance(store, user, currentBalance) {
+        var email = cleanEmail(user && user.email);
+        if (!email) return currentBalance;
+        var rows = normalizeRows(parseJson(store.getItem('pendingRequests'), []));
+        if (!rows.length) return currentBalance;
+
+        var nextBalance = Math.max(0, num(currentBalance));
+        var changed = false;
+
+        rows = rows.map(function (row) {
+          if (cleanEmail(row && row.email) !== email) return row;
+          var type = str(row && (row.type || row.requestType || row.plan || '')).toLowerCase();
+          if (type.indexOf('top') < 0) return row;
+          var status = str(row && (row.status || row.paymentStatus || '')).toLowerCase();
+          if (status !== 'approved' && status !== 'paid' && status !== 'success') return row;
+          if (row && row.walletCreditedAt) return row;
+          var amount = Math.max(0, num(row.amount));
+          if (amount <= 0) return row;
+          nextBalance += amount;
+          changed = true;
+          return Object.assign({}, row, {
+            status: 'Approved',
+            paymentStatus: 'Paid',
+            walletCreditedAt: new Date().toISOString(),
+            autoRecoveredBy: 'index-inline-balance'
+          });
+        });
+
+        if (changed) {
+          try { store.setItem('pendingRequests', JSON.stringify(rows)); } catch (_) {}
+          updateSessionBalance(store, user, nextBalance);
+        }
+        return nextBalance;
+      }
+
+      function computeBalance() {
+        var store = storageRef();
+        if (!store) return 0;
+        var user = resolveCurrentUser(store);
+        if (!user || typeof user !== 'object') return 0;
+        var email = cleanEmail(user.email);
+        if (!email || email === 'guest@matrixmarket.local') return 0;
+
+        var mirrorKey = balanceMirrorKey(email);
+        var mirrorValue = mirrorKey ? store.getItem(mirrorKey) : null;
+        if (mirrorValue != null && mirrorValue !== '') return num(mirrorValue);
+
+        var accountBalance = findAccountBalance(store, email);
+        if (accountBalance != null && accountBalance > 0) {
+          updateSessionBalance(store, user, accountBalance);
+          return accountBalance;
+        }
+
+        var sessionBalance = num((user && user.balance != null) ? user.balance : (store.getItem('userBalance') || store.getItem('balance') || 0));
+        return recoverApprovedPaymentBalance(store, user, sessionBalance);
+      }
+
+      function renderBalance() {
+        var chip = document.getElementById('walletBalanceChip');
+        if (!chip) return;
+        chip.textContent = money(computeBalance());
+      }
+
+      function boot() {
+        renderBalance();
+        window.addEventListener('storage', renderBalance);
+        window.addEventListener('focus', renderBalance);
+        document.addEventListener('visibilitychange', function () {
+          if (document.visibilityState === 'visible') renderBalance();
+        });
+        setInterval(renderBalance, 3000);
+      }
+
+      var ready = window.MMStorage && window.MMStorage.ready;
+      if (ready && typeof ready.then === 'function') {
+        ready.finally(boot);
+      } else if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', boot);
+      } else {
+        boot();
+      }
+    })();
+  </script>
+  <script defer src="index-home.js?v=20260509m"></script>
   <script defer src="sw-register.js?v=20260228a"></script>
   <script defer src="site-performance.js?v=20260226a"></script>
   <script>

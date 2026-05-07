@@ -221,6 +221,10 @@
     function num(v) { const n = Number(v); return Number.isFinite(n) ? n : 0; }
     function money(v) { return num(v).toFixed(2) + " GMD"; }
     function cleanEmail(v) { return String(v || "").trim().toLowerCase(); }
+    function balanceMirrorKey(email) {
+      const target = cleanEmail(email);
+      return target ? ("userBalanceByEmail:" + target) : "";
+    }
     function cleanPhone(v) { return String(v || "").replace(/\D+/g, ""); }
     function isValidEmail(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || "").trim()); }
     function esc(v) { return String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;"); }
@@ -304,6 +308,9 @@
       cachedUserScope = resolveUserScopeToken();
       return cachedUserScope;
     }
+    function isGuestScope() {
+      return userScopeToken() === "guest";
+    }
     function shouldScopeKey(key) {
       const value = String(key || "");
       if (SCOPED_EXACT_KEYS.has(value)) return true;
@@ -322,13 +329,13 @@
         if (shouldScopeKey(target)) {
           const scoped = storage.getItem(scopedStorageKey(target));
           if (scoped != null && scoped !== "") return scoped;
-          if (LEGACY_READ_THROUGH_KEYS.has(target)) {
+          if (LEGACY_READ_THROUGH_KEYS.has(target) && isGuestScope()) {
             const guestScoped = storage.getItem(guestScopedStorageKey(target));
             if (guestScoped != null && guestScoped !== "") return guestScoped;
             const legacy = storage.getItem(target);
             if (legacy != null && legacy !== "") return legacy;
           }
-          if (userScopeToken() !== "guest") return null;
+          if (!isGuestScope()) return null;
         }
         return storage.getItem(target);
       } catch (_) { return null; }
@@ -379,18 +386,37 @@
         return fallback;
       }
     }
+    function writeDirectJson(storageKey, value) {
+      if (!storage) return false;
+      try {
+        storage.setItem(String(storageKey || ""), JSON.stringify(value));
+        return true;
+      } catch (error) {
+        console.warn("Direct storage write failed for key:", storageKey, error);
+        return false;
+      }
+    }
+    function isFreshBridgeStamp(value) {
+      const stamp = Date.parse(String(value || ""));
+      if (!Number.isFinite(stamp)) return false;
+      return (Date.now() - stamp) <= (15 * 60 * 1000);
+    }
     function recoverCheckoutRowsFromAnyKey() {
       const keyPool = [
         scopedStorageKey("checkoutCart"),
         scopedStorageKey("cart"),
-        scopedStorageKey("cartItems"),
-        guestScopedStorageKey("checkoutCart"),
-        guestScopedStorageKey("cart"),
-        guestScopedStorageKey("cartItems"),
-        "checkoutCart",
-        "cart",
-        "cartItems"
+        scopedStorageKey("cartItems")
       ];
+      if (isGuestScope()) {
+        keyPool.push(
+          guestScopedStorageKey("checkoutCart"),
+          guestScopedStorageKey("cart"),
+          guestScopedStorageKey("cartItems"),
+          "checkoutCart",
+          "cart",
+          "cartItems"
+        );
+      }
       const seen = new Set();
       let best = [];
       keyPool.forEach(function (key) {
@@ -655,7 +681,9 @@
 
     function readBalance() {
       const user = readActiveSessionUser() || read("currentUser", null);
-      const fallback = num(rawGet("userBalance") || rawGet("balance") || 0);
+      const mirrorKey = balanceMirrorKey(user && user.email);
+      const mirrored = mirrorKey ? rawGet(mirrorKey) : null;
+      const fallback = num(mirrored || rawGet("userBalance") || rawGet("balance") || 0);
       const value = (user && user.balance != null) ? num(user.balance) : fallback;
       state.balance = value;
       byId("walletInfo").textContent = "Wallet Balance: " + money(value);
@@ -677,6 +705,8 @@
       }
       rawSet("userBalance", String(next));
       rawSet("balance", String(next));
+      const mirrorKey = balanceMirrorKey(user && user.email);
+      if (mirrorKey) rawSet(mirrorKey, String(next));
       state.balance = next;
       byId("walletInfo").textContent = "Wallet Balance: " + money(next);
     }
@@ -753,10 +783,10 @@
 
       const bridge = readBridgePayload();
       if (bridge) {
-        if (bridge.mmCheckoutBridge && Array.isArray(bridge.mmCheckoutBridge.cart)) {
+        if (bridge.mmCheckoutBridge && isFreshBridgeStamp(bridge.mmCheckoutBridge.savedAt || bridge.mmCheckoutBridge.createdAt) && Array.isArray(bridge.mmCheckoutBridge.cart)) {
           addCandidate(bridge.mmCheckoutBridge.cart, "window-checkout-bridge", 60);
         }
-        if (bridge.mmCartBridge && Array.isArray(bridge.mmCartBridge.cart)) {
+        if (bridge.mmCartBridge && isFreshBridgeStamp(bridge.mmCartBridge.savedAt || bridge.mmCartBridge.createdAt) && Array.isArray(bridge.mmCartBridge.cart)) {
           addCandidate(bridge.mmCartBridge.cart, "window-cart-bridge", 55);
         }
       }
@@ -860,13 +890,32 @@
       return write(storageKey, list);
     }
 
+    function upsertOrderInDirectKey(storageKey, order) {
+      if (!order || typeof order !== "object") return false;
+      const rows = readDirectJson(storageKey, []);
+      const list = Array.isArray(rows) ? rows.slice() : [];
+      const orderId = String(order.id || order.orderNumber || order.orderId || "").trim();
+      const index = list.findIndex(function (row) {
+        const id = String((row && (row.id || row.orderNumber || row.orderId)) || "").trim();
+        return id && id === orderId;
+      });
+      if (index >= 0) {
+        list[index] = Object.assign({}, list[index], order);
+      } else {
+        list.unshift(order);
+      }
+      return writeDirectJson(storageKey, list);
+    }
+
     function upsertBuyerOrder(order, buyer) {
       const primarySaved = upsertOrderInKey("buyerOrders", order);
       const email = cleanEmail((order && (order.ownerEmail || order.accountEmail)) || (buyer && buyer.email));
       const phone = String((order && (order.ownerPhone || order.accountPhone)) || (buyer && buyer.phone) || "").replace(/\D+/g, "");
-      if (email) upsertOrderInKey("buyerOrdersByEmail:" + email, order);
-      if (phone) upsertOrderInKey("buyerOrdersByPhone:" + phone, order);
-      return primarySaved;
+      const emailScopedSaved = email ? upsertOrderInKey("buyerOrdersByEmail:" + email, order) : false;
+      const phoneScopedSaved = phone ? upsertOrderInKey("buyerOrdersByPhone:" + phone, order) : false;
+      const emailDirectSaved = email ? upsertOrderInDirectKey("buyerOrdersByEmail:" + email, order) : false;
+      const phoneDirectSaved = phone ? upsertOrderInDirectKey("buyerOrdersByPhone:" + phone, order) : false;
+      return Boolean(primarySaved || emailScopedSaved || phoneScopedSaved || emailDirectSaved || phoneDirectSaved);
     }
 
     function toSnapshotItems(cartRows) {
@@ -923,7 +972,12 @@
       nextMap[orderId] = snapshot;
       const okMap = write("orderLineSnapshots", nextMap);
       const okDirect = write("orderItemsById:" + orderId, snapshot);
-      return okMap && okDirect;
+      const legacyMap = readDirectJson("orderLineSnapshots", {});
+      const nextLegacyMap = (legacyMap && typeof legacyMap === "object" && !Array.isArray(legacyMap)) ? legacyMap : {};
+      nextLegacyMap[orderId] = snapshot;
+      const okLegacyMap = writeDirectJson("orderLineSnapshots", nextLegacyMap);
+      const okLegacyDirect = writeDirectJson("orderItemsById:" + orderId, snapshot);
+      return Boolean(okMap || okDirect || okLegacyMap || okLegacyDirect);
     }
 
     function safeRun(label, fn) {
@@ -1205,10 +1259,10 @@
       state.buyer = read("buyerInfo", null);
       state.meta = read("checkoutMeta", null);
       const bridge = readBridgePayload();
-      if ((!state.buyer || typeof state.buyer !== "object" || !Object.keys(state.buyer).length) && bridge && bridge.mmCartBridge && bridge.mmCartBridge.buyer) {
+      if ((!state.buyer || typeof state.buyer !== "object" || !Object.keys(state.buyer).length) && bridge && bridge.mmCartBridge && isFreshBridgeStamp(bridge.mmCartBridge.savedAt || bridge.mmCartBridge.createdAt) && bridge.mmCartBridge.buyer) {
         state.buyer = bridge.mmCartBridge.buyer;
       }
-      if ((!state.meta || typeof state.meta !== "object") && bridge && bridge.mmCartBridge && bridge.mmCartBridge.meta) {
+      if ((!state.meta || typeof state.meta !== "object") && bridge && bridge.mmCartBridge && isFreshBridgeStamp(bridge.mmCartBridge.savedAt || bridge.mmCartBridge.createdAt) && bridge.mmCartBridge.meta) {
         state.meta = bridge.mmCartBridge.meta;
       }
 

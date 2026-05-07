@@ -47,6 +47,16 @@
     }
   }
 
+  function balanceMirrorKey(email) {
+    return "userBalanceByEmail:" + cleanEmail(email);
+  }
+
+  function syncBalanceMirror(email, amount) {
+    const target = cleanEmail(email);
+    if (!target) return false;
+    return writeRaw(balanceMirrorKey(target), String(num(amount)));
+  }
+
   function listStorageKeys() {
     const store = storageRef();
     if (!store) return [];
@@ -424,8 +434,55 @@
     return toArray(normalizeRequestRows(payments), { injectEmail: true, injectId: true });
   }
 
+  function requestRowTs(row) {
+    const direct = new Date(row && (row.updatedAt || row.createdAt || row.date || "")).getTime();
+    if (Number.isFinite(direct) && direct > 0) return direct;
+    const fallback = num(row && row.id);
+    return fallback > 1000000000 ? fallback : 0;
+  }
+
+  function statusWeight(status) {
+    const s = str(status).toLowerCase();
+    if (s === "approved" || s === "paid" || s === "success") return 3;
+    if (s === "declined" || s === "cancelled" || s === "canceled") return 2;
+    if (s === "pending" || !s) return 1;
+    return 0;
+  }
+
+  function mergePaymentRows(baseRows, nextRows) {
+    const map = new Map();
+    toArray(baseRows, { injectEmail: true, injectId: true }).forEach(function (row, idx) {
+      const key = str(row && row.id) || ("row:" + idx);
+      map.set(key, row && typeof row === "object" ? { ...row } : row);
+    });
+
+    toArray(nextRows, { injectEmail: true, injectId: true }).forEach(function (row, idx) {
+      const key = str(row && row.id) || ("row:" + idx);
+      const prev = map.get(key);
+      if (!prev || typeof prev !== "object" || !row || typeof row !== "object") {
+        map.set(key, row);
+        return;
+      }
+      const prevWeight = statusWeight(prev.status || prev.paymentStatus || "");
+      const nextWeight = statusWeight(row.status || row.paymentStatus || "");
+      const prevTs = requestRowTs(prev);
+      const nextTs = requestRowTs(row);
+      const winner = nextWeight > prevWeight
+        ? { ...prev, ...row }
+        : (nextWeight < prevWeight
+          ? { ...row, ...prev }
+          : (nextTs >= prevTs ? { ...prev, ...row } : { ...row, ...prev }));
+      map.set(key, winner);
+    });
+
+    return Array.from(map.values()).sort(function (a, b) {
+      return requestRowTs(b) - requestRowTs(a);
+    });
+  }
+
   function setPayments(payments) {
-    writeJSON("pendingRequests", payments);
+    const current = readJSON("pendingRequests", []);
+    writeJSON("pendingRequests", mergePaymentRows(current, payments));
   }
 
   function getOrders() {
@@ -527,6 +584,7 @@
       setSellers(sellers.filter(function (s) { return cleanEmail(s.email) !== email; }));
       setUsers(upsert(users.filter(function (u) { return cleanEmail(u.email) !== email; }), "user"));
     }
+    syncBalanceMirror(email, record.balance);
   }
 
   function updateAccountByEmail(email, patch) {
@@ -548,6 +606,8 @@
     if (changed) {
       setUsers(users);
       setSellers(sellers);
+      const account = findAccount(target);
+      if (account) syncBalanceMirror(account.email, account.balance);
       return true;
     }
 
@@ -584,9 +644,61 @@
     return true;
   }
 
-  function applyPaymentDecision(index, decision) {
+  function paymentTimestamp(row) {
+    const direct = new Date(row && (row.updatedAt || row.createdAt || row.date || "")).getTime();
+    if (Number.isFinite(direct) && direct > 0) return direct;
+    const fallback = num(row && row.id);
+    return fallback > 1000000000 ? fallback : 0;
+  }
+
+  function approveLatestTopupRequest(email) {
+    const target = cleanEmail(email);
+    if (!target) return 0;
     const payments = getPayments();
-    if (!payments[index]) return false;
+    if (!Array.isArray(payments) || !payments.length) return 0;
+
+    let matchIndex = -1;
+    let bestStamp = -1;
+    for (let i = 0; i < payments.length; i += 1) {
+      const row = payments[i] || {};
+      if (cleanEmail(row.email || "") !== target) continue;
+      const type = str(row.type || row.requestType || row.plan || "").toLowerCase();
+      if (type.indexOf("top") < 0) continue;
+      if (row.walletCreditedAt) continue;
+      const stamp = paymentTimestamp(row);
+      if (stamp >= bestStamp) {
+        bestStamp = stamp;
+        matchIndex = i;
+      }
+    }
+
+    if (matchIndex < 0) return 0;
+    const row = { ...payments[matchIndex] };
+    const amount = Math.max(0, num(row.amount));
+    if (amount <= 0) return 0;
+    if (!adjustBalance(target, amount)) return 0;
+
+    row.status = "Approved";
+    row.paymentStatus = "Paid";
+    row.updatedAt = new Date().toISOString();
+    row.walletCreditedAt = row.updatedAt;
+    payments[matchIndex] = row;
+    setPayments(payments);
+    return amount;
+  }
+
+  function applyPaymentDecision(target, decision) {
+    const payments = getPayments();
+    const rawTarget = str(target);
+    let index = -1;
+    if (rawTarget && !/^\d+$/.test(rawTarget)) {
+      index = payments.findIndex(function (row) { return str(row && row.id) === rawTarget; });
+    }
+    if (index < 0) {
+      const fallbackIndex = Number(target);
+      index = Number.isInteger(fallbackIndex) && fallbackIndex >= 0 ? fallbackIndex : -1;
+    }
+    if (index < 0 || !payments[index]) return false;
 
     const row = { ...payments[index] };
     const prevStatus = str(row.status || "Pending");
@@ -612,7 +724,10 @@
         }
 
         if (isTopup) {
-          adjustBalance(email, num(row.amount));
+          if (!row.walletCreditedAt) {
+            adjustBalance(email, num(row.amount));
+            row.walletCreditedAt = new Date().toISOString();
+          }
         }
 
         if (isWithdrawal) {
@@ -629,7 +744,10 @@
             row.netAmount = netAmount;
             row.approvedAt = new Date().toISOString();
             row.status = "Approved";
-            adjustBalance(email, -amount);
+            if (!row.walletDebitedAt) {
+              adjustBalance(email, -amount);
+              row.walletDebitedAt = new Date().toISOString();
+            }
           }
         }
       }
@@ -893,6 +1011,7 @@
     deleteAccount: deleteAccount,
     findAccount: findAccount,
     adjustBalance: adjustBalance,
+    approveLatestTopupRequest: approveLatestTopupRequest,
     getProducts: getProducts,
     setProducts: setProducts,
     getPayments: getPayments,

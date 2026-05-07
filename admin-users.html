@@ -49,7 +49,7 @@
         <div class="adm-foot">User administration controls</div>
     </main>
 
-    <script src="admin-core.js?v=20260222c"></script>
+    <script src="admin-core.js?v=20260509o"></script>
     <script>
         const state = { users: [], filtered: [] };
 
@@ -129,7 +129,8 @@
                     paymentStatus: "Paid",
                     subscription: "Active"
                 });
-                AdminCore.log("user_approved", { email: target });
+                const credited = AdminCore.approveLatestTopupRequest(target);
+                AdminCore.log("user_approved", { email: target, creditedAmount: credited });
             }
 
             if (mode === "suspend") {
@@ -166,14 +167,16 @@
 
             document.getElementById("bulkApproveBtn").addEventListener("click", function () {
                 if (!state.filtered.length) return;
+                let creditedTotal = 0;
                 state.filtered.forEach(function (u) {
                     AdminCore.updateAccountByEmail(u.email, {
                         status: "Approved",
                         paymentStatus: "Paid",
                         subscription: "Active"
                     });
+                    creditedTotal += AdminCore.approveLatestTopupRequest(u.email);
                 });
-                AdminCore.log("bulk_user_approved", { count: state.filtered.length });
+                AdminCore.log("bulk_user_approved", { count: state.filtered.length, creditedTotal: creditedTotal });
                 refresh();
             });
 

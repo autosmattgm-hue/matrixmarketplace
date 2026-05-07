@@ -225,6 +225,9 @@
             cachedUserScope = resolveUserScopeToken();
             return cachedUserScope;
         }
+        function isGuestScope() {
+            return userScopeToken() === "guest";
+        }
         function shouldScopeKey(key) {
             return SCOPED_KEYS.has(String(key || ""));
         }
@@ -240,13 +243,13 @@
                 if (shouldScopeKey(target)) {
                     const scoped = storage.getItem(scopedStorageKey(target));
                     if (scoped != null && scoped !== "") return scoped;
-                    if (LEGACY_READ_THROUGH_KEYS.has(target)) {
+                    if (LEGACY_READ_THROUGH_KEYS.has(target) && isGuestScope()) {
                         const guestScoped = storage.getItem(guestScopedStorageKey(target));
                         if (guestScoped != null && guestScoped !== "") return guestScoped;
                         const legacy = storage.getItem(target);
                         if (legacy != null && legacy !== "") return legacy;
                     }
-                    if (userScopeToken() !== "guest") return null;
+                    if (!isGuestScope()) return null;
                 }
                 return storage.getItem(target);
             } catch (_) {
@@ -292,6 +295,17 @@
                 return fallback;
             }
         }
+        function isFreshBridgeStamp(value) {
+            const stamp = Date.parse(String(value || ""));
+            if (!Number.isFinite(stamp)) return false;
+            return (Date.now() - stamp) <= (15 * 60 * 1000);
+        }
+        function readSessionUser() {
+            return parseStoredJson(storage.getItem("currentUser"), null) ||
+                parseStoredJson(storage.getItem("loggedInUser"), null) ||
+                parseStoredJson(storage.getItem("currentSeller"), null) ||
+                null;
+        }
         function readBridgeCart() {
             try {
                 const raw = String(window.name || "").trim();
@@ -300,6 +314,7 @@
                 if (!parsed || typeof parsed !== "object") return [];
                 const bridge = parsed.mmCartBridge;
                 if (!bridge || !Array.isArray(bridge.cart)) return [];
+                if (!isFreshBridgeStamp(bridge.savedAt || bridge.createdAt)) return [];
                 return normalizeCart(bridge.cart);
             } catch (_) {
                 return [];
@@ -309,15 +324,7 @@
             const bridgeRows = readBridgeCart();
             if (bridgeRows.length) return bridgeRows;
             const keyPool = [
-                scopedStorageKey("cart"),
-                scopedStorageKey("cartItems"),
-                scopedStorageKey("checkoutCart"),
-                guestScopedStorageKey("cart"),
-                guestScopedStorageKey("cartItems"),
-                guestScopedStorageKey("checkoutCart"),
-                "cart",
-                "cartItems",
-                "checkoutCart"
+                scopedStorageKey("cartItems")
             ];
             const seen = new Set();
             let best = [];
@@ -504,7 +511,7 @@
         function loadBuyerForm() {
             const draft = read("buyerInfoDraft", null);
             const buyer = read("buyerInfo", null);
-            const user = read("currentUser", null);
+            const user = readSessionUser();
             const source = draft || buyer || user || {};
             byId("buyerName").value = source.name || source.fullName || "";
             byId("buyerPhone").value = source.phone || "";

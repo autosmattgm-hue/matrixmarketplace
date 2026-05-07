@@ -223,7 +223,7 @@
       <a href="checkout.html">Checkout</a>
       <a href="chat.html">Chat</a>
       <a class="active" href="buyers-orders.html">My Orders</a>
-      <a href="agent-page.html">Support</a>
+      <a href="matrix-market-ai.html">Support</a>
       <a href="settings.html">Settings</a>
     </nav>
     <span class="chip" id="buyerChip">Buyer: Guest</span>
@@ -545,11 +545,54 @@
         return out;
       }
 
+      function collectCandidateStorageKeys(key) {
+        const target = str(key || "");
+        if (!target) return [];
+        const keys = [];
+        const seen = new Set();
+        function push(nextKey) {
+          const value = str(nextKey || "");
+          if (!value || seen.has(value)) return;
+          seen.add(value);
+          keys.push(value);
+        }
+        push(target);
+        if (!shouldScopeKey(target)) return keys;
+        push(scopedStorageKey(target));
+        push(guestScopedStorageKey(target));
+        const suffix = "__" + target;
+        listStorageKeys().forEach(function (storageKey) {
+          if (storageKey === target) {
+            push(storageKey);
+            return;
+          }
+          if (storageKey.indexOf(BUYER_SCOPE_PREFIX) === 0 && storageKey.endsWith(suffix)) push(storageKey);
+        });
+        return keys;
+      }
+
+      function readStorageKey(storageKey, fallback) {
+        try {
+          return parse(storage().getItem(str(storageKey || "")), fallback);
+        } catch (_) {
+          return fallback;
+        }
+      }
+
       function write(key, value) {
         try {
           const target = str(key || "");
           const storageKey = shouldScopeKey(target) ? scopedStorageKey(target) : target;
           storage().setItem(storageKey, JSON.stringify(value));
+          return true;
+        } catch (_) {
+          return false;
+        }
+      }
+
+      function writeLiteral(storageKey, value) {
+        try {
+          storage().setItem(str(storageKey || ""), JSON.stringify(value));
           return true;
         } catch (_) {
           return false;
@@ -657,27 +700,32 @@
         const trustedUser = !isGuestUser(user) ? user : null;
         const buyer = read(KEYS.BUYER, null) || {};
         const bridgeOrder = readBridgeOrder();
+        const requestedOrderId = str(q.get("orderId") || (bridgeOrder && bridgeOrder.id) || "");
+        const storedOrder = requestedOrderId ? findOrderRecordById(requestedOrderId) : null;
         return {
           name: str(
             (trustedUser && (trustedUser.fullName || trustedUser.name)) ||
             buyer.fullName ||
             buyer.name ||
+            (storedOrder && (storedOrder.ownerName || storedOrder.accountName || storedOrder.buyerAccountName || storedOrder.fullName || storedOrder.name || storedOrder.buyerName || storedOrder.buyer)) ||
             (bridgeOrder && (bridgeOrder.ownerName || bridgeOrder.fullName)) ||
             ""
           ),
           email: email(
             (trustedUser && trustedUser.email) ||
             buyer.email ||
+            (storedOrder && (storedOrder.ownerEmail || storedOrder.accountEmail || storedOrder.buyerAccountEmail || storedOrder.email || storedOrder.buyerEmail)) ||
             (bridgeOrder && (bridgeOrder.ownerEmail || bridgeOrder.email)) ||
             ""
           ),
           phone: phone(
             (trustedUser && trustedUser.phone) ||
             buyer.phone ||
+            (storedOrder && (storedOrder.ownerPhone || storedOrder.accountPhone || storedOrder.buyerAccountPhone || storedOrder.phone || storedOrder.buyerPhone)) ||
             (bridgeOrder && (bridgeOrder.ownerPhone || bridgeOrder.phone)) ||
             ""
           ),
-          orderId: str(q.get("orderId") || (bridgeOrder && bridgeOrder.id) || "")
+          orderId: requestedOrderId
         };
       }
 
@@ -687,8 +735,9 @@
 
       function orderOwnedByIdentity(order) {
         const i = state.identity || {};
-        if (!order || !hasTrustedIdentity()) return false;
+        if (!order) return false;
         if (order.scopeOwned === true) return true;
+        if (!hasTrustedIdentity()) return false;
         if (order.ownerEmail || order.ownerPhone || order.ownerName) {
           if (i.email && order.ownerEmail === i.email) return true;
           if (i.phone && order.ownerPhone === i.phone) return true;
@@ -703,6 +752,7 @@
 
       function belongs(order) {
         const i = state.identity;
+        if (order && order.scopeOwned === true) return true;
         if (!i || !hasTrustedIdentity()) return false;
         return orderOwnedByIdentity(order);
       }
@@ -763,26 +813,163 @@
         return Array.from(map.values()).sort(function (a, b) { return stamp(b.placedAt) - stamp(a.placedAt); });
       }
 
-      function localOrders() {
-        const keys = [KEYS.ORDERS];
-        if (state.identity.email) keys.push("buyerOrdersByEmail:" + state.identity.email);
-        if (state.identity.phone) keys.push("buyerOrdersByPhone:" + state.identity.phone);
+      function upsertOrderInLiteralKey(storageKey, order) {
+        if (!order || typeof order !== "object") return false;
+        const rows = toArray(readStorageKey(storageKey, []));
+        const orderId = str(order.id || order.orderId || order.orderNumber || "").trim();
+        if (!orderId) return false;
+        const nextRows = rows.slice();
+        const index = nextRows.findIndex(function (row) {
+          const rowId = str((row && (row.id || row.orderId || row.orderNumber)) || "").trim();
+          return rowId && sameOrderId(rowId, orderId);
+        });
+        if (index >= 0) {
+          nextRows[index] = Object.assign({}, nextRows[index], order);
+        } else {
+          nextRows.unshift(order);
+        }
+        return writeLiteral(storageKey, nextRows);
+      }
 
+      function persistRecoveredOrderMirrors(order) {
+        if (!order || typeof order !== "object") return false;
+        const orderId = str(order.id || order.orderId || order.orderNumber || "").trim();
+        if (!orderId) return false;
+
+        const emailKey = email(order.ownerEmail || order.accountEmail || order.email || "");
+        const phoneKey = phone(order.ownerPhone || order.accountPhone || order.phone || "");
+        let saved = false;
+
+        if (emailKey) saved = upsertOrderInLiteralKey("buyerOrdersByEmail:" + emailKey, order) || saved;
+        if (phoneKey) saved = upsertOrderInLiteralKey("buyerOrdersByPhone:" + phoneKey, order) || saved;
+
+        const snapshot = {
+          id: orderId,
+          orderId: orderId,
+          fullName: str(order.fullName || order.ownerName || ""),
+          email: str(order.email || ""),
+          phone: str(order.phone || ""),
+          ownerEmail: str(order.ownerEmail || order.accountEmail || ""),
+          ownerPhone: str(order.ownerPhone || order.accountPhone || ""),
+          ownerName: str(order.ownerName || order.accountName || ""),
+          address: str(order.address || ""),
+          status: str(order.status || "pending"),
+          paymentMethod: str(order.paymentMethod || "wallet"),
+          subtotal: num(order.subtotal || 0),
+          shipping: num(order.shipping || 0),
+          discount: num(order.discount || 0),
+          total: num(order.total || 0),
+          placedAt: order.placedAt || nowIso(),
+          updatedAt: order.updatedAt || nowIso(),
+          note: str(order.note || ""),
+          items: toArray(order.cart).map(function (item) {
+            return {
+              id: str(item.id || item.productId || ""),
+              productId: str(item.productId || item.id || ""),
+              name: str(item.name || "Product"),
+              image: str(item.image || "matrixx.png"),
+              seller: str(item.seller || ""),
+              sellerEmail: str(item.sellerEmail || ""),
+              category: str(item.category || "general"),
+              quantity: Math.max(1, Math.floor(num(item.quantity || 1))),
+              unitPrice: num(item.price || 0),
+              lineTotal: num(item.price || 0) * Math.max(1, Math.floor(num(item.quantity || 1)))
+            };
+          })
+        };
+
+        const snapshotMap = readStorageKey("orderLineSnapshots", {});
+        const nextSnapshotMap = (snapshotMap && typeof snapshotMap === "object" && !Array.isArray(snapshotMap)) ? snapshotMap : {};
+        nextSnapshotMap[orderId] = snapshot;
+        saved = writeLiteral("orderLineSnapshots", nextSnapshotMap) || saved;
+        saved = writeLiteral("orderItemsById:" + orderId, snapshot) || saved;
+        return saved;
+      }
+
+      function localOrders() {
+        const keys = collectCandidateStorageKeys(KEYS.ORDERS);
+        if (state.identity.email) collectCandidateStorageKeys("buyerOrdersByEmail:" + state.identity.email).forEach(function (key) { keys.push(key); });
+        if (state.identity.phone) collectCandidateStorageKeys("buyerOrdersByPhone:" + state.identity.phone).forEach(function (key) { keys.push(key); });
+
+        const currentScopedKeys = new Set();
+        currentScopedKeys.add(scopedStorageKey(KEYS.ORDERS));
+        if (state.identity.email) currentScopedKeys.add(scopedStorageKey("buyerOrdersByEmail:" + state.identity.email));
+        if (state.identity.phone) currentScopedKeys.add(scopedStorageKey("buyerOrdersByPhone:" + state.identity.phone));
         let rows = [];
-        keys.forEach(function (key) {
-          rows = rows.concat(toArray(readScopedOnly(key, [])).map(function (entry, idx) {
-            const row = (entry && typeof entry === "object") ? Object.assign({}, entry, { scopeOwned: true }) : entry;
-            return normalizeOrder(row, idx, key + "-scoped");
-          }));
-          rows = rows.concat(toArray(readGuestScopedOnly(key, [])).map(function (entry, idx) {
-            const row = (entry && typeof entry === "object") ? Object.assign({}, entry, { scopeOwned: true }) : entry;
-            return normalizeOrder(row, idx, key + "-guest");
-          }));
-          rows = rows.concat(toArray(readLegacyOnly(key, [])).map(function (entry, idx) {
-            return normalizeOrder(entry, idx, key + "-legacy");
+        const seenKeys = new Set();
+        keys.forEach(function (storageKey) {
+          const targetKey = str(storageKey || "");
+          if (!targetKey || seenKeys.has(targetKey)) return;
+          seenKeys.add(targetKey);
+          rows = rows.concat(toArray(readStorageKey(targetKey, [])).map(function (entry, idx) {
+            const row = (entry && typeof entry === "object" && currentScopedKeys.has(targetKey))
+              ? Object.assign({}, entry, { scopeOwned: true })
+              : entry;
+            return normalizeOrder(row, idx, targetKey);
           }));
         });
         return rows;
+      }
+
+      function findOrderRecordById(orderId) {
+        const target = str(orderId || "").trim();
+        if (!target) return null;
+
+        const snapshot = findSnapshotRecord(target);
+        if (snapshot) return snapshot;
+
+        const orderKeys = collectCandidateStorageKeys(KEYS.ORDERS);
+        for (let i = 0; i < orderKeys.length; i += 1) {
+          const rows = toArray(readStorageKey(orderKeys[i], []));
+          for (let j = 0; j < rows.length; j += 1) {
+            const row = rows[j];
+            const rowId = str((row && (row.id || row.orderId || row.orderNumber)) || "");
+            if (sameOrderId(rowId, target)) return row;
+          }
+        }
+
+        const queues = read(KEYS.QUEUE, {});
+        if (queues && typeof queues === "object") {
+          const queueKeys = Object.keys(queues);
+          for (let i = 0; i < queueKeys.length; i += 1) {
+            const entries = toArray(queues[queueKeys[i]]);
+            for (let j = 0; j < entries.length; j += 1) {
+              const row = (typeof entries[j] === "string" ? parse(entries[j], {}) : entries[j]) || {};
+              const rowId = str(row.orderId || row.id || row.orderNumber || "");
+              if (sameOrderId(rowId, target)) return row;
+            }
+          }
+        }
+
+        const purchases = toArray(read(KEYS.PURCHASES, []));
+        for (let i = 0; i < purchases.length; i += 1) {
+          const row = (typeof purchases[i] === "string" ? parse(purchases[i], {}) : purchases[i]) || {};
+          const rowId = str(row.orderId || row.id || row.orderNumber || "");
+          if (sameOrderId(rowId, target)) return row;
+        }
+
+        return null;
+      }
+
+      function findSnapshotRecord(orderId) {
+        const target = str(orderId || "").trim();
+        if (!target) return null;
+
+        const directKeys = collectCandidateStorageKeys("orderItemsById:" + target);
+        for (let i = 0; i < directKeys.length; i += 1) {
+          const raw = readStorageKey(directKeys[i], null);
+          if (!raw) continue;
+          const rawId = str((raw && (raw.id || raw.orderId || raw.orderNumber)) || target);
+          if (sameOrderId(rawId, target)) return raw;
+        }
+
+        const snapshotKeys = collectCandidateStorageKeys(KEYS.ORDER_SNAPSHOTS);
+        for (let i = 0; i < snapshotKeys.length; i += 1) {
+          const map = readStorageKey(snapshotKeys[i], null);
+          const hit = byOrderKey(map, target);
+          if (hit) return hit;
+        }
+        return null;
       }
 
       function recoverOwnedOrderIdsFromSnapshots() {
@@ -879,10 +1066,7 @@
         const target = str(orderId || "").trim();
         if (!target) return null;
 
-        const map = read(KEYS.ORDER_SNAPSHOTS, {});
-        const fromMap = byOrderKey(map, target);
-        const fromDirect = read("orderItemsById:" + target, null);
-        const raw = fromDirect != null ? fromDirect : fromMap;
+        const raw = findSnapshotRecord(target);
         if (!raw) return null;
 
         const parsed = typeof raw === "string" ? parse(raw, null) : raw;
@@ -1353,7 +1537,7 @@
         });
         write(KEYS.SUPPORT, tickets);
         showNote("Complaint submitted. Redirecting to support...", "ok");
-        setTimeout(function () { window.location.href = "agent-page.html"; }, 700);
+        setTimeout(function () { window.location.href = "matrix-market-ai.html"; }, 700);
       }
 
       function exportOrderJson(order) {
@@ -1539,6 +1723,11 @@
           const recovered = buildOrderFromSnapshot(order.id) || buildOrderFromQueue(order.id) || buildOrderFromPurchases(order.id);
           if (!recovered || !Array.isArray(recovered.cart) || !recovered.cart.length) return order;
           return Object.assign({}, recovered, order, { cart: recovered.cart.slice() });
+        });
+
+        merged.forEach(function (order) {
+          if (!Array.isArray(order.cart) || !order.cart.length) return;
+          persistRecoveredOrderMirrors(order);
         });
 
         state.all = merged.filter(belongs);

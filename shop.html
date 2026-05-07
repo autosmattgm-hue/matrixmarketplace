@@ -809,6 +809,9 @@
             cachedUserScope = resolveUserScopeToken();
             return cachedUserScope;
         }
+        function isGuestScope() {
+            return userScopeToken() === "guest";
+        }
         function shouldScopeKey(key) {
             return SCOPED_KEYS.has(String(key || ""));
         }
@@ -823,12 +826,12 @@
             if (shouldScopeKey(key)) {
                 const scoped = parseStoredJson(store.getItem(scopedStorageKey(key)), null);
                 if (scoped != null) return scoped;
-                if (LEGACY_READ_THROUGH_KEYS.has(String(key || ""))) {
+                if (LEGACY_READ_THROUGH_KEYS.has(String(key || "")) && isGuestScope()) {
                     const guestScoped = parseStoredJson(store.getItem(guestScopedStorageKey(key)), null);
                     if (guestScoped != null) return guestScoped;
                     return parseStoredJson(store.getItem(key), fallback);
                 }
-                if (userScopeToken() !== "guest") return fallback;
+                if (!isGuestScope()) return fallback;
             }
             return parseStoredJson(store.getItem(key), fallback);
         }

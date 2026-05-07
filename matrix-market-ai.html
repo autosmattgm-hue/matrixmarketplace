@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
+    <meta name="description" content="Matrix Market AI is a conversational copilot for shopping, seller tools, checkout, orders, support, and account help across MatrixMarket.">
+    <title>Matrix Market AI</title>
+    <link rel="icon" type="image/x-icon" href="matrixx.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap">
+    <script defer src="firebase-online-storage.js?v=20260224c"></script>
+    <style>
+        :root {
+            --bg: #eef2f1;
+            --panel: #f8fbfa;
+            --sidebar: #101917;
+            --sidebar-soft: #162220;
+            --surface: #ffffff;
+            --surface-soft: #f2f7f5;
+            --line: #d7e2dd;
+            --text: #13221e;
+            --muted: #667a73;
+            --muted-strong: #a6bab2;
+            --brand: #0f8a78;
+            --brand-deep: #0b6b5d;
+            --accent: #ff915b;
+            --good: #1f9c6b;
+            --warn: #bb6a2e;
+            --shadow-lg: 0 28px 70px rgba(10, 22, 18, 0.14);
+            --shadow-md: 0 14px 34px rgba(10, 22, 18, 0.08);
+            --radius-xl: 28px;
+            --radius-lg: 22px;
+            --radius-md: 16px;
+            --radius-sm: 12px;
+        }
+
+        * { box-sizing: border-box; }
+        html {
+            -webkit-text-size-adjust: 100%;
+            text-size-adjust: 100%;
+            color-scheme: light;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Manrope", "Segoe UI", sans-serif;
+            color: var(--text);
+            background:
+                radial-gradient(960px 420px at 0% 0%, rgba(15, 138, 120, 0.10), transparent),
+                radial-gradient(860px 420px at 100% 0%, rgba(255, 145, 91, 0.10), transparent),
+                linear-gradient(180deg, #f3f7f5 0, #eef2f1 100%);
+        }
+
+        a { color: inherit; }
+        button, input, textarea { font: inherit; }
+
+        .mm-app {
+            min-height: 100vh;
+            display: grid;
+            grid-template-columns: 310px minmax(0, 1fr);
+            gap: 1rem;
+            padding: 1rem;
+        }
+
+        .mm-sidebar {
+            position: sticky;
+            top: 1rem;
+            align-self: start;
+            min-height: calc(100vh - 2rem);
+            border-radius: var(--radius-xl);
+            padding: 1rem;
+            background:
+                linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 28%),
+                linear-gradient(180deg, #0f1715 0, #15211e 100%);
+            color: #f5fbf8;
+            box-shadow: var(--shadow-lg);
+            display: grid;
+            gap: 1rem;
+        }
+
+        .mm-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.9rem;
+            text-decoration: none;
+        }
+
+        .mm-brand img {
+            width: 3rem;
+            height: 3rem;
+            border-radius: 16px;
+            object-fit: cover;
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .mm-brand-copy {
+            display: grid;
+            gap: 0.15rem;
+        }
+
+        .mm-brand-copy strong {
+            font-size: 1.08rem;
+            letter-spacing: -0.03em;
+        }
+
+        .mm-brand-copy span {
+            color: var(--muted-strong);
+            font-size: 0.74rem;
+            font-weight: 800;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+        }
+
+        .mm-sidebar-card {
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: var(--radius-lg);
+            padding: 0.95rem;
+            background: rgba(255, 255, 255, 0.05);
+            display: grid;
+            gap: 0.75rem;
+        }
+
+        .mm-sidebar-card h2,
+        .mm-sidebar-card h3 {
+            margin: 0;
+            font-size: 0.98rem;
+            letter-spacing: -0.03em;
+        }
+
+        .mm-sidebar-card p,
+        .mm-sidebar-card li {
+            margin: 0;
+            color: var(--muted-strong);
+            font-size: 0.88rem;
+            line-height: 1.55;
+        }
+
+        .mm-sidebar-card ul {
+            margin: 0;
+            padding-left: 1rem;
+            display: grid;
+            gap: 0.45rem;
+        }
+
+        .mm-stack {
+            display: grid;
+            gap: 0.65rem;
+        }
+
+        .mm-btn,
+        .mm-link-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.55rem;
+            min-height: 46px;
+            padding: 0.78rem 1rem;
+            border-radius: 16px;
+            border: 1px solid transparent;
+            text-decoration: none;
+            cursor: pointer;
+            transition: 180ms ease;
+            font-weight: 800;
+        }
+
+        .mm-btn:hover,
+        .mm-link-btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .mm-btn.primary,
+        .mm-link-btn.primary {
+            background: linear-gradient(135deg, var(--brand), var(--brand-deep));
+            color: #fff;
+            box-shadow: 0 12px 30px rgba(15, 138, 120, 0.26);
+        }
+
+        .mm-btn.soft,
+        .mm-link-btn.soft {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.12);
+            color: #f5fbf8;
+        }
+
+        .mm-btn.ghost,
+        .mm-link-btn.ghost {
+            background: var(--surface-soft);
+            border-color: var(--line);
+            color: var(--text);
+        }
+
+        .mm-pills,
+        .mm-toolbar,
+        .mm-composer-actions,
+        .mm-prompt-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.7rem;
+        }
+
+        .mm-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            padding: 0.5rem 0.75rem;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #f5fbf8;
+            font-size: 0.8rem;
+            font-weight: 800;
+        }
+
+        .mm-pill.light {
+            background: rgba(15, 138, 120, 0.08);
+            border-color: rgba(15, 138, 120, 0.12);
+            color: var(--brand-deep);
+        }
+
+        .mm-pill.good {
+            color: var(--good);
+            background: rgba(31, 156, 107, 0.12);
+            border-color: rgba(31, 156, 107, 0.16);
+        }
+
+        .mm-pill.warn {
+            color: var(--warn);
+            background: rgba(187, 106, 46, 0.10);
+            border-color: rgba(187, 106, 46, 0.16);
+        }
+
+        .mm-main {
+            min-width: 0;
+            border-radius: var(--radius-xl);
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.68);
+            backdrop-filter: blur(16px);
+            box-shadow: var(--shadow-md);
+            display: grid;
+            grid-template-rows: auto minmax(0, 1fr) auto;
+            gap: 1rem;
+        }
+
+        .mm-topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 1rem;
+            padding: 0.3rem 0.2rem 0;
+        }
+
+        .mm-topbar h1 {
+            margin: 0;
+            font-size: clamp(1.7rem, 3vw, 2.35rem);
+            letter-spacing: -0.05em;
+        }
+
+        .mm-topbar p {
+            margin: 0.45rem 0 0;
+            color: var(--muted);
+            max-width: 760px;
+            line-height: 1.6;
+        }
+
+        .mm-stage {
+            min-height: 0;
+            border: 1px solid rgba(19, 34, 30, 0.08);
+            border-radius: var(--radius-xl);
+            background:
+                radial-gradient(560px 220px at 50% 0%, rgba(15, 138, 120, 0.05), transparent),
+                linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(245, 249, 247, 0.98));
+            display: grid;
+            grid-template-rows: auto minmax(0, 1fr);
+            overflow: hidden;
+        }
+
+        .mm-welcome {
+            padding: 1.25rem 1.25rem 0;
+            display: grid;
+            gap: 0.95rem;
+        }
+
+        .mm-eyebrow {
+            margin: 0;
+            color: var(--brand);
+            font-size: 0.78rem;
+            font-weight: 900;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+        }
+
+        .mm-welcome h2 {
+            margin: 0;
+            font-size: clamp(2rem, 4vw, 3.1rem);
+            line-height: 0.98;
+            letter-spacing: -0.06em;
+            max-width: 12ch;
+        }
+
+        .mm-welcome p {
+            margin: 0;
+            color: var(--muted);
+            max-width: 780px;
+            line-height: 1.65;
+        }
+
+        .mm-prompt-grid button {
+            flex: 1 1 220px;
+            text-align: left;
+            justify-content: flex-start;
+            min-height: 94px;
+            padding: 1rem;
+            border-radius: 20px;
+            border: 1px solid var(--line);
+            background: #ffffff;
+            color: var(--text);
+            box-shadow: 0 12px 30px rgba(10, 22, 18, 0.05);
+            cursor: pointer;
+        }
+
+        .mm-prompt-grid button strong {
+            display: block;
+            margin-bottom: 0.3rem;
+            font-size: 0.95rem;
+        }
+
+        .mm-prompt-grid button span {
+            display: block;
+            color: var(--muted);
+            font-size: 0.85rem;
+            line-height: 1.5;
+        }
+
+        .mm-chat-feed {
+            min-height: 0;
+            overflow: auto;
+            padding: 1.25rem;
+            display: grid;
+            gap: 1rem;
+        }
+
+        .mm-message {
+            display: grid;
+            gap: 0.34rem;
+            justify-items: start;
+        }
+
+        .mm-message.user {
+            justify-items: end;
+        }
+
+        .mm-message-label {
+            color: var(--muted);
+            font-size: 0.72rem;
+            font-weight: 900;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+        }
+
+        .mm-bubble {
+            max-width: min(820px, 100%);
+            border-radius: 22px;
+            padding: 1rem 1.05rem;
+            border: 1px solid var(--line);
+            background: #fff;
+            box-shadow: 0 12px 30px rgba(10, 22, 18, 0.05);
+            line-height: 1.68;
+            white-space: normal;
+            word-break: break-word;
+        }
+
+        .mm-message.user .mm-bubble {
+            background: linear-gradient(135deg, rgba(15, 138, 120, 0.13), rgba(15, 138, 120, 0.06));
+            border-color: rgba(15, 138, 120, 0.18);
+        }
+
+        .mm-message.system .mm-bubble {
+            background: #f5f8f7;
+            color: var(--muted);
+        }
+
+        .mm-composer-wrap {
+            display: grid;
+            gap: 0.55rem;
+        }
+
+        .mm-composer {
+            border: 1px solid rgba(19, 34, 30, 0.1);
+            border-radius: 26px;
+            background: #fff;
+            padding: 0.9rem;
+            box-shadow: var(--shadow-md);
+            display: grid;
+            gap: 0.8rem;
+        }
+
+        .mm-composer textarea {
+            width: 100%;
+            min-height: 94px;
+            max-height: 240px;
+            resize: vertical;
+            border: none;
+            outline: none;
+            background: transparent;
+            color: var(--text);
+            line-height: 1.65;
+            font-size: 1rem;
+        }
+
+        .mm-composer textarea::placeholder {
+            color: #8ca098;
+        }
+
+        .mm-composer-actions {
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .mm-meta {
+            color: var(--muted);
+            font-size: 0.86rem;
+            line-height: 1.55;
+        }
+
+        .mm-history-list {
+            display: grid;
+            gap: 0.55rem;
+        }
+
+        .mm-history-list button {
+            width: 100%;
+            text-align: left;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.04);
+            color: #f5fbf8;
+            padding: 0.8rem 0.85rem;
+            cursor: pointer;
+            line-height: 1.45;
+        }
+
+        .mm-history-list button span {
+            display: block;
+            color: var(--muted-strong);
+            font-size: 0.77rem;
+            margin-top: 0.25rem;
+        }
+
+        .mm-divider {
+            height: 1px;
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .mm-inline-link {
+            color: var(--brand-deep);
+            font-weight: 800;
+            text-decoration: none;
+        }
+
+        .is-hidden {
+            display: none !important;
+        }
+
+        @media (max-width: 1180px) {
+            .mm-app {
+                grid-template-columns: 1fr;
+            }
+
+            .mm-sidebar {
+                position: static;
+                min-height: auto;
+            }
+        }
+
+        @media (max-width: 760px) {
+            .mm-app,
+            .mm-main {
+                padding: 0.85rem;
+            }
+
+            .mm-main,
+            .mm-sidebar,
+            .mm-stage,
+            .mm-composer {
+                border-radius: 22px;
+            }
+
+            .mm-topbar {
+                flex-direction: column;
+            }
+
+            .mm-chat-feed,
+            .mm-welcome {
+                padding: 1rem;
+            }
+
+            .mm-prompt-grid button {
+                min-height: 84px;
+            }
+
+            .mm-composer textarea {
+                min-height: 86px;
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="mm-app">
+        <aside class="mm-sidebar" aria-label="Matrix Market AI navigation">
+            <a class="mm-brand" href="index.html" aria-label="MatrixMarket home">
+                <img src="matrixx.png" alt="" width="48" height="48" decoding="async" loading="eager">
+                <span class="mm-brand-copy">
+                    <strong>Matrix Market AI</strong>
+                    <span>Website Copilot</span>
+                </span>
+            </a>
+
+            <div class="mm-stack">
+                <button class="mm-btn primary" id="newChatBtn" type="button">New chat</button>
+                <a class="mm-link-btn soft" href="index.html">Back to home</a>
+            </div>
+
+            <section class="mm-sidebar-card">
+                <h2>Session</h2>
+                <div class="mm-pills">
+                    <span class="mm-pill" id="serverStatusPill">Checking server...</span>
+                    <span class="mm-pill" id="userStatusPill">Guest session</span>
+                </div>
+                <p id="sessionSummary">Ask about products, checkout, orders, seller tools, payments, support, or where to find something on the website.</p>
+            </section>
+
+            <section class="mm-sidebar-card">
+                <h3>Recent prompts</h3>
+                <div class="mm-history-list" id="historyList">
+                    <button type="button" data-prompt="How do I place an order from home page to checkout?">How do I place an order from home page to checkout?<span>Starter</span></button>
+                    <button type="button" data-prompt="How does seller payment approval affect wallet balance?">How does seller payment approval affect wallet balance?<span>Starter</span></button>
+                </div>
+            </section>
+
+            <section class="mm-sidebar-card">
+                <h3>Website shortcuts</h3>
+                <div class="mm-stack">
+                    <a class="mm-link-btn soft" href="shop.html">Shop products</a>
+                    <a class="mm-link-btn soft" href="buyers-orders.html">My orders</a>
+                    <a class="mm-link-btn soft" href="settings.html">Settings</a>
+                    <button class="mm-btn soft" id="openSupportBtnSide" type="button">Support chat</button>
+                </div>
+            </section>
+
+            <section class="mm-sidebar-card">
+                <h3>Server tools</h3>
+                <p id="serverNote">If the AI server is offline, Matrix Market AI falls back to built-in website guidance so the page still helps users navigate.</p>
+                <div class="mm-divider"></div>
+                <p><strong>Endpoint</strong></p>
+                <p id="serverEndpoint">http://127.0.0.1:4050</p>
+                <div class="mm-stack">
+                    <button class="mm-btn soft" id="refreshServerBtn" type="button">Refresh server</button>
+                    <button class="mm-btn soft" id="copyServerBtn" type="button">Copy server URL</button>
+                    <button class="mm-btn soft" id="insertRunPromptBtn" type="button">How do I run it?</button>
+                </div>
+            </section>
+        </aside>
+
+        <main class="mm-main">
+            <header class="mm-topbar">
+                <div>
+                    <p class="mm-eyebrow">Chat-style workspace</p>
+                    <h1>How can Matrix Market AI help today?</h1>
+                    <p>Use it like a store copilot. It can guide buyers, sellers, and admins across product flow, cart, checkout, wallet balance, support, and order tracking.</p>
+                </div>
+                <div class="mm-toolbar">
+                    <span class="mm-pill light">Coverage: Store workflow</span>
+                    <a class="mm-link-btn ghost" href="buyers-orders.html">Orders</a>
+                    <button class="mm-btn ghost" id="clearChatBtn" type="button">Clear chat</button>
+                    <button class="mm-btn ghost" id="openSupportBtn" type="button">Open support</button>
+                </div>
+            </header>
+
+            <section class="mm-stage">
+                <div class="mm-welcome" id="welcomePanel">
+                    <p class="mm-eyebrow">MatrixMarket Copilot</p>
+                    <h2>Ask anything about the website flow.</h2>
+                    <p>Need help with product selection, wallet top-up, seller approval, checkout, orders, support, or where a feature lives? Start with one of these focused prompts or type your own message below.</p>
+                    <div class="mm-prompt-grid">
+                        <button type="button" data-prompt="How do products move from the home page into cart, checkout, and orders?">
+                            <strong>Buyer journey</strong>
+                            <span>Trace the full path from product discovery to order confirmation.</span>
+                        </button>
+                        <button type="button" data-prompt="Why would wallet balance stay at 0.00 GMD after admin approves a payment?">
+                            <strong>Wallet help</strong>
+                            <span>Explain approval, balance sync, and where to verify the update.</span>
+                        </button>
+                        <button type="button" data-prompt="How do I use the seller dashboard, products page, and order queue correctly?">
+                            <strong>Seller tools</strong>
+                            <span>Get a guided walkthrough of seller setup and daily workflow.</span>
+                        </button>
+                        <button type="button" data-prompt="What should I do if an order disappears after I refresh the page?">
+                            <strong>Order recovery</strong>
+                            <span>Understand where orders are stored and how the website tries to rebuild them.</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mm-chat-feed" id="chatFeed" aria-live="polite" aria-label="Matrix Market AI conversation"></div>
+            </section>
+
+            <form class="mm-composer-wrap" id="chatForm">
+                <div class="mm-composer">
+                    <textarea id="chatInput" placeholder="Message Matrix Market AI about products, checkout, orders, seller tools, support, wallet balance, or any page on the website." required></textarea>
+                    <div class="mm-composer-actions">
+                        <span class="mm-meta" id="composerMeta">When the live AI server is available, replies come from the backend. If it is offline, this page switches to built-in guide mode automatically.</span>
+                        <button class="mm-btn primary" id="chatComposer" type="submit">Send message</button>
+                    </div>
+                </div>
+                <div class="mm-meta">Quick tip: you can ask for the exact page to open next, like <span class="mm-inline-link">cart.html</span>, <span class="mm-inline-link">checkout.html</span>, <span class="mm-inline-link">buyers-orders.html</span>, or <span class="mm-inline-link">settings.html</span>.</div>
+            </form>
+        </main>
+    </div>
+
+    <script>
+        (function () {
+            const STORAGE_KEY = "matrixmarket_ai_chat_v2";
+            const SERVER_URL_KEY = "MM_AI_SERVER_URL";
+            const DEFAULT_SERVER = "http://127.0.0.1:4050";
+            const state = {
+                messages: [],
+                sending: false,
+                user: null,
+                server: DEFAULT_SERVER,
+                mode: "server"
+            };
+
+            function byId(id) { return document.getElementById(id); }
+            function str(value) { return String(value == null ? "" : value).trim(); }
+            function esc(value) {
+                return String(value == null ? "" : value)
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#39;");
+            }
+            function nl(value) {
+                return esc(value).replace(/\n/g, "<br>");
+            }
+
+            function getStorage() {
+                if (window.MMStorage && typeof window.MMStorage.getItem === "function") return window.MMStorage;
+                try {
+                    if (window.localStorage && typeof window.localStorage.getItem === "function") return window.localStorage;
+                } catch (_) {}
+                return {
+                    getItem: function () { return null; },
+                    setItem: function () {},
+                    removeItem: function () {}
+                };
+            }
+
+            function readJson(key, fallback) {
+                try {
+                    const raw = getStorage().getItem(key);
+                    if (!raw) return fallback;
+                    const parsed = JSON.parse(raw);
+                    return parsed == null ? fallback : parsed;
+                } catch (_) {
+                    return fallback;
+                }
+            }
+
+            function writeJson(key, value) {
+                try {
+                    getStorage().setItem(key, JSON.stringify(value));
+                } catch (_) {}
+            }
+
+            function setStatus(text, tone) {
+                const pill = byId("serverStatusPill");
+                if (!pill) return;
+                pill.textContent = text;
+                pill.className = "mm-pill" + (tone ? " " + tone : "");
+            }
+
+            function defaultMessages() {
+                return [{
+                    role: "assistant",
+                    content: "I’m Matrix Market AI. I can guide you through home, shop, cart, checkout, orders, settings, seller tools, payment approval, and support without making you guess which page comes next."
+                }];
+            }
+
+            function saveConversation() {
+                writeJson(STORAGE_KEY, state.messages.slice(-40));
+            }
+
+            function toggleWelcome() {
+                const welcome = byId("welcomePanel");
+                if (!welcome) return;
+                const hasUserMessage = state.messages.some(function (message) {
+                    return str(message && message.role).toLowerCase() === "user";
+                });
+                welcome.classList.toggle("is-hidden", hasUserMessage);
+            }
+
+            function renderMessages() {
+                const box = byId("chatFeed");
+                if (!box) return;
+                if (!Array.isArray(state.messages) || !state.messages.length) {
+                    state.messages = defaultMessages();
+                }
+                box.innerHTML = state.messages.map(function (message) {
+                    const role = str(message && message.role || "assistant").toLowerCase();
+                    const label = role === "user" ? "You" : (role === "assistant" ? "Matrix Market AI" : "System");
+                    return '<article class="mm-message ' + esc(role) + '">' +
+                        '<div class="mm-message-label">' + esc(label) + '</div>' +
+                        '<div class="mm-bubble">' + nl(message && message.content || "") + '</div>' +
+                        '</article>';
+                }).join("");
+                box.scrollTop = box.scrollHeight;
+                toggleWelcome();
+                renderHistory();
+            }
+
+            function pushMessage(role, content) {
+                state.messages.push({ role: role, content: str(content) });
+                saveConversation();
+                renderMessages();
+            }
+
+            function renderHistory() {
+                const host = byId("historyList");
+                if (!host) return;
+                const prompts = state.messages
+                    .filter(function (message) { return str(message && message.role).toLowerCase() === "user"; })
+                    .map(function (message) { return str(message && message.content); })
+                    .filter(Boolean)
+                    .slice(-6)
+                    .reverse();
+
+                if (!prompts.length) {
+                    host.innerHTML = '<button type="button" data-prompt="How do I place an order from home page to checkout?">How do I place an order from home page to checkout?<span>Starter</span></button>' +
+                        '<button type="button" data-prompt="How does seller payment approval affect wallet balance?">How does seller payment approval affect wallet balance?<span>Starter</span></button>';
+                    bindPromptButtons(host);
+                    return;
+                }
+
+                host.innerHTML = prompts.map(function (prompt, index) {
+                    const label = index === 0 ? "Latest" : "Recent";
+                    return '<button type="button" data-prompt="' + esc(prompt) + '">' + esc(prompt) + '<span>' + label + '</span></button>';
+                }).join("");
+                bindPromptButtons(host);
+            }
+
+            function bindPromptButtons(scope) {
+                (scope || document).querySelectorAll("[data-prompt]").forEach(function (button) {
+                    if (button.dataset.mmBound === "1") return;
+                    button.dataset.mmBound = "1";
+                    button.addEventListener("click", function () {
+                        const prompt = str(button.getAttribute("data-prompt"));
+                        byId("chatInput").value = prompt;
+                        byId("chatInput").focus();
+                    });
+                });
+            }
+
+            function loadUser() {
+                state.user = readJson("currentUser", null) || readJson("loggedInUser", null) || readJson("currentSeller", null) || null;
+                const name = str(state.user && (state.user.fullName || state.user.name || state.user.username));
+                const isSeller = !!(state.user && state.user.isSeller);
+                const role = isSeller ? "Seller" : "Buyer";
+                byId("userStatusPill").textContent = name ? (role + ": " + name) : "Guest session";
+                byId("sessionSummary").textContent = name
+                    ? ("Signed in as " + name + ". Ask for role-specific help across " + (isSeller ? "seller tools, products, payouts, and orders." : "shopping, cart, checkout, balance, and orders."))
+                    : "You are browsing as a guest. The AI can still explain the website flow and direct you to the right page.";
+            }
+
+            function openSupport() {
+                try {
+                    getStorage().setItem("chatWith", "Support");
+                } catch (_) {}
+                window.location.href = "chat.html?seller=" + encodeURIComponent("Support");
+            }
+
+            async function refreshServerStatus() {
+                const url = state.server.replace(/\/+$/, "");
+                byId("serverEndpoint").textContent = url;
+                try {
+                    const response = await fetch(url + "/health", { headers: { "Accept": "application/json" } });
+                    if (!response.ok) throw new Error("HTTP " + response.status);
+                    const data = await response.json();
+                    const ready = !!(data && data.keyConfigured);
+                    state.mode = ready ? "server" : "guide";
+                    setStatus(ready ? "AI server online" : "Guide mode active", ready ? "good" : "warn");
+                    byId("serverNote").textContent = ready
+                        ? "Live backend is connected and ready to answer MatrixMarket questions."
+                        : "Server is reachable but the external AI key is missing, so Matrix Market AI will stay in built-in guide mode.";
+                } catch (_) {
+                    state.mode = "guide";
+                    setStatus("Guide mode active", "warn");
+                    byId("serverNote").textContent = "Live server is offline. Built-in guide mode will still explain the MatrixMarket flow and point users to the right page.";
+                }
+            }
+
+            function localGuideReply(prompt) {
+                const text = str(prompt).toLowerCase();
+                const name = str(state.user && (state.user.fullName || state.user.name || state.user.username));
+                const opener = name ? ("Here’s the clearest path for you, " + name + ":") : "Here’s the clearest path:";
+
+                if (text.includes("wallet") || text.includes("balance") || text.includes("payment") || text.includes("deposit") || text.includes("top up")) {
+                    return opener + "\n\n1. Open settings to confirm the payment request was created.\n2. Check the admin payment approval flow and make sure the request stayed approved.\n3. Return to the home page and let the balance chip refresh from the approved payment mirror.\n4. If it still looks wrong, compare the buyer email on the payment request with the signed-in account email.\n\nBest pages: settings.html, admin-accept-payment.html, admin-users.html, index.html.";
+                }
+
+                if (text.includes("order") || text.includes("checkout") || text.includes("cart")) {
+                    return opener + "\n\n1. Products should move from index.html or shop.html into cart.html.\n2. cart.html prepares the selected products for checkout.html.\n3. checkout.html places the order and writes buyer-facing order records.\n4. buyers-orders.html rebuilds and displays those saved order records after refresh.\n\nBest pages: cart.html, checkout.html, buyers-orders.html, chat.html for support.";
+                }
+
+                if (text.includes("seller") || text.includes("dashboard") || text.includes("product") || text.includes("subscription")) {
+                    return opener + "\n\nSeller flow usually starts with seller-login.html, then the dashboard, product management, order queue, payouts, and support tools. If products are missing, check seller subscription state, stock, and visibility. If orders are missing, inspect the seller queue and buyer orders together.\n\nBest pages: seller-login.html, dashboard.html, seller-products.html, seller-orders.html, settings.html.";
+                }
+
+                if (text.includes("support") || text.includes("complaint") || text.includes("refund") || text.includes("issue")) {
+                    return opener + "\n\nUse chat support for direct follow-up, and use buyers-orders.html when the issue is tied to a specific order. If it is a payment problem, settings.html plus the admin payment page are the key places to verify status.\n\nBest pages: chat.html, buyers-orders.html, settings.html.";
+                }
+
+                return opener + "\n\nI can help you with page-to-page navigation, buyer flow, seller tools, payment approval, wallet balance, orders, and support. Ask me in a direct way, for example:\n- How do products move from home to orders?\n- Why is the wallet balance not updating?\n- Which page should a seller use next?\n- Where do I report an order problem?";
+            }
+
+            function conversationPayload() {
+                return state.messages
+                    .filter(function (message) {
+                        const role = str(message && message.role).toLowerCase();
+                        return role === "user" || role === "assistant";
+                    })
+                    .slice(-12)
+                    .map(function (message) {
+                        return {
+                            role: str(message.role || "assistant").toLowerCase(),
+                            content: str(message.content)
+                        };
+                    });
+            }
+
+            async function requestServerReply(prompt) {
+                const server = state.server.replace(/\/+$/, "");
+                const response = await fetch(server + "/api/ai/chat", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Accept": "application/json"
+                    },
+                    body: JSON.stringify({
+                        messages: conversationPayload(),
+                        userContext: {
+                            name: str(state.user && (state.user.fullName || state.user.name || state.user.username)),
+                            email: str(state.user && state.user.email),
+                            role: state.user && state.user.isSeller ? "seller" : "buyer"
+                        },
+                        pageContext: {
+                            page: "matrix-market-ai.html",
+                            url: window.location.href,
+                            referrer: document.referrer || ""
+                        }
+                    })
+                });
+
+                const data = await response.json().catch(function () { return {}; });
+                if (!response.ok) {
+                    throw new Error(str(data && (data.error || data.message)) || ("HTTP " + response.status));
+                }
+                return str(data.reply || "");
+            }
+
+            async function sendMessage(text) {
+                const content = str(text);
+                if (!content || state.sending) return;
+                state.sending = true;
+                byId("chatInput").disabled = true;
+                byId("chatComposer").disabled = true;
+                pushMessage("user", content);
+                byId("composerMeta").textContent = "Thinking...";
+
+                try {
+                    let reply = "";
+                    if (state.mode === "server") {
+                        reply = await requestServerReply(content);
+                    } else {
+                        reply = localGuideReply(content);
+                    }
+                    if (!reply) reply = localGuideReply(content);
+                    pushMessage("assistant", reply);
+                    byId("composerMeta").textContent = state.mode === "server"
+                        ? "Live AI answered from the MatrixMarket backend."
+                        : "Built-in guide mode answered while the live server is offline.";
+                } catch (_) {
+                    state.mode = "guide";
+                    setStatus("Guide mode active", "warn");
+                    pushMessage("assistant", localGuideReply(content));
+                    byId("composerMeta").textContent = "Live server was unavailable, so Matrix Market AI answered in built-in guide mode.";
+                } finally {
+                    state.sending = false;
+                    byId("chatInput").disabled = false;
+                    byId("chatComposer").disabled = false;
+                    byId("chatInput").focus();
+                }
+            }
+
+            function restoreConversation() {
+                state.messages = readJson(STORAGE_KEY, defaultMessages());
+                if (!Array.isArray(state.messages) || !state.messages.length) {
+                    state.messages = defaultMessages();
+                }
+                renderMessages();
+            }
+
+            function bind() {
+                byId("chatForm").addEventListener("submit", function (event) {
+                    event.preventDefault();
+                    const input = byId("chatInput");
+                    const text = input.value;
+                    input.value = "";
+                    sendMessage(text);
+                });
+
+                byId("newChatBtn").addEventListener("click", function () {
+                    state.messages = defaultMessages();
+                    saveConversation();
+                    renderMessages();
+                    byId("composerMeta").textContent = "Started a fresh Matrix Market AI chat.";
+                    byId("chatInput").focus();
+                });
+
+                byId("clearChatBtn").addEventListener("click", function () {
+                    state.messages = defaultMessages();
+                    saveConversation();
+                    renderMessages();
+                    byId("composerMeta").textContent = "Chat cleared.";
+                });
+
+                byId("openSupportBtn").addEventListener("click", openSupport);
+                byId("openSupportBtnSide").addEventListener("click", openSupport);
+                byId("refreshServerBtn").addEventListener("click", refreshServerStatus);
+
+                byId("copyServerBtn").addEventListener("click", function () {
+                    const target = state.server.replace(/\/+$/, "");
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(target).then(function () {
+                            byId("composerMeta").textContent = "Server URL copied: " + target;
+                        }).catch(function () {
+                            byId("composerMeta").textContent = "Server URL: " + target;
+                        });
+                    } else {
+                        byId("composerMeta").textContent = "Server URL: " + target;
+                    }
+                });
+
+                byId("insertRunPromptBtn").addEventListener("click", function () {
+                    byId("chatInput").value = "How do I run the MatrixMarket AI server locally?";
+                    byId("chatInput").focus();
+                });
+
+                bindPromptButtons(document);
+            }
+
+            function start() {
+                state.server = str(readJson(SERVER_URL_KEY, DEFAULT_SERVER)) || DEFAULT_SERVER;
+                loadUser();
+                restoreConversation();
+                bind();
+                refreshServerStatus();
+            }
+
+            window.addEventListener("load", function () {
+                const ready = window.MMStorage && window.MMStorage.ready;
+                if (ready && typeof ready.then === "function") {
+                    ready.finally(start);
+                    return;
+                }
+                start();
+            });
+        }());
+    </script>
+    <script defer src="sw-register.js?v=20260228a"></script>
+    <script defer src="site-performance.js?v=20260226a"></script>
+</body>
+</html>
