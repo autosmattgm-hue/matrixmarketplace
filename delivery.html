@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Seller Delivery Board - MatrixMarket</title>
+    <link rel="stylesheet" href="seller-layout.css" />
+    <link rel="stylesheet" href="upgrade.css" />
+    <style>
+        .delivery-shell {
+            width: min(1220px, 100% - 1.2rem);
+            margin: 1rem auto 1.4rem;
+            display: grid;
+            gap: 0.8rem;
+        }
+
+        .summary-grid {
+            display: grid;
+            gap: 0.7rem;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+
+        .summary-card {
+            border: 1px solid var(--sel-border);
+            border-radius: 12px;
+            background: rgba(2, 6, 23, 0.52);
+            padding: 0.7rem;
+        }
+
+        .summary-card .label {
+            color: var(--sel-muted);
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .summary-card .value {
+            margin-top: 0.25rem;
+            font-size: 1.25rem;
+            font-weight: 800;
+        }
+
+        .contact-note {
+            color: var(--sel-muted);
+            font-size: 0.82rem;
+        }
+
+        @media (max-width: 980px) {
+            .summary-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+    <script src="firebase-online-storage.js"></script>
+</head>
+<body class="seller-page">
+    <div id="sellerHeader"></div>
+
+    <main class="delivery-shell">
+        <section class="seller-titlebar">
+            <h1>Delivery Board</h1>
+            <div class="seller-actions">
+                <button class="btn-sel" id="refreshBtn" type="button">Refresh</button>
+                <button class="btn-sel" id="exportBtn" type="button">Export CSV</button>
+                <a class="btn-sel" href="seller-orders.html">Orders</a>
+                <a class="btn-sel primary" href="seller-dashboard.html">Dashboard</a>
+            </div>
+        </section>
+
+        <section class="summary-grid" id="summaryGrid"></section>
+
+        <section class="seller-card">
+            <div class="sel-toolbar">
+                <input class="sel" id="searchInput" type="search" placeholder="Search order, buyer, address, item" />
+                <select class="sel" id="statusFilter">
+                    <option value="">All Status</option>
+                    <option value="pending">Pending</option>
+                    <option value="in-transit">In Transit</option>
+                    <option value="delivered">Delivered</option>
+                    <option value="declined">Declined</option>
+                </select>
+                <select class="sel" id="sortFilter">
+                    <option value="newest">Newest</option>
+                    <option value="oldest">Oldest</option>
+                    <option value="amountDesc">Highest Amount</option>
+                    <option value="amountAsc">Lowest Amount</option>
+                </select>
+                <button class="btn-sel" id="resetBtn" type="button">Reset</button>
+            </div>
+        </section>
+
+        <section class="seller-card">
+            <div class="sel-table-wrap">
+                <table class="sel-table" id="deliveryTable"></table>
+            </div>
+        </section>
+
+        <div class="sel-foot">Manage delivery statuses and buyer handoff details.</div>
+    </main>
+
+    <script src="seller-core.js?v=20260228a"></script>
+    <script>
+        let seller = null;
+        const state = { rows: [], filtered: [] };
+
+        function byId(id) { return document.getElementById(id); }
+
+        function renderHeader() {
+            byId("sellerHeader").innerHTML = SellerCore.renderSellerHeader("delivery.html");
+        }
+
+        function readRows() {
+            state.rows = SellerCore.getSellerQueueRows(seller);
+        }
+
+        function applyFilters() {
+            const query = SellerCore.str(byId("searchInput").value).toLowerCase();
+            const status = SellerCore.str(byId("statusFilter").value).toLowerCase();
+            const sort = SellerCore.str(byId("sortFilter").value);
+
+            state.filtered = state.rows.filter(function (row) {
+                const hay = [row.orderId, row.buyer, row.email, row.phone, row.address, row.item].join(" ").toLowerCase();
+                const rowStatus = SellerCore.str(row.status || "pending").toLowerCase();
+                return (!query || hay.includes(query)) && (!status || rowStatus === status);
+            });
+
+            state.filtered.sort(function (a, b) {
+                if (sort === "oldest") return String(a.date).localeCompare(String(b.date));
+                if (sort === "amountDesc") return SellerCore.num(b.amount) - SellerCore.num(a.amount);
+                if (sort === "amountAsc") return SellerCore.num(a.amount) - SellerCore.num(b.amount);
+                return String(b.date).localeCompare(String(a.date));
+            });
+        }
+
+        function renderSummary() {
+            const pending = state.rows.filter(function (r) {
+                return SellerCore.str(r.status || "").toLowerCase() === "pending";
+            }).length;
+            const transit = state.rows.filter(function (r) {
+                return SellerCore.str(r.status || "").toLowerCase() === "in-transit";
+            }).length;
+            const delivered = state.rows.filter(function (r) {
+                return ["delivered", "completed"].includes(SellerCore.str(r.status || "").toLowerCase());
+            }).length;
+            const totalAmount = state.rows.reduce(function (sum, r) {
+                return sum + SellerCore.num(r.amount);
+            }, 0);
+
+            byId("summaryGrid").innerHTML = [
+                ["Pending", pending],
+                ["In Transit", transit],
+                ["Delivered", delivered],
+                ["Queue Amount", SellerCore.fmtMoney(totalAmount)]
+            ].map(function (item) {
+                return '<article class="summary-card"><div class="label">' + item[0] + '</div><div class="value">' + item[1] + '</div></article>';
+            }).join("");
+        }
+
+        function actionButtons(index) {
+            return '<div class="sel-inline-actions">' +
+                '<button class="btn-sel" data-action="pending" data-index="' + index + '">Pending</button>' +
+                '<button class="btn-sel warning" data-action="in-transit" data-index="' + index + '">In Transit</button>' +
+                '<button class="btn-sel success" data-action="delivered" data-index="' + index + '">Delivered</button>' +
+                '<button class="btn-sel danger" data-action="declined" data-index="' + index + '">Decline</button>' +
+                '<button class="btn-sel" data-action="copy" data-index="' + index + '">Copy Address</button>' +
+                '</div>';
+        }
+
+        function renderTable() {
+            const table = byId("deliveryTable");
+            const head = '<thead><tr><th>Order</th><th>Buyer</th><th>Item</th><th>Qty</th><th>Amount</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>';
+
+            if (!state.filtered.length) {
+                table.innerHTML = head + '<tbody><tr><td colspan="8" class="sel-empty">No delivery tasks available.</td></tr></tbody>';
+                return;
+            }
+
+            table.innerHTML = head + '<tbody>' + state.filtered.map(function (row, index) {
+                return '<tr>' +
+                    '<td>' + (row.orderId || "-") + '</td>' +
+                    '<td>' + (row.buyer || "-") + '<br><span class="contact-note">' + (row.email || "-") + ' | ' + (row.phone || "-") + '</span><br><span class="contact-note">' + (row.address || "-") + '</span></td>' +
+                    '<td>' + (row.item || "-") + '</td>' +
+                    '<td>' + row.quantity + '</td>' +
+                    '<td>' + SellerCore.fmtMoney(row.amount) + '</td>' +
+                    '<td>' + SellerCore.badge(row.status || "pending") + '</td>' +
+                    '<td>' + SellerCore.fmtDate(row.date) + '</td>' +
+                    '<td>' + actionButtons(index) + '</td>' +
+                    '</tr>';
+            }).join("") + '</tbody>';
+        }
+
+        function refresh() {
+            readRows();
+            applyFilters();
+            renderSummary();
+            renderTable();
+        }
+
+        function updateRowStatus(row, nextStatus) {
+            if (!row) return;
+            const ok = SellerCore.updateQueueStatus(seller, row.queueKey, row.index, nextStatus);
+            if (!ok) {
+                alert("Could not update status for this row.");
+                return;
+            }
+            refresh();
+        }
+
+        function copyAddress(row) {
+            const text = [row.buyer, row.phone, row.email, row.address].filter(Boolean).join(" | ");
+            if (!text) {
+                alert("No address details found.");
+                return;
+            }
+            navigator.clipboard.writeText(text).then(function () {
+                alert("Address copied.");
+            }).catch(function () {
+                alert("Copy failed.");
+            });
+        }
+
+        function exportCSV() {
+            if (!state.filtered.length) {
+                alert("No rows to export.");
+                return;
+            }
+
+            const headers = ["orderId", "buyer", "email", "phone", "address", "item", "quantity", "amount", "status", "date"];
+            const csv = [headers.join(",")].concat(state.filtered.map(function (row) {
+                const mapped = {
+                    orderId: row.orderId,
+                    buyer: row.buyer,
+                    email: row.email,
+                    phone: row.phone,
+                    address: row.address,
+                    item: row.item,
+                    quantity: row.quantity,
+                    amount: row.amount,
+                    status: row.status,
+                    date: SellerCore.fmtDate(row.date)
+                };
+                return headers.map(function (key) {
+                    return '"' + String(mapped[key]).replace(/"/g, '""') + '"';
+                }).join(",");
+            })).join("\n");
+
+            const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "seller-delivery.csv";
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function initDeliveryPage() {
+            seller = SellerCore.ensureSellerSession("seller-login.html");
+            if (!seller) return;
+
+            renderHeader();
+            refresh();
+
+            byId("refreshBtn").addEventListener("click", refresh);
+            byId("searchInput").addEventListener("input", refresh);
+            byId("statusFilter").addEventListener("change", refresh);
+            byId("sortFilter").addEventListener("change", refresh);
+            byId("exportBtn").addEventListener("click", exportCSV);
+
+            byId("resetBtn").addEventListener("click", function () {
+                byId("searchInput").value = "";
+                byId("statusFilter").value = "";
+                byId("sortFilter").value = "newest";
+                refresh();
+            });
+
+            byId("deliveryTable").addEventListener("click", function (event) {
+                const button = event.target.closest("button[data-action]");
+                if (!button) return;
+                const row = state.filtered[Number(button.dataset.index)];
+                if (!row) return;
+                const action = button.dataset.action;
+
+                if (action === "copy") {
+                    copyAddress(row);
+                    return;
+                }
+                updateRowStatus(row, action);
+            });
+            window.addEventListener("storage", refresh);
+        }
+
+        function startDeliveryPage() {
+            const ready = window.MMStorage && window.MMStorage.ready;
+            if (ready && typeof ready.then === "function") {
+                ready.finally(initDeliveryPage);
+                return;
+            }
+            initDeliveryPage();
+        }
+
+        if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", startDeliveryPage);
+        else startDeliveryPage();
+    </script>
+    <script defer src="upgrade.js"></script>
+  <script defer src="sw-register.js?v=20260226a"></script>
+  <script defer src="site-performance.js?v=20260226a"></script>
+</body>
+</html>
+
+
+

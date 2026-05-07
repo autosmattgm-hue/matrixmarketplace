@@ -1,0 +1,1648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>My Orders - MatrixMarket</title>
+  <link rel="icon" type="image/x-icon" href="matrixx.png" />
+  <link rel="stylesheet" href="upgrade.css" />
+  <style>
+    :root {
+      --bg: #f1f5f9;
+      --card: #ffffff;
+      --line: #dbe3ec;
+      --text: #0f172a;
+      --muted: #64748b;
+      --ok: #166534;
+      --warn: #92400e;
+      --bad: #991b1b;
+    }
+
+    * { box-sizing: border-box; font-family: "Segoe UI", "Nunito Sans", sans-serif; }
+
+    body {
+      margin: 0;
+      color: var(--text);
+      background:
+        radial-gradient(920px 240px at -10% -10%, rgba(59, 130, 246, 0.12), transparent),
+        radial-gradient(840px 220px at 110% 0, rgba(14, 165, 233, 0.1), transparent),
+        var(--bg);
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 1200;
+      background: #fff;
+      border-bottom: 1px solid #e5e7eb;
+      box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
+      padding: 0.75rem 1rem;
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+
+    .brand { font-weight: 900; letter-spacing: 0.02em; }
+    nav { display: flex; gap: 0.4rem; flex-wrap: wrap; max-width: 100%; overflow-x: auto; padding-bottom: 2px; }
+
+    nav a {
+      text-decoration: none;
+      color: #1f2937;
+      border: 1px solid #d1d5db;
+      border-radius: 999px;
+      padding: 0.3rem 0.65rem;
+      font-weight: 700;
+      background: #fff;
+    }
+
+    nav a.active { color: #1d4ed8; border-color: #93c5fd; background: #eff6ff; }
+
+    .chip {
+      border: 1px solid #dbe4f0;
+      border-radius: 999px;
+      padding: 0.25rem 0.56rem;
+      background: #f8fafc;
+      font-size: 0.8rem;
+      color: #334155;
+      font-weight: 700;
+    }
+
+    .page { width: min(1240px, calc(100% - 1rem)); margin: 0.75rem auto 1.2rem; display: grid; gap: 0.7rem; }
+    .card { border: 1px solid var(--line); border-radius: 14px; background: var(--card); padding: 0.7rem; box-shadow: 0 10px 22px rgba(15, 23, 42, 0.07); }
+
+    .hero { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 0.65rem; align-items: start; }
+    .hero h1 { margin: 0; font-size: clamp(1.16rem, 3vw, 1.65rem); }
+    .hero p { margin: 0.45rem 0 0; color: #475569; max-width: 66ch; }
+    .actions { margin-top: 0.62rem; display: flex; gap: 0.45rem; flex-wrap: wrap; }
+
+    .panel { border: 1px solid #dbe4f0; border-radius: 12px; background: #f8fafc; padding: 0.6rem; display: grid; gap: 0.35rem; }
+    .panel .row { display: flex; justify-content: space-between; gap: 0.5rem; font-size: 0.83rem; color: #334155; flex-wrap: wrap; }
+
+    .stats { display: grid; gap: 0.48rem; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+    .stat { border: 1px solid var(--line); border-radius: 12px; padding: 0.5rem; display: grid; gap: 0.2rem; }
+    .stat .label { color: var(--muted); font-size: 0.73rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; }
+    .stat .value { font-weight: 900; font-size: 1rem; }
+
+    .toolbar { display: grid; gap: 0.46rem; grid-template-columns: 1.3fr repeat(5, minmax(120px, 1fr)) auto; }
+
+    input, select, button, a.btn {
+      border: 1px solid #d1d5db;
+      border-radius: 10px;
+      min-height: 38px;
+      padding: 0.44rem 0.56rem;
+      background: #fff;
+      color: #111827;
+      font: inherit;
+    }
+
+    button, a.btn {
+      cursor: pointer;
+      font-weight: 800;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    button:hover, a.btn:hover { background: #f8fafc; border-color: #9ca3af; }
+    .btn.primary { border-color: #1d4ed8; background: #2563eb; color: #fff; }
+    .btn.primary:hover { background: #1d4ed8; }
+
+    .badge {
+      display: inline-flex;
+      border: 1px solid transparent;
+      border-radius: 999px;
+      padding: 0.15rem 0.48rem;
+      font-size: 0.73rem;
+      font-weight: 800;
+      text-transform: capitalize;
+    }
+
+    .badge.pending { color: var(--warn); border-color: #fbbf24; background: #fffbeb; }
+    .badge.good { color: var(--ok); border-color: #86efac; background: #ecfdf3; }
+    .badge.bad { color: var(--bad); border-color: #fca5a5; background: #fef2f2; }
+    .badge.info { color: #1e3a8a; border-color: #93c5fd; background: #eff6ff; }
+    .layout { display: grid; gap: 0.7rem; grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr); align-items: start; }
+
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border-bottom: 1px solid #e5e7eb; padding: 0.46rem 0.5rem; text-align: left; vertical-align: top; font-size: 0.84rem; }
+    th { background: #f8fafc; color: #334155; font-size: 0.75rem; letter-spacing: 0.04em; text-transform: uppercase; }
+
+    .inline-actions { display: flex; gap: 0.26rem; flex-wrap: wrap; }
+    .inline-actions button { min-height: 30px; font-size: 0.74rem; border-radius: 8px; padding: 0.24rem 0.46rem; }
+
+    .exact-list { display: grid; gap: 0.34rem; margin-top: 0.28rem; }
+    .exact-row {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 0.36rem;
+      display: grid;
+      grid-template-columns: 54px minmax(0, 1fr) auto;
+      gap: 0.42rem;
+      align-items: center;
+      background: #fff;
+    }
+    .exact-row img {
+      width: 54px;
+      height: 54px;
+      border-radius: 8px;
+      object-fit: cover;
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+    }
+    .exact-main { min-width: 0; display: grid; gap: 0.16rem; }
+    .exact-name {
+      font-weight: 800;
+      font-size: 0.86rem;
+      line-height: 1.25;
+      overflow-wrap: anywhere;
+    }
+    .exact-meta {
+      color: var(--muted);
+      font-size: 0.76rem;
+      overflow-wrap: anywhere;
+    }
+    .exact-total {
+      font-weight: 900;
+      font-size: 0.84rem;
+      color: #0f172a;
+      white-space: nowrap;
+    }
+
+    .detail { position: sticky; top: 76px; display: grid; gap: 0.5rem; }
+    .detail h3 { margin: 0; font-size: 1rem; }
+    .detail-grid { display: grid; gap: 0.35rem; grid-template-columns: 1fr 1fr; }
+
+    .cell { border: 1px solid var(--line); border-radius: 10px; padding: 0.45rem; }
+    .cell .label { display: block; color: var(--muted); font-size: 0.72rem; text-transform: uppercase; margin-bottom: 0.18rem; letter-spacing: 0.04em; font-weight: 700; }
+
+    .timeline { border: 1px solid var(--line); border-radius: 10px; background: #f8fafc; padding: 0.45rem; display: grid; gap: 0.28rem; }
+    .timeline .step { border-radius: 8px; padding: 0.28rem 0.42rem; font-size: 0.81rem; border: 1px solid #dbe2ea; color: #334155; background: #fff; }
+    .timeline .step.done { color: #166534; border-color: #86efac; background: #ecfdf3; }
+    .timeline .step.current { color: #1e3a8a; border-color: #93c5fd; background: #eff6ff; }
+    .timeline .step.blocked { color: #991b1b; border-color: #fca5a5; background: #fef2f2; }
+
+    .note { display: none; border: 1px solid #dbe2ea; border-radius: 10px; padding: 0.5rem 0.56rem; font-size: 0.84rem; }
+    .note.show { display: block; }
+    .note.ok { color: #166534; border-color: #86efac; background: #ecfdf3; }
+    .note.warn { color: #92400e; border-color: #fbbf24; background: #fffbeb; }
+    .note.err { color: #991b1b; border-color: #fca5a5; background: #fef2f2; }
+
+    .empty { text-align: center; border: 1px dashed #d1d5db; border-radius: 12px; padding: 0.9rem; color: var(--muted); }
+
+    @media (max-width: 1160px) {
+      .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .toolbar { grid-template-columns: 1fr 1fr 1fr; }
+      .layout { grid-template-columns: 1fr; }
+      .detail { position: static; }
+    }
+
+    @media (max-width: 780px) {
+      .hero { grid-template-columns: 1fr; }
+      .stats { grid-template-columns: 1fr 1fr; }
+    }
+
+    @media (max-width: 560px) {
+      .page { width: min(1240px, calc(100% - 0.6rem)); }
+      .toolbar, .stats, .detail-grid { grid-template-columns: 1fr; }
+      nav a { white-space: nowrap; }
+    }
+  </style>
+  <script src="firebase-online-storage.js"></script>
+  <script src="api-client.js"></script>
+</head>
+<body>
+  <header>
+    <div class="brand">MatrixMarket Orders</div>
+    <nav aria-label="Main navigation">
+      <a href="index.html">Home</a>
+      <a href="shop.html">Shop</a>
+      <a href="cart.html">Cart</a>
+      <a href="checkout.html">Checkout</a>
+      <a href="chat.html">Chat</a>
+      <a class="active" href="buyers-orders.html">My Orders</a>
+      <a href="agent-page.html">Support</a>
+      <a href="settings.html">Settings</a>
+    </nav>
+    <span class="chip" id="buyerChip">Buyer: Guest</span>
+  </header>
+
+  <main class="page">
+    <section class="card hero">
+      <div>
+        <h1>Track and manage your orders</h1>
+        <p>Filter by status, inspect full order details, reorder in one click, cancel pending orders, and contact support from this page.</p>
+        <div class="actions">
+          <button class="btn primary" id="syncBtn" type="button">Refresh</button>
+          <button id="exportBtn" type="button">Export CSV</button>
+          <a class="btn" href="shop.html">Shop More</a>
+        </div>
+      </div>
+      <aside class="panel">
+        <div class="row"><span>Network</span><strong id="onlineState">Checking...</strong></div>
+        <div class="row"><span>Last Sync</span><strong id="lastSync">--</strong></div>
+        <div class="row"><span>Highlighted</span><strong id="highlightChip">None</strong></div>
+      </aside>
+    </section>
+
+    <section class="card">
+      <div class="stats">
+        <article class="stat"><span class="label">Orders</span><span class="value" id="sOrders">0</span></article>
+        <article class="stat"><span class="label">Open</span><span class="value" id="sOpen">0</span></article>
+        <article class="stat"><span class="label">Delivered</span><span class="value" id="sDelivered">0</span></article>
+        <article class="stat"><span class="label">Cancelled</span><span class="value" id="sCancelled">0</span></article>
+        <article class="stat"><span class="label">Spent</span><span class="value" id="sSpent">0.00 GMD</span></article>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="toolbar">
+        <input id="searchInput" type="search" placeholder="Search order ID, item, seller, email, phone" />
+        <select id="statusFilter">
+          <option value="">All Statuses</option>
+          <option value="pending">Pending</option>
+          <option value="approved">Approved</option>
+          <option value="in-transit">In Transit</option>
+          <option value="delivered">Delivered</option>
+          <option value="completed">Completed</option>
+          <option value="declined">Declined</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+        <select id="paymentFilter">
+          <option value="">Any Payment</option>
+          <option value="wallet">Wallet</option>
+          <option value="cod">Cash on Delivery</option>
+        </select>
+        <select id="windowFilter">
+          <option value="">Any Time</option>
+          <option value="7">Last 7 Days</option>
+          <option value="30">Last 30 Days</option>
+          <option value="90">Last 90 Days</option>
+        </select>
+        <select id="sortFilter">
+          <option value="newest">Newest</option>
+          <option value="oldest">Oldest</option>
+          <option value="totalDesc">Total High-Low</option>
+          <option value="totalAsc">Total Low-High</option>
+          <option value="status">Status A-Z</option>
+        </select>
+        <select id="sizeFilter">
+          <option value="5">5 / page</option>
+          <option value="10" selected>10 / page</option>
+          <option value="20">20 / page</option>
+          <option value="40">40 / page</option>
+        </select>
+        <button id="resetBtn" type="button">Reset</button>
+      </div>
+    </section>
+
+    <div class="note" id="noteBox"></div>
+
+    <section class="layout">
+      <section class="card">
+        <h2 style="margin:0 0 .55rem;">Orders</h2>
+        <div style="overflow:auto;"><table id="ordersTable"></table></div>
+      </section>
+
+      <aside class="card detail">
+        <h3>Order Detail</h3>
+        <div id="detailBox" class="empty">Select an order.</div>
+      </aside>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      "use strict";
+
+      const KEYS = {
+        USER: "currentUser",
+        LOGGED: "loggedInUser",
+        BUYER: "buyerInfo",
+        ORDERS: "buyerOrders",
+        ORDER_SNAPSHOTS: "orderLineSnapshots",
+        CART: "cart",
+        CART_ITEMS: "cartItems",
+        CHECKOUT_CART: "checkoutCart",
+        CHECKOUT_META: "checkoutMeta",
+        QUEUE: "sellerOrderQueues",
+        PURCHASES: "purchases",
+        SUPPORT: "supportTickets"
+      };
+      const BUYER_SCOPE_PREFIX = "__mm_buyer__";
+      const SCOPED_EXACT_KEYS = new Set([
+        KEYS.BUYER,
+        KEYS.ORDERS,
+        KEYS.ORDER_SNAPSHOTS,
+        KEYS.CART,
+        KEYS.CART_ITEMS,
+        KEYS.CHECKOUT_CART,
+        KEYS.CHECKOUT_META
+      ]);
+      const SCOPED_KEY_PREFIXES = ["buyerOrdersByEmail:", "buyerOrdersByPhone:", "orderItemsById:"];
+      const LEGACY_READ_THROUGH_KEYS = new Set([
+        KEYS.BUYER,
+        KEYS.ORDERS,
+        KEYS.ORDER_SNAPSHOTS,
+        KEYS.CART,
+        KEYS.CART_ITEMS,
+        KEYS.CHECKOUT_CART,
+        KEYS.CHECKOUT_META
+      ]);
+      let cachedUserScope = null;
+
+      const state = {
+        sessionUser: null,
+        identity: { name: "", email: "", phone: "", orderId: "" },
+        all: [],
+        filtered: [],
+        selected: "",
+        page: 1,
+        size: 10
+      };
+
+      function byId(id) { return document.getElementById(id); }
+      function num(v) { const n = Number(v); return Number.isFinite(n) ? n : 0; }
+      function str(v) { return String(v == null ? "" : v); }
+      function low(v) { return str(v).trim().toLowerCase(); }
+      function email(v) { return low(v); }
+      function phone(v) { return str(v).replace(/\D+/g, ""); }
+      function money(v) { return num(v).toFixed(2) + " GMD"; }
+      function nowIso() { return new Date().toISOString(); }
+      function esc(v) { return str(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;").replace(/'/g, "&#39;"); }
+      function sameOrderId(a, b) { return low(a) === low(b); }
+      function byOrderKey(map, wanted) {
+        if (!map || typeof map !== "object") return null;
+        const key = str(wanted || "").trim();
+        if (!key) return null;
+        if (Object.prototype.hasOwnProperty.call(map, key)) return map[key];
+        const match = Object.keys(map).find(function (k) { return sameOrderId(k, key); });
+        return match ? map[match] : null;
+      }
+
+      function stamp(v) { const d = new Date(v || ""); return Number.isNaN(d.getTime()) ? 0 : d.getTime(); }
+      function dateText(v) { const d = new Date(v || ""); return Number.isNaN(d.getTime()) ? "-" : d.toLocaleString(); }
+
+      function storage() {
+        if (window.MMStorage && typeof window.MMStorage.getItem === "function") return window.MMStorage;
+        try { if (window.localStorage && typeof window.localStorage.getItem === "function") return window.localStorage; } catch (_) {}
+        return { getItem: function () { return null; }, setItem: function () {} };
+      }
+
+      function normalizeScopeToken(value) {
+        const token = str(value).trim().toLowerCase();
+        if (!token) return "";
+        return token.replace(/[^a-z0-9._:@-]+/g, "_");
+      }
+
+      function isGuestUser(user) {
+        if (!user || typeof user !== "object") return true;
+        if (user.isGuest) return true;
+        return normalizeScopeToken(user.email) === "guest@matrixmarket.local";
+      }
+
+      function readActiveSessionUser() {
+        const store = storage();
+        const keys = [KEYS.USER, KEYS.LOGGED];
+        let fallback = null;
+        for (let i = 0; i < keys.length; i += 1) {
+          const parsed = parseSimpleJson(store.getItem(keys[i]));
+          if (!parsed || typeof parsed !== "object") continue;
+          if (!fallback) fallback = parsed;
+          if (!isGuestUser(parsed)) return parsed;
+        }
+        return fallback;
+      }
+
+      function parseSimpleJson(raw) {
+        if (raw == null || raw === "") return null;
+        try { return JSON.parse(raw); } catch (_) { return null; }
+      }
+
+      function resolveUserScopeToken() {
+        const current = readActiveSessionUser() || {};
+        const userEmail = normalizeScopeToken(current && current.email);
+        if (userEmail && userEmail !== "guest@matrixmarket.local") return userEmail;
+        const uid = normalizeScopeToken(current && (current.id || current.uid || current.userId));
+        if (uid) return "id_" + uid;
+        const userPhone = normalizeScopeToken(current && current.phone);
+        if (userPhone) return "phone_" + userPhone;
+        const userName = normalizeScopeToken(current && (current.username || current.name || current.fullName));
+        if (userName) return "name_" + userName;
+        return "guest";
+      }
+
+      function userScopeToken() {
+        if (cachedUserScope) return cachedUserScope;
+        cachedUserScope = resolveUserScopeToken();
+        return cachedUserScope;
+      }
+
+      function shouldScopeKey(key) {
+        const value = str(key || "");
+        if (SCOPED_EXACT_KEYS.has(value)) return true;
+        return SCOPED_KEY_PREFIXES.some(function (prefix) { return value.indexOf(prefix) === 0; });
+      }
+
+      function scopedStorageKey(key) {
+        return BUYER_SCOPE_PREFIX + userScopeToken() + "__" + str(key || "");
+      }
+      function guestScopedStorageKey(key) {
+        return BUYER_SCOPE_PREFIX + "guest__" + str(key || "");
+      }
+
+      function parse(raw, fallback) {
+        if (raw == null || raw === "") return fallback;
+        let value = raw;
+        for (let i = 0; i < 3; i += 1) {
+          if (typeof value !== "string") break;
+          const trimmed = value.trim();
+          if (!trimmed) return fallback;
+          try {
+            value = JSON.parse(trimmed);
+          } catch (_) {
+            return i === 0 ? fallback : value;
+          }
+        }
+        return value == null ? fallback : value;
+      }
+
+      function read(key, fallback) {
+        try {
+          const store = storage();
+          const target = str(key || "");
+          if (shouldScopeKey(target)) {
+            const scopedRaw = store.getItem(scopedStorageKey(target));
+            const scopedValue = parse(scopedRaw, null);
+            if (scopedValue != null) return scopedValue;
+            const allowLegacy = LEGACY_READ_THROUGH_KEYS.has(target) || SCOPED_KEY_PREFIXES.some(function (prefix) {
+              return target.indexOf(prefix) === 0;
+            });
+            if (allowLegacy) {
+              const guestRaw = store.getItem(guestScopedStorageKey(target));
+              const guestValue = parse(guestRaw, null);
+              if (guestValue != null) return guestValue;
+              const legacyValue = parse(store.getItem(target), null);
+              if (legacyValue != null) return legacyValue;
+            }
+            if (userScopeToken() !== "guest") return fallback;
+          }
+          return parse(store.getItem(target), fallback);
+        } catch (_) {
+          return fallback;
+        }
+      }
+
+      function readScopedOnly(key, fallback) {
+        try {
+          const raw = storage().getItem(scopedStorageKey(key));
+          return parse(raw, fallback);
+        } catch (_) {
+          return fallback;
+        }
+      }
+
+      function readGuestScopedOnly(key, fallback) {
+        try {
+          const raw = storage().getItem(guestScopedStorageKey(key));
+          return parse(raw, fallback);
+        } catch (_) {
+          return fallback;
+        }
+      }
+
+      function readLegacyOnly(key, fallback) {
+        try {
+          return parse(storage().getItem(str(key || "")), fallback);
+        } catch (_) {
+          return fallback;
+        }
+      }
+
+      function listStorageKeys() {
+        const store = storage();
+        if (!store) return [];
+        if (typeof store.keys === "function") {
+          try {
+            const rows = store.keys();
+            if (Array.isArray(rows)) return rows.map(function (key) { return str(key || ""); }).filter(Boolean);
+          } catch (_) {}
+        }
+        const out = [];
+        const seen = new Set();
+        const total = Number(store.length);
+        if (!Number.isInteger(total) || total <= 0 || typeof store.key !== "function") return out;
+        for (let i = 0; i < total; i += 1) {
+          try {
+            const key = str(store.key(i) || "");
+            if (!key || seen.has(key)) continue;
+            seen.add(key);
+            out.push(key);
+          } catch (_) {}
+        }
+        return out;
+      }
+
+      function write(key, value) {
+        try {
+          const target = str(key || "");
+          const storageKey = shouldScopeKey(target) ? scopedStorageKey(target) : target;
+          storage().setItem(storageKey, JSON.stringify(value));
+          return true;
+        } catch (_) {
+          return false;
+        }
+      }
+
+      function toArray(rows) {
+        if (Array.isArray(rows)) return rows.slice();
+        if (typeof rows === "string") {
+          const parsed = parse(rows, null);
+          if (parsed == null) return [];
+          return toArray(parsed);
+        }
+        if (rows && typeof rows === "object") {
+          return Object.keys(rows).map(function (key) {
+            const row = rows[key];
+            if (row && typeof row === "object") return Object.assign({ id: row.id || key }, row);
+            return { id: key, value: row };
+          });
+        }
+        return [];
+      }
+      function normalizeItem(raw) {
+        const parsed = typeof raw === "string" ? parse(raw, {}) : raw;
+        const row = parsed && typeof parsed === "object" ? parsed : {};
+        const qty = Math.max(1, Math.floor(num(row.quantity || row.qty || 1)));
+        const directPrice = num(row.price || row.unitPrice || 0);
+        const lineTotal = num(row.total || row.amount || 0);
+        const resolvedPrice = directPrice > 0 ? directPrice : (lineTotal > 0 ? lineTotal / qty : 0);
+        return {
+          id: str(row.id || row.productId || ""),
+          name: str(row.name || row.productName || row.title || row.item || "Product"),
+          image: str(row.image || "matrixx.png"),
+          seller: str(row.seller || row.sellerName || row.store || row.shopName || ""),
+          sellerEmail: email(row.sellerEmail || ""),
+          category: str(row.category || "general"),
+          quantity: qty,
+          price: Math.max(0, resolvedPrice)
+        };
+      }
+
+      function normalizeOrder(raw, idx, source) {
+        const parsed = typeof raw === "string" ? parse(raw, {}) : raw;
+        const row = parsed && typeof parsed === "object" ? parsed : {};
+        const rawItems = row.cart != null
+          ? row.cart
+          : (row.items != null
+            ? row.items
+            : (row.lines != null ? row.lines : (row.products != null ? row.products : [])));
+        const cart = toArray(rawItems).map(normalizeItem);
+        const subtotal = num(row.subtotal || cart.reduce(function (sum, it) { return sum + it.price * it.quantity; }, 0));
+        const total = num(row.total || subtotal + num(row.shipping || 0) - num(row.discount || 0));
+        const status = str(row.status || "pending");
+        return {
+          source: source || "local",
+          scopeOwned: row.scopeOwned === true,
+          id: str(row.id || row.orderId || row.orderNumber || ("ORD-" + idx)),
+          fullName: str(row.fullName || row.name || row.buyerName || ""),
+          email: email(row.email || row.buyerEmail || ""),
+          phone: phone(row.phone || row.buyerPhone || ""),
+          ownerEmail: email(row.ownerEmail || row.accountEmail || row.buyerAccountEmail || ""),
+          ownerPhone: phone(row.ownerPhone || row.accountPhone || row.buyerAccountPhone || ""),
+          ownerName: str(row.ownerName || row.accountName || row.buyerAccountName || ""),
+          address: str(row.address || ""),
+          paymentMethod: low(row.paymentMethod || "wallet"),
+          subtotal: subtotal,
+          shipping: num(row.shipping || 0),
+          discount: num(row.discount || 0),
+          total: total,
+          status: status,
+          statusKey: low(status).replace(/\s+/g, "-"),
+          placedAt: row.placedAt || row.createdAt || row.date || nowIso(),
+          updatedAt: row.updatedAt || "",
+          etaText: str(row.etaText || ""),
+          note: str(row.note || row.orderNote || ""),
+          cart: cart
+        };
+      }
+
+      function statusTone(key) {
+        const s = low(key);
+        if (["delivered", "completed", "approved", "success"].includes(s)) return "good";
+        if (["cancelled", "canceled", "declined", "failed"].includes(s)) return "bad";
+        if (["pending", "processing", "in-transit", "shipped", "out-for-delivery"].includes(s)) return "pending";
+        return "info";
+      }
+
+      function canCancel(order) {
+        const s = low(order && order.statusKey);
+        return s === "pending" || s === "processing";
+      }
+
+      function statusRank(key) {
+        const s = low(key);
+        if (["pending", "processing"].includes(s)) return 1;
+        if (["approved"].includes(s)) return 2;
+        if (["in-transit", "shipped", "out-for-delivery"].includes(s)) return 3;
+        if (["delivered", "completed"].includes(s)) return 4;
+        return 0;
+      }
+
+      function resolveIdentity() {
+        const q = new URLSearchParams(window.location.search);
+        const user = readActiveSessionUser() || {};
+        const trustedUser = !isGuestUser(user) ? user : null;
+        const buyer = read(KEYS.BUYER, null) || {};
+        const bridgeOrder = readBridgeOrder();
+        return {
+          name: str(
+            (trustedUser && (trustedUser.fullName || trustedUser.name)) ||
+            buyer.fullName ||
+            buyer.name ||
+            (bridgeOrder && (bridgeOrder.ownerName || bridgeOrder.fullName)) ||
+            ""
+          ),
+          email: email(
+            (trustedUser && trustedUser.email) ||
+            buyer.email ||
+            (bridgeOrder && (bridgeOrder.ownerEmail || bridgeOrder.email)) ||
+            ""
+          ),
+          phone: phone(
+            (trustedUser && trustedUser.phone) ||
+            buyer.phone ||
+            (bridgeOrder && (bridgeOrder.ownerPhone || bridgeOrder.phone)) ||
+            ""
+          ),
+          orderId: str(q.get("orderId") || (bridgeOrder && bridgeOrder.id) || "")
+        };
+      }
+
+      function hasTrustedIdentity() {
+        return Boolean(state.identity && (state.identity.email || state.identity.phone || state.identity.name));
+      }
+
+      function orderOwnedByIdentity(order) {
+        const i = state.identity || {};
+        if (!order || !hasTrustedIdentity()) return false;
+        if (order.scopeOwned === true) return true;
+        if (order.ownerEmail || order.ownerPhone || order.ownerName) {
+          if (i.email && order.ownerEmail === i.email) return true;
+          if (i.phone && order.ownerPhone === i.phone) return true;
+          if (i.name && low(order.ownerName) === low(i.name)) return true;
+          return false;
+        }
+        if (i.email && order.email === i.email) return true;
+        if (i.phone && order.phone === i.phone) return true;
+        if (i.name && low(order.fullName) === low(i.name)) return true;
+        return false;
+      }
+
+      function belongs(order) {
+        const i = state.identity;
+        if (!i || !hasTrustedIdentity()) return false;
+        return orderOwnedByIdentity(order);
+      }
+
+      function identityMatchesRow(raw) {
+        if (!raw || !hasTrustedIdentity()) return false;
+        const row = (typeof raw === "string" ? parse(raw, {}) : raw) || {};
+        const i = state.identity || {};
+        const ownerEmail = email(row.ownerEmail || row.accountEmail || row.buyerAccountEmail || "");
+        const ownerPhone = phone(row.ownerPhone || row.accountPhone || row.buyerAccountPhone || "");
+        const ownerName = low(row.ownerName || row.accountName || row.buyerAccountName || "");
+        const buyerEmail = email(row.email || row.buyerEmail || "");
+        const buyerPhone = phone(row.phone || row.buyerPhone || "");
+        const buyerName = low(row.fullName || row.name || row.buyerName || row.buyer || "");
+        if (i.email && (ownerEmail === i.email || buyerEmail === i.email)) return true;
+        if (i.phone && (ownerPhone === i.phone || buyerPhone === i.phone)) return true;
+        if (i.name && (ownerName === low(i.name) || buyerName === low(i.name))) return true;
+        return false;
+      }
+
+      function addUniqueOrderId(list, orderId) {
+        const next = str(orderId || "").trim();
+        if (!next) return;
+        if (list.some(function (id) { return sameOrderId(id, next); })) return;
+        list.push(next);
+      }
+
+      function mergeRows(rows) {
+        const map = new Map();
+        rows.forEach(function (row) {
+          if (!row.id) return;
+          const prev = map.get(row.id);
+          if (!prev) {
+            map.set(row.id, row);
+            return;
+          }
+          const prevTs = Math.max(stamp(prev.updatedAt), stamp(prev.placedAt));
+          const nextTs = Math.max(stamp(row.updatedAt), stamp(row.placedAt));
+          const newer = nextTs >= prevTs ? Object.assign({}, prev, row) : Object.assign({}, row, prev);
+          const older = nextTs >= prevTs ? prev : row;
+
+          // Keep item lines from any source if the newer snapshot has none.
+          if ((!Array.isArray(newer.cart) || !newer.cart.length) && Array.isArray(older.cart) && older.cart.length) {
+            newer.cart = older.cart.slice();
+          }
+
+          // Fill critical fields when missing on the winner.
+          if (!str(newer.fullName) && str(older.fullName)) newer.fullName = older.fullName;
+          if (!str(newer.email) && str(older.email)) newer.email = older.email;
+          if (!str(newer.phone) && str(older.phone)) newer.phone = older.phone;
+          if (!str(newer.address) && str(older.address)) newer.address = older.address;
+          if (!str(newer.paymentMethod) && str(older.paymentMethod)) newer.paymentMethod = older.paymentMethod;
+          if ((!num(newer.subtotal) || num(newer.subtotal) <= 0) && num(older.subtotal) > 0) newer.subtotal = older.subtotal;
+          if ((!num(newer.total) || num(newer.total) <= 0) && num(older.total) > 0) newer.total = older.total;
+
+          map.set(row.id, newer);
+        });
+        return Array.from(map.values()).sort(function (a, b) { return stamp(b.placedAt) - stamp(a.placedAt); });
+      }
+
+      function localOrders() {
+        const keys = [KEYS.ORDERS];
+        if (state.identity.email) keys.push("buyerOrdersByEmail:" + state.identity.email);
+        if (state.identity.phone) keys.push("buyerOrdersByPhone:" + state.identity.phone);
+
+        let rows = [];
+        keys.forEach(function (key) {
+          rows = rows.concat(toArray(readScopedOnly(key, [])).map(function (entry, idx) {
+            const row = (entry && typeof entry === "object") ? Object.assign({}, entry, { scopeOwned: true }) : entry;
+            return normalizeOrder(row, idx, key + "-scoped");
+          }));
+          rows = rows.concat(toArray(readGuestScopedOnly(key, [])).map(function (entry, idx) {
+            const row = (entry && typeof entry === "object") ? Object.assign({}, entry, { scopeOwned: true }) : entry;
+            return normalizeOrder(row, idx, key + "-guest");
+          }));
+          rows = rows.concat(toArray(readLegacyOnly(key, [])).map(function (entry, idx) {
+            return normalizeOrder(entry, idx, key + "-legacy");
+          }));
+        });
+        return rows;
+      }
+
+      function recoverOwnedOrderIdsFromSnapshots() {
+        const ids = [];
+        const snapshotStorageKeys = ["orderLineSnapshots"];
+        listStorageKeys().forEach(function (key) {
+          if (key.indexOf(BUYER_SCOPE_PREFIX) === 0 && key.endsWith("__orderLineSnapshots")) snapshotStorageKeys.push(key);
+        });
+
+        snapshotStorageKeys.forEach(function (storageKey) {
+          const map = parse(storage().getItem(storageKey), null);
+          if (!map || typeof map !== "object" || Array.isArray(map)) return;
+          Object.keys(map).forEach(function (mapKey) {
+            const row = map[mapKey];
+            if (!identityMatchesRow(row)) return;
+            addUniqueOrderId(ids, str((row && (row.id || row.orderId)) || mapKey));
+          });
+        });
+
+        listStorageKeys().forEach(function (key) {
+          if (key.indexOf("orderItemsById:") < 0 && key.indexOf("__orderItemsById:") < 0) return;
+          const row = parse(storage().getItem(key), null);
+          if (!identityMatchesRow(row)) return;
+          addUniqueOrderId(ids, str(row && (row.id || row.orderId || row.orderNumber) || ""));
+        });
+        return ids;
+      }
+
+      function recoverOwnedOrderIdsFromQueues() {
+        const ids = [];
+        const queues = read(KEYS.QUEUE, {});
+        if (!queues || typeof queues !== "object") return ids;
+        Object.keys(queues).forEach(function (queueKey) {
+          toArray(queues[queueKey]).forEach(function (entry) {
+            const row = (typeof entry === "string" ? parse(entry, {}) : entry) || {};
+            if (!identityMatchesRow(row)) return;
+            addUniqueOrderId(ids, row.orderId || row.id || row.orderNumber || "");
+          });
+        });
+        return ids;
+      }
+
+      function recoverOwnedOrderIdsFromPurchases() {
+        const ids = [];
+        toArray(read(KEYS.PURCHASES, [])).forEach(function (entry) {
+          const row = (typeof entry === "string" ? parse(entry, {}) : entry) || {};
+          if (!identityMatchesRow(row)) return;
+          addUniqueOrderId(ids, row.orderId || row.id || row.orderNumber || "");
+        });
+        return ids;
+      }
+
+      function recoverOwnedOrders() {
+        const ids = [];
+        recoverOwnedOrderIdsFromSnapshots().forEach(function (id) { addUniqueOrderId(ids, id); });
+        recoverOwnedOrderIdsFromQueues().forEach(function (id) { addUniqueOrderId(ids, id); });
+        recoverOwnedOrderIdsFromPurchases().forEach(function (id) { addUniqueOrderId(ids, id); });
+
+        const recovered = [];
+        ids.forEach(function (orderId) {
+          const order = buildOrderFromSnapshot(orderId) || buildOrderFromQueue(orderId) || buildOrderFromPurchases(orderId);
+          if (order) recovered.push(order);
+        });
+        return recovered;
+      }
+
+      async function apiOrders() {
+        try {
+          if (!(window.MMApi && typeof window.MMApi.isEnabled === "function" && window.MMApi.isEnabled())) return [];
+          if (typeof window.MMApi.getOrders !== "function") return [];
+          const response = await window.MMApi.getOrders({
+            buyerEmail: state.identity.email || undefined,
+            buyerPhone: state.identity.phone || undefined,
+            limit: 250
+          });
+          const list = response && Array.isArray(response.orders) ? response.orders : [];
+          return list.map(function (entry, idx) { return normalizeOrder(entry, idx, "api"); });
+        } catch (_) {
+          return [];
+        }
+      }
+
+      function readBridgeOrder() {
+        try {
+          const payload = parse(window.name || "", null);
+          if (!payload || payload.type !== "MM_LAST_ORDER" || !payload.order) return null;
+          return normalizeOrder(payload.order, 0, "window-bridge");
+        } catch (_) {
+          return null;
+        }
+      }
+
+      function buildOrderFromSnapshot(orderId) {
+        const target = str(orderId || "").trim();
+        if (!target) return null;
+
+        const map = read(KEYS.ORDER_SNAPSHOTS, {});
+        const fromMap = byOrderKey(map, target);
+        const fromDirect = read("orderItemsById:" + target, null);
+        const raw = fromDirect != null ? fromDirect : fromMap;
+        if (!raw) return null;
+
+        const parsed = typeof raw === "string" ? parse(raw, null) : raw;
+        if (!parsed || typeof parsed !== "object") return null;
+
+        const itemsRaw = parsed.items != null
+          ? parsed.items
+          : (parsed.cart != null ? parsed.cart : (parsed.lines != null ? parsed.lines : []));
+
+        const cart = toArray(itemsRaw).map(normalizeItem).filter(function (it) {
+          return str(it.name).trim() !== "" && it.quantity > 0;
+        });
+        if (!cart.length) return null;
+
+        const subtotal = cart.reduce(function (sum, it) { return sum + (it.price * it.quantity); }, 0);
+        const shipping = num(parsed.shipping || parsed.deliveryFee || 0);
+        const discount = num(parsed.discount || 0);
+        const total = num(parsed.total || (subtotal + shipping - discount));
+
+        const recovered = normalizeOrder(Object.assign({}, parsed, {
+          id: str(parsed.id || parsed.orderId || target),
+          subtotal: subtotal,
+          shipping: shipping,
+          discount: discount,
+          total: total,
+          cart: cart
+        }), 0, "snapshot-recovery");
+        return orderOwnedByIdentity(recovered) ? recovered : null;
+      }
+
+      function buildOrderFromQueue(orderId) {
+        const target = str(orderId || "").trim();
+        if (!target) return null;
+        const queues = read(KEYS.QUEUE, {});
+        if (!queues || typeof queues !== "object") return null;
+
+        const hits = [];
+        Object.keys(queues).forEach(function (queueKey) {
+          const rows = toArray(queues[queueKey]);
+          rows.forEach(function (entry) {
+            const row = (typeof entry === "string" ? parse(entry, {}) : entry) || {};
+            const rowId = str(row.orderId || row.id || row.orderNumber || "");
+            if (!sameOrderId(rowId, target)) return;
+            hits.push(Object.assign({ __queueKey: queueKey }, row));
+          });
+        });
+        if (!hits.length) return null;
+
+        const cart = hits.map(function (row, idx) {
+          const qty = Math.max(1, Math.floor(num(row.quantity || 1)));
+          const amount = num(row.amount || row.total || 0);
+          const unit = qty > 0 ? (amount / qty) : amount;
+          return normalizeItem({
+            id: str(row.productId || row.itemId || ("Q-" + idx)),
+            name: str(row.item || row.productName || "Product"),
+            image: str(row.image || "matrixx.png"),
+            seller: str(row.seller || row.sellerName || row.__queueKey || ""),
+            sellerEmail: str(row.sellerEmail || ""),
+            category: str(row.category || "general"),
+            quantity: qty,
+            price: unit
+          });
+        });
+
+        const first = hits[0] || {};
+        const subtotal = cart.reduce(function (sum, it) { return sum + (it.price * it.quantity); }, 0);
+        const shipping = num(first.shipping || 0);
+        const discount = num(first.discount || 0);
+        const total = num(first.total || (subtotal + shipping - discount));
+
+        const recovered = normalizeOrder({
+          id: target,
+          fullName: str(first.buyer || first.fullName || first.name || ""),
+          email: str(first.email || first.buyerEmail || ""),
+          phone: str(first.phone || first.buyerPhone || ""),
+          ownerEmail: str(first.ownerEmail || first.accountEmail || ""),
+          ownerPhone: str(first.ownerPhone || first.accountPhone || ""),
+          ownerName: str(first.ownerName || first.accountName || ""),
+          address: str(first.address || ""),
+          paymentMethod: str(first.paymentMethod || "wallet"),
+          subtotal: subtotal,
+          shipping: shipping,
+          discount: discount,
+          total: total,
+          status: str(first.status || "pending"),
+          placedAt: first.date || first.createdAt || nowIso(),
+          updatedAt: first.updatedAt || "",
+          etaText: str(first.etaText || ""),
+          note: str(first.note || ""),
+          cart: cart
+        }, 0, "queue-recovery");
+        return orderOwnedByIdentity(recovered) ? recovered : null;
+      }
+
+      function buildOrderFromPurchases(orderId) {
+        const target = str(orderId || "").trim();
+        if (!target) return null;
+        const rows = toArray(read(KEYS.PURCHASES, [])).map(function (entry) {
+          return (typeof entry === "string" ? parse(entry, {}) : entry) || {};
+        }).filter(function (row) {
+          return sameOrderId(str(row.orderId || row.id || row.orderNumber || ""), target);
+        });
+        if (!rows.length) return null;
+
+        const cart = rows.map(function (row, idx) {
+          const qty = Math.max(1, Math.floor(num(row.quantity || 1)));
+          const amount = num(row.total || 0);
+          const unit = num(row.price || (qty > 0 ? amount / qty : amount));
+          return normalizeItem({
+            id: str(row.productId || ("P-" + idx)),
+            name: str(row.productName || row.name || "Product"),
+            image: str(row.image || "matrixx.png"),
+            seller: str(row.seller || row.sellerName || ""),
+            sellerEmail: str(row.sellerEmail || ""),
+            category: str(row.category || "general"),
+            quantity: qty,
+            price: unit
+          });
+        });
+
+        const first = rows[0] || {};
+        const subtotal = cart.reduce(function (sum, it) { return sum + (it.price * it.quantity); }, 0);
+        const total = rows.reduce(function (sum, row) { return sum + num(row.total || 0); }, 0) || subtotal;
+
+        const recovered = normalizeOrder({
+          id: target,
+          fullName: str(first.buyerName || first.fullName || first.name || ""),
+          email: str(first.buyerEmail || first.email || ""),
+          phone: str(first.buyerPhone || first.phone || ""),
+          ownerEmail: str(first.ownerEmail || first.accountEmail || ""),
+          ownerPhone: str(first.ownerPhone || first.accountPhone || ""),
+          ownerName: str(first.ownerName || first.accountName || ""),
+          address: str(first.address || ""),
+          paymentMethod: str(first.paymentMethod || "wallet"),
+          subtotal: subtotal,
+          shipping: 0,
+          discount: 0,
+          total: total,
+          status: str(first.status || "pending"),
+          placedAt: first.date || first.createdAt || nowIso(),
+          updatedAt: first.updatedAt || "",
+          etaText: "",
+          note: "Recovered from purchase logs.",
+          cart: cart
+        }, 0, "purchase-recovery");
+        return orderOwnedByIdentity(recovered) ? recovered : null;
+      }
+
+      function requireSignedInBuyer() {
+        if (hasTrustedIdentity()) return true;
+        byId("buyerChip").textContent = "Buyer: Guest";
+        showNote("We could not find buyer details for this orders session. Redirecting to login...", "warn");
+        setTimeout(function () {
+          window.location.href = "login.html?next=buyers-orders.html";
+        }, 1200);
+        return false;
+      }
+
+      function showNote(text, kind) {
+        const box = byId("noteBox");
+        box.className = "note show " + (["ok", "warn", "err"].includes(kind) ? kind : "ok");
+        box.textContent = str(text || "");
+        clearTimeout(showNote.timer);
+        showNote.timer = setTimeout(function () {
+          box.className = "note";
+          box.textContent = "";
+        }, 3600);
+      }
+
+      function updateStats() {
+        const rows = state.all;
+        const open = rows.filter(function (o) {
+          const s = low(o.statusKey);
+          return ["pending", "processing", "approved", "in-transit", "shipped", "out-for-delivery"].includes(s);
+        }).length;
+        const delivered = rows.filter(function (o) {
+          const s = low(o.statusKey);
+          return s === "delivered" || s === "completed";
+        }).length;
+        const cancelled = rows.filter(function (o) {
+          const s = low(o.statusKey);
+          return s === "cancelled" || s === "canceled" || s === "declined";
+        }).length;
+        const spent = rows.reduce(function (sum, o) {
+          const s = low(o.statusKey);
+          if (s === "cancelled" || s === "canceled" || s === "declined") return sum;
+          return sum + num(o.total);
+        }, 0);
+        byId("sOrders").textContent = String(rows.length);
+        byId("sOpen").textContent = String(open);
+        byId("sDelivered").textContent = String(delivered);
+        byId("sCancelled").textContent = String(cancelled);
+        byId("sSpent").textContent = money(spent);
+      }
+      function applyFilters() {
+        const q = low(byId("searchInput").value);
+        const status = low(byId("statusFilter").value);
+        const pay = low(byId("paymentFilter").value);
+        const days = Math.floor(num(byId("windowFilter").value || 0));
+        const sort = str(byId("sortFilter").value || "newest");
+        state.filtered = state.all.filter(function (o) {
+          if (days > 0 && (Date.now() - stamp(o.placedAt)) > days * 86400000) return false;
+          if (status) {
+            const s = low(o.statusKey);
+            if (s !== status && s.indexOf(status) < 0) return false;
+          }
+          if (pay && low(o.paymentMethod) !== pay) return false;
+          if (q) {
+            const items = o.cart.map(function (it) { return [it.name, it.seller, it.sellerEmail].join(" "); }).join(" ");
+            const hay = [o.id, o.fullName, o.email, o.phone, o.address, o.status, o.paymentMethod, items].join(" ").toLowerCase();
+            if (hay.indexOf(q) < 0) return false;
+          }
+          return true;
+        });
+
+        state.filtered.sort(function (a, b) {
+          if (sort === "oldest") return stamp(a.placedAt) - stamp(b.placedAt);
+          if (sort === "totalDesc") return b.total - a.total;
+          if (sort === "totalAsc") return a.total - b.total;
+          if (sort === "status") return low(a.status).localeCompare(low(b.status));
+          return stamp(b.placedAt) - stamp(a.placedAt);
+        });
+      }
+
+      function selectedOrder() {
+        return state.all.find(function (o) { return sameOrderId(o.id, state.selected); }) || null;
+      }
+
+      function renderTable() {
+        const table = byId("ordersTable");
+        const head = "<thead><tr><th>Order</th><th>Date</th><th>Total</th><th>Status</th><th>Actions</th></tr></thead>";
+        if (!state.filtered.length) {
+          table.innerHTML = head + "<tbody><tr><td colspan=\"5\"><div class=\"empty\">No orders found.</div></td></tr></tbody>";
+          return;
+        }
+
+        const pages = Math.max(1, Math.ceil(state.filtered.length / state.size));
+        if (state.page > pages) state.page = pages;
+        if (state.page < 1) state.page = 1;
+        const from = (state.page - 1) * state.size;
+        const rows = state.filtered.slice(from, from + state.size);
+
+        table.innerHTML = head + "<tbody>" + rows.map(function (o) {
+          const tone = statusTone(o.statusKey);
+          const cancel = canCancel(o) ? "<button data-action=\"cancel\" data-id=\"" + esc(o.id) + "\" type=\"button\">Cancel</button>" : "";
+          return "<tr>" +
+            "<td><strong>" + esc(o.id) + "</strong><br><span style=\"color:#64748b;\">" + esc((o.cart[0] && o.cart[0].name) || "No items") + "</span></td>" +
+            "<td>" + esc(dateText(o.placedAt)) + "</td>" +
+            "<td>" + money(o.total) + "</td>" +
+            "<td><span class=\"badge " + tone + "\">" + esc(o.status) + "</span></td>" +
+            "<td><div class=\"inline-actions\">" +
+            "<button data-action=\"view\" data-id=\"" + esc(o.id) + "\" type=\"button\">View</button>" +
+            "<button data-action=\"reorder\" data-id=\"" + esc(o.id) + "\" type=\"button\">Reorder</button>" +
+            cancel +
+            "<button data-action=\"chat\" data-id=\"" + esc(o.id) + "\" type=\"button\">Chat</button>" +
+            "<button data-action=\"complain\" data-id=\"" + esc(o.id) + "\" type=\"button\">Complain</button>" +
+            "<button data-action=\"receipt\" data-id=\"" + esc(o.id) + "\" type=\"button\">Receipt</button>" +
+            "<button data-action=\"json\" data-id=\"" + esc(o.id) + "\" type=\"button\">JSON</button>" +
+            "<button data-action=\"copy\" data-id=\"" + esc(o.id) + "\" type=\"button\">Copy ID</button>" +
+            "</div></td>" +
+            "</tr>";
+        }).join("") + "</tbody>";
+      }
+
+      function renderTimeline(order) {
+        const s = low(order.statusKey);
+        if (["cancelled", "canceled", "declined"].includes(s)) {
+          return "<div class=\"step blocked\">Order " + esc(order.status) + " at " + esc(dateText(order.updatedAt || order.placedAt)) + "</div>";
+        }
+        const rank = statusRank(s);
+        const steps = [
+          { id: 1, name: "Pending" },
+          { id: 2, name: "Approved" },
+          { id: 3, name: "In Transit" },
+          { id: 4, name: "Delivered" }
+        ];
+        return steps.map(function (step) {
+          const cls = step.id < rank ? "done" : (step.id === rank ? "current" : "");
+          return "<div class=\"step " + cls + "\">" + step.name + " - " + (step.id <= rank ? "Reached" : "Pending") + "</div>";
+        }).join("");
+      }
+
+      function renderExactItems(order) {
+        if (!order || !Array.isArray(order.cart) || !order.cart.length) {
+          return "<div class=\"empty\">No exact ordered items found for this order.</div>";
+        }
+        return "<div class=\"exact-list\">" + order.cart.map(function (it, idx) {
+          const lineTotal = num(it.price) * Math.max(1, Math.floor(num(it.quantity)));
+          return "<article class=\"exact-row\">" +
+            "<img loading=\"lazy\" decoding=\"async\" fetchpriority=\"low\" src=\"" + esc(it.image || "matrixx.png") + "\" alt=\"" + esc(it.name || ("Item " + (idx + 1))) + "\">" +
+            "<div class=\"exact-main\">" +
+            "<div class=\"exact-name\">" + esc(it.name || ("Item " + (idx + 1))) + "</div>" +
+            "<div class=\"exact-meta\">Qty: " + Math.max(1, Math.floor(num(it.quantity))) + " | Unit: " + money(it.price) + " | Seller: " + esc(it.seller || "-") + "</div>" +
+            "<div class=\"exact-meta\">Product ID: " + esc(it.id || "-") + " | Category: " + esc(it.category || "general") + "</div>" +
+            "</div>" +
+            "<div class=\"exact-total\">" + money(lineTotal) + "</div>" +
+            "</article>";
+        }).join("") + "</div>";
+      }
+
+      function renderDetail() {
+        const box = byId("detailBox");
+        const order = selectedOrder();
+        if (!order) {
+          box.className = "empty";
+          box.textContent = "Select an order.";
+          return;
+        }
+        box.className = "";
+        box.innerHTML =
+          "<div class=\"detail-grid\">" +
+          "<div class=\"cell\"><span class=\"label\">Order</span>" + esc(order.id) + "</div>" +
+          "<div class=\"cell\"><span class=\"label\">Status</span><span class=\"badge " + statusTone(order.statusKey) + "\">" + esc(order.status) + "</span></div>" +
+          "<div class=\"cell\"><span class=\"label\">Buyer</span>" + esc(order.fullName || "-") + "</div>" +
+          "<div class=\"cell\"><span class=\"label\">Email</span>" + esc(order.email || "-") + "</div>" +
+          "<div class=\"cell\"><span class=\"label\">Phone</span>" + esc(order.phone || "-") + "</div>" +
+          "<div class=\"cell\"><span class=\"label\">Payment</span>" + esc((order.paymentMethod || "wallet").toUpperCase()) + "</div>" +
+          "<div class=\"cell\"><span class=\"label\">Placed</span>" + esc(dateText(order.placedAt)) + "</div>" +
+          "<div class=\"cell\"><span class=\"label\">Total</span><strong>" + money(order.total) + "</strong></div>" +
+          "<div class=\"cell\"><span class=\"label\">Order Source</span>" + esc(order.source || "unknown") + "</div>" +
+          "<div class=\"cell\"><span class=\"label\">Item Count</span>" + (Array.isArray(order.cart) ? order.cart.length : 0) + "</div>" +
+          "</div>" +
+          "<div class=\"timeline\">" + renderTimeline(order) + "</div>" +
+          "<div class=\"cell\"><span class=\"label\">Address</span>" + esc(order.address || "-") + "</div>" +
+          "<div class=\"cell\"><span class=\"label\">Exact Ordered Items</span>" + renderExactItems(order) + "</div>" +
+          "<div class=\"cell\"><span class=\"label\">Note</span>" + esc(order.note || "None") + "</div>";
+      }
+
+      function updateDetailSelection(id) {
+        state.selected = str(id || "");
+        renderDetail();
+      }
+      function patchOrderInKey(key, orderId, patch) {
+        const rows = toArray(read(key, []));
+        if (!rows.length) return false;
+        let changed = false;
+        const next = rows.map(function (row) {
+          const id = str(row && (row.id || row.orderId || row.orderNumber) || "");
+          if (id !== orderId) return row;
+          changed = true;
+          return Object.assign({}, row, patch);
+        });
+        if (!changed) return false;
+        return write(key, next);
+      }
+
+      function patchQueue(orderId, nextStatus) {
+        const queues = read(KEYS.QUEUE, {});
+        if (!queues || typeof queues !== "object") return false;
+        let changed = false;
+        Object.keys(queues).forEach(function (queueKey) {
+          const rows = Array.isArray(queues[queueKey]) ? queues[queueKey] : [];
+          queues[queueKey] = rows.map(function (row) {
+            if (str(row && row.orderId || "") !== orderId) return row;
+            changed = true;
+            return Object.assign({}, row, { status: nextStatus, updatedAt: nowIso() });
+          });
+        });
+        if (!changed) return false;
+        return write(KEYS.QUEUE, queues);
+      }
+
+      function patchPurchases(orderId, nextStatus) {
+        const rows = toArray(read(KEYS.PURCHASES, []));
+        if (!rows.length) return false;
+        let changed = false;
+        const next = rows.map(function (row) {
+          if (str(row && row.orderId || "") !== orderId) return row;
+          changed = true;
+          return Object.assign({}, row, { status: nextStatus, updatedAt: nowIso() });
+        });
+        if (!changed) return false;
+        return write(KEYS.PURCHASES, next);
+      }
+
+      async function cancelOrder(order) {
+        if (!order || !canCancel(order)) {
+          showNote("Only pending/processing orders can be cancelled.", "warn");
+          return;
+        }
+        if (!window.confirm("Cancel order " + order.id + "?")) return;
+
+        let apiError = "";
+        if (window.MMApi && typeof window.MMApi.isEnabled === "function" && window.MMApi.isEnabled() && typeof window.MMApi.cancelOrder === "function") {
+          try {
+            await window.MMApi.cancelOrder(order.id);
+          } catch (error) {
+            apiError = error && error.message ? String(error.message) : "API cancel failed";
+          }
+        }
+
+        const patch = { status: "cancelled", updatedAt: nowIso() };
+        patchOrderInKey(KEYS.ORDERS, order.id, patch);
+        if (order.email) patchOrderInKey("buyerOrdersByEmail:" + order.email, order.id, patch);
+        if (order.phone) patchOrderInKey("buyerOrdersByPhone:" + order.phone, order.id, patch);
+        patchQueue(order.id, "cancelled");
+        patchPurchases(order.id, "cancelled");
+
+        if (window.MMStorage && typeof window.MMStorage.syncNow === "function") {
+          try { await window.MMStorage.syncNow(); } catch (_) {}
+        }
+        await refresh(true);
+        showNote(apiError ? ("Cancelled locally. " + apiError) : "Order cancelled.", apiError ? "warn" : "ok");
+      }
+
+      function setCheckoutMeta(items) {
+        const subtotal = items.reduce(function (sum, it) { return sum + (it.price * it.quantity); }, 0);
+        const shipping = subtotal >= 500 ? 0 : 25;
+        write(KEYS.CHECKOUT_META, {
+          coupon: null,
+          subtotal: subtotal,
+          discount: 0,
+          shipping: shipping,
+          total: subtotal + shipping
+        });
+      }
+
+      function reorder(order) {
+        if (!order || !order.cart.length) {
+          showNote("No items to reorder.", "warn");
+          return;
+        }
+        const cart = order.cart.map(function (it) {
+          return {
+            id: it.id,
+            name: it.name,
+            price: it.price,
+            image: it.image || "matrixx.png",
+            seller: it.seller,
+            sellerEmail: it.sellerEmail,
+            category: it.category,
+            quantity: it.quantity
+          };
+        });
+        write(KEYS.CART, cart);
+        write(KEYS.CART_ITEMS, cart);
+        write(KEYS.CHECKOUT_CART, cart);
+        setCheckoutMeta(cart);
+        window.location.href = "checkout.html";
+      }
+
+      function chat(order) {
+        const seller = order && order.cart.find(function (it) { return it && (it.seller || it.sellerEmail); });
+        if (!seller) {
+          showNote("No seller found for this order.", "warn");
+          return;
+        }
+        const target = str(seller.seller || seller.sellerEmail);
+        window.location.href = "chat.html?seller=" + encodeURIComponent(target);
+      }
+
+      function complain(order) {
+        const message = window.prompt("Describe your complaint for order " + order.id + ":");
+        if (!message || !message.trim()) return;
+        const tickets = toArray(read(KEYS.SUPPORT, []));
+        tickets.unshift({
+          id: "TKT-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6),
+          name: state.identity.name || "Buyer",
+          email: state.identity.email || "",
+          role: "buyer",
+          orderId: order.id,
+          subject: "Order complaint - " + order.id,
+          priority: "high",
+          message: str(message).trim(),
+          status: "open",
+          createdAt: nowIso(),
+          date: nowIso()
+        });
+        write(KEYS.SUPPORT, tickets);
+        showNote("Complaint submitted. Redirecting to support...", "ok");
+        setTimeout(function () { window.location.href = "agent-page.html"; }, 700);
+      }
+
+      function exportOrderJson(order) {
+        if (!order) return;
+        const payload = {
+          id: order.id,
+          source: order.source || "unknown",
+          status: order.status,
+          placedAt: order.placedAt,
+          updatedAt: order.updatedAt || "",
+          buyer: {
+            fullName: order.fullName || "",
+            email: order.email || "",
+            phone: order.phone || "",
+            address: order.address || ""
+          },
+          paymentMethod: order.paymentMethod || "",
+          totals: {
+            subtotal: num(order.subtotal),
+            shipping: num(order.shipping),
+            discount: num(order.discount),
+            total: num(order.total)
+          },
+          items: (order.cart || []).map(function (it) {
+            return {
+              id: it.id || "",
+              name: it.name || "",
+              image: it.image || "",
+              seller: it.seller || "",
+              sellerEmail: it.sellerEmail || "",
+              category: it.category || "",
+              quantity: Math.max(1, Math.floor(num(it.quantity))),
+              unitPrice: num(it.price),
+              lineTotal: num(it.price) * Math.max(1, Math.floor(num(it.quantity)))
+            };
+          })
+        };
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "matrixmarket-order-" + order.id + ".json";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      }
+
+      function receipt(order) {
+        const lines = [
+          "MatrixMarket Receipt",
+          "Order ID: " + order.id,
+          "Buyer: " + (order.fullName || "-"),
+          "Email: " + (order.email || "-"),
+          "Phone: " + (order.phone || "-"),
+          "Address: " + (order.address || "-"),
+          "Status: " + (order.status || "-"),
+          "Placed At: " + dateText(order.placedAt),
+          "Payment: " + (order.paymentMethod || "-"),
+          "",
+          "Items:"
+        ];
+        order.cart.forEach(function (it, idx) {
+          lines.push((idx + 1) + ". " + it.name + " | Seller: " + (it.seller || "-") + " | Qty: " + it.quantity + " | Price: " + money(it.price));
+        });
+        lines.push("");
+        lines.push("Subtotal: " + money(order.subtotal));
+        lines.push("Shipping: " + money(order.shipping));
+        lines.push("Discount: " + money(order.discount));
+        lines.push("Total: " + money(order.total));
+        lines.push("Generated: " + dateText(nowIso()));
+
+        const blob = new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "matrixmarket-receipt-" + order.id + ".txt";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      }
+      function exportCsv() {
+        if (!state.filtered.length) {
+          showNote("No rows to export.", "warn");
+          return;
+        }
+        const rows = [["id", "status", "placedAt", "fullName", "email", "phone", "items", "paymentMethod", "subtotal", "shipping", "discount", "total"]];
+        state.filtered.forEach(function (o) {
+          rows.push([o.id, o.status, o.placedAt, o.fullName, o.email, o.phone, String(o.cart.length), o.paymentMethod, o.subtotal.toFixed(2), o.shipping.toFixed(2), o.discount.toFixed(2), o.total.toFixed(2)]);
+        });
+        const csv = rows.map(function (row) {
+          return row.map(function (cell) { return "\"" + str(cell).replace(/\"/g, "\"\"") + "\""; }).join(",");
+        }).join("\n");
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "matrixmarket-my-orders.csv";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        showNote("CSV exported.", "ok");
+      }
+
+      function copyId(order) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(order.id).then(function () {
+            showNote("Order ID copied.", "ok");
+          }).catch(function () {
+            showNote("Copy failed.", "warn");
+          });
+          return;
+        }
+        showNote("Copy is not supported.", "warn");
+      }
+
+      function action(name, id) {
+        const order = state.all.find(function (o) { return sameOrderId(o.id, id); });
+        if (!order) return;
+        if (name === "view") { updateDetailSelection(order.id); return; }
+        if (name === "reorder") { reorder(order); return; }
+        if (name === "cancel") { cancelOrder(order); return; }
+        if (name === "chat") { chat(order); return; }
+        if (name === "complain") { complain(order); return; }
+        if (name === "json") { exportOrderJson(order); return; }
+        if (name === "receipt") { receipt(order); return; }
+        if (name === "copy") { copyId(order); }
+      }
+
+      async function refresh(silent) {
+        byId("onlineState").textContent = navigator.onLine ? "Online" : "Offline";
+        byId("lastSync").textContent = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+        byId("highlightChip").textContent = state.identity.orderId || "None";
+
+        const local = localOrders();
+        const remote = await apiOrders();
+        let merged = mergeRows(local.concat(remote).concat(recoverOwnedOrders()));
+        const bridgeOrder = readBridgeOrder();
+        if (bridgeOrder && !state.identity.orderId) {
+          state.identity.orderId = bridgeOrder.id;
+          byId("highlightChip").textContent = state.identity.orderId || "None";
+        }
+
+        if (state.identity.orderId && !merged.some(function (o) { return sameOrderId(o.id, state.identity.orderId); })) {
+          if (window.MMApi && typeof window.MMApi.isEnabled === "function" && window.MMApi.isEnabled() && typeof window.MMApi.getOrder === "function") {
+            try {
+              const one = await window.MMApi.getOrder(state.identity.orderId);
+              if (one) merged = mergeRows(merged.concat([normalizeOrder(one, merged.length, "api-order")]));
+            } catch (_) {}
+          }
+        }
+
+        if (
+          state.identity.orderId &&
+          bridgeOrder &&
+          sameOrderId(bridgeOrder.id, state.identity.orderId) &&
+          !merged.some(function (o) { return sameOrderId(o.id, state.identity.orderId); })
+        ) {
+          merged = mergeRows(merged.concat([bridgeOrder]));
+          try { window.name = ""; } catch (_) {}
+        }
+
+        if (state.identity.orderId && !merged.some(function (o) { return sameOrderId(o.id, state.identity.orderId); })) {
+          const recoveredSnapshot = buildOrderFromSnapshot(state.identity.orderId);
+          if (recoveredSnapshot) merged = mergeRows(merged.concat([recoveredSnapshot]));
+        }
+
+        if (state.identity.orderId && !merged.some(function (o) { return sameOrderId(o.id, state.identity.orderId); })) {
+          const recoveredQueue = buildOrderFromQueue(state.identity.orderId);
+          if (recoveredQueue) merged = mergeRows(merged.concat([recoveredQueue]));
+        }
+
+        if (state.identity.orderId && !merged.some(function (o) { return sameOrderId(o.id, state.identity.orderId); })) {
+          const recoveredPurchase = buildOrderFromPurchases(state.identity.orderId);
+          if (recoveredPurchase) merged = mergeRows(merged.concat([recoveredPurchase]));
+        }
+
+        // Final enrichment pass: if any order is missing item rows, recover from snapshot/queue/purchases by ID.
+        merged = merged.map(function (order) {
+          if (Array.isArray(order.cart) && order.cart.length) return order;
+          const recovered = buildOrderFromSnapshot(order.id) || buildOrderFromQueue(order.id) || buildOrderFromPurchases(order.id);
+          if (!recovered || !Array.isArray(recovered.cart) || !recovered.cart.length) return order;
+          return Object.assign({}, recovered, order, { cart: recovered.cart.slice() });
+        });
+
+        state.all = merged.filter(belongs);
+        applyFilters();
+        updateStats();
+        renderTable();
+
+        if (state.identity.orderId && state.all.some(function (o) { return sameOrderId(o.id, state.identity.orderId); })) {
+          state.selected = state.identity.orderId;
+        } else if (!state.selected || !state.all.some(function (o) { return sameOrderId(o.id, state.selected); })) {
+          state.selected = state.filtered[0] ? state.filtered[0].id : "";
+        }
+        renderDetail();
+
+        if (!silent) showNote("Orders refreshed.", "ok");
+      }
+
+      function bind() {
+        byId("syncBtn").addEventListener("click", function () { refresh(false); });
+        byId("exportBtn").addEventListener("click", exportCsv);
+        byId("resetBtn").addEventListener("click", function () {
+          byId("searchInput").value = "";
+          byId("statusFilter").value = "";
+          byId("paymentFilter").value = "";
+          byId("windowFilter").value = "";
+          byId("sortFilter").value = "newest";
+          byId("sizeFilter").value = "10";
+          state.page = 1;
+          state.size = 10;
+          applyFilters();
+          renderTable();
+          renderDetail();
+        });
+
+        byId("searchInput").addEventListener("input", function () {
+          state.page = 1;
+          applyFilters();
+          renderTable();
+          renderDetail();
+        });
+
+        ["statusFilter", "paymentFilter", "windowFilter", "sortFilter"].forEach(function (id) {
+          byId(id).addEventListener("change", function () {
+            state.page = 1;
+            applyFilters();
+            renderTable();
+            renderDetail();
+          });
+        });
+
+        byId("sizeFilter").addEventListener("change", function () {
+          const size = Math.floor(num(this.value));
+          state.size = [5, 10, 20, 40].includes(size) ? size : 10;
+          state.page = 1;
+          applyFilters();
+          renderTable();
+          renderDetail();
+        });
+
+        byId("ordersTable").addEventListener("click", function (event) {
+          const btn = event.target.closest("button[data-action][data-id]");
+          if (!btn) return;
+          action(str(btn.getAttribute("data-action")), str(btn.getAttribute("data-id")));
+        });
+
+        window.addEventListener("online", function () { byId("onlineState").textContent = "Online"; });
+        window.addEventListener("offline", function () { byId("onlineState").textContent = "Offline"; });
+        window.addEventListener("storage", function () { refresh(true); });
+      }
+
+      async function init() {
+        state.sessionUser = readActiveSessionUser() || null;
+        state.identity = resolveIdentity();
+        if (!requireSignedInBuyer()) return;
+        byId("buyerChip").textContent = "Buyer: " + (state.identity.name || state.identity.email || state.identity.phone || "Guest");
+        bind();
+        await refresh(true);
+        if (state.identity.orderId) {
+          if (state.all.some(function (o) { return sameOrderId(o.id, state.identity.orderId); })) {
+            updateDetailSelection(state.identity.orderId);
+            showNote("Highlighted order " + state.identity.orderId + ".", "ok");
+          } else {
+            showNote("Order " + state.identity.orderId + " was not found yet. Please tap Refresh again shortly.", "warn");
+          }
+        }
+      }
+
+      function start() {
+        const ready = window.MMStorage && window.MMStorage.ready;
+        if (ready && typeof ready.then === "function") {
+          ready.finally(init);
+          return;
+        }
+        init();
+      }
+
+      if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start);
+      else start();
+    })();
+  </script>
+  <script defer src="upgrade.js"></script>
+  <script defer src="sw-register.js?v=20260226a"></script>
+  <script defer src="site-performance.js?v=20260226a"></script>
+</body>
+</html>
+
+

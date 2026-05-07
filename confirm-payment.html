@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>MatrixMarket - Confirm Payment</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="upgrade.css">
+  <script src="firebase-online-storage.js"></script>
+  <style>
+    :root {
+      --bg: #f6f8fc;
+      --panel: #ffffff;
+      --panel-soft: #f8fafc;
+      --text: #122033;
+      --muted: #5f6c7b;
+      --border: #dbe3ef;
+      --brand: #0f766e;
+      --brand-deep: #115e59;
+      --accent: #f97316;
+      --accent-soft: #fff7ed;
+      --good: #15803d;
+      --good-soft: #f0fdf4;
+      --warn: #b45309;
+      --warn-soft: #fffbeb;
+      --danger: #dc2626;
+      --danger-soft: #fef2f2;
+      --shadow-sm: 0 8px 20px rgba(15, 23, 42, 0.06);
+      --shadow-md: 0 18px 40px rgba(15, 23, 42, 0.10);
+      --radius-xl: 28px;
+      --radius-lg: 22px;
+      --radius-md: 16px;
+      --radius-sm: 12px;
+      --radius-pill: 999px;
+      --transition: 180ms ease;
+    }
+
+    * { box-sizing: border-box; }
+
+    html {
+      scroll-behavior: smooth;
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Inter", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(15, 118, 110, 0.10), transparent 24%),
+        radial-gradient(circle at top right, rgba(249, 115, 22, 0.12), transparent 26%),
+        linear-gradient(180deg, #f8fbff 0%, #f5f7fb 100%);
+    }
+
+    a { color: inherit; }
+    button, input, select, textarea { font: inherit; }
+
+    .cp-shell {
+      width: min(1260px, calc(100% - 1.4rem));
+      margin: 0 auto;
+      padding: 1rem 0 1.6rem;
+      display: grid;
+      gap: 1rem;
+    }
+
+    .cp-header {
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      backdrop-filter: blur(16px);
+      background: rgba(248, 251, 255, 0.88);
+      border-bottom: 1px solid rgba(219, 227, 239, 0.82);
+    }
+
+    .cp-header-inner {
+      width: min(1260px, calc(100% - 1.4rem));
+      margin: 0 auto;
+      padding: 0.85rem 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .cp-brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.8rem;
+      text-decoration: none;
+    }
+
+    .cp-brand-mark {
+      width: 2.8rem;
+      height: 2.8rem;
+      border-radius: 16px;
+      background: linear-gradient(135deg, var(--brand), var(--brand-deep));
+      color: #fff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.15rem;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .cp-brand-copy {
+      display: grid;
+      gap: 0.1rem;
+    }
+
+    .cp-brand-copy strong {
+      font-family: "Nunito", sans-serif;
+      font-size: 1.15rem;
+      letter-spacing: -0.03em;
+    }
+
+    .cp-brand-copy span {
+      color: var(--muted);
+      font-size: 0.74rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      font-weight: 800;
+    }
+
+    .cp-nav {
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      flex-wrap: wrap;
+    }
+
+    .cp-nav a {
+      text-decoration: none;
+      color: var(--muted);
+      padding: 0.55rem 0.9rem;
+      border-radius: var(--radius-pill);
+      font-weight: 700;
+      transition: var(--transition);
+    }
+
+    .cp-nav a:hover,
+    .cp-nav a.active {
+      color: var(--brand-deep);
+      background: rgba(15, 118, 110, 0.08);
+    }
+
+    .cp-main {
+      display: grid;
+      grid-template-columns: minmax(0, 0.95fr) minmax(360px, 0.9fr);
+      gap: 1rem;
+      align-items: start;
+    }
+
+    .cp-card,
+    .cp-form-card,
+    .cp-info-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .cp-card {
+      padding: 1.4rem;
+    }
+
+    .cp-hero {
+      padding: 1.5rem;
+      background:
+        radial-gradient(circle at top right, rgba(249, 115, 22, 0.14), transparent 32%),
+        linear-gradient(135deg, #ffffff 0%, #f5fffc 100%);
+    }
+
+    .cp-kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.5rem 0.9rem;
+      border-radius: var(--radius-pill);
+      background: rgba(15, 118, 110, 0.08);
+      color: var(--brand-deep);
+      font-size: 0.76rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .cp-hero h1 {
+      margin: 0.95rem 0 0.5rem;
+      font-family: "Nunito", sans-serif;
+      font-size: clamp(2rem, 4vw, 3rem);
+      line-height: 0.98;
+      letter-spacing: -0.05em;
+    }
+
+    .cp-hero p {
+      margin: 0;
+      max-width: 660px;
+      color: var(--muted);
+      font-size: 1rem;
+      line-height: 1.75;
+    }
+
+    .cp-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.7rem;
+      margin-top: 1rem;
+    }
+
+    .cp-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.6rem 0.9rem;
+      border-radius: var(--radius-pill);
+      background: #fff;
+      border: 1px solid rgba(15, 118, 110, 0.12);
+      color: var(--text);
+      font-size: 0.84rem;
+      font-weight: 700;
+    }
+
+    .cp-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1rem;
+    }
+
+    .cp-info-card {
+      padding: 1.25rem;
+      display: grid;
+      gap: 0.8rem;
+    }
+
+    .cp-info-card h2,
+    .cp-form-head h2 {
+      margin: 0;
+      font-family: "Nunito", sans-serif;
+      font-size: 1.28rem;
+      letter-spacing: -0.03em;
+    }
+
+    .cp-info-card p,
+    .cp-form-head p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.65;
+    }
+
+    .cp-user-box {
+      padding: 1rem;
+      border-radius: var(--radius-lg);
+      background: linear-gradient(180deg, #f9fcff 0%, #ffffff 100%);
+      border: 1px solid var(--border);
+      display: grid;
+      gap: 0.45rem;
+    }
+
+    .cp-user-name {
+      font-size: 1rem;
+      font-weight: 800;
+    }
+
+    .cp-user-meta {
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
+
+    .cp-method-list,
+    .cp-step-list {
+      display: grid;
+      gap: 0.75rem;
+    }
+
+    .cp-method-item,
+    .cp-step-item {
+      display: grid;
+      gap: 0.2rem;
+      padding: 0.95rem 1rem;
+      border-radius: var(--radius-lg);
+      background: var(--panel-soft);
+      border: 1px solid var(--border);
+    }
+
+    .cp-method-item strong,
+    .cp-step-item strong {
+      font-size: 0.96rem;
+    }
+
+    .cp-method-item span,
+    .cp-step-item span {
+      color: var(--muted);
+      font-size: 0.86rem;
+      line-height: 1.55;
+    }
+
+    .cp-account-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.7rem;
+      align-items: center;
+      padding: 0.95rem 1rem;
+      border-radius: var(--radius-lg);
+      background: var(--accent-soft);
+      border: 1px solid #fed7aa;
+      color: #9a3412;
+      font-weight: 700;
+    }
+
+    .cp-account-strip code {
+      background: rgba(255,255,255,0.62);
+      border: 1px solid rgba(154, 52, 18, 0.12);
+      border-radius: 10px;
+      padding: 0.25rem 0.45rem;
+      font-family: inherit;
+      font-weight: 800;
+    }
+
+    .cp-form-card {
+      padding: 1.4rem;
+      position: sticky;
+      top: 1rem;
+    }
+
+    .cp-form-head {
+      display: grid;
+      gap: 0.35rem;
+      margin-bottom: 1rem;
+    }
+
+    .cp-form-grid {
+      display: grid;
+      gap: 0.95rem;
+    }
+
+    .cp-field {
+      display: grid;
+      gap: 0.42rem;
+    }
+
+    .cp-label-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+    }
+
+    .cp-field label {
+      font-size: 0.86rem;
+      font-weight: 800;
+      color: var(--text);
+    }
+
+    .cp-help {
+      color: var(--muted);
+      font-size: 0.76rem;
+      font-weight: 700;
+    }
+
+    .cp-input,
+    .cp-select,
+    .cp-textarea {
+      width: 100%;
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--text);
+      border-radius: var(--radius-md);
+      padding: 0.9rem 1rem;
+      outline: none;
+      transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
+    }
+
+    .cp-input:focus,
+    .cp-select:focus,
+    .cp-textarea:focus {
+      border-color: #22c55e;
+      box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.12);
+      background: #fff;
+    }
+
+    .cp-textarea {
+      min-height: 110px;
+      resize: vertical;
+    }
+
+    .cp-inline {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.9rem;
+    }
+
+    .cp-preview {
+      padding: 1rem;
+      border-radius: var(--radius-lg);
+      background: linear-gradient(180deg, #f8fffd 0%, #ffffff 100%);
+      border: 1px solid rgba(15, 118, 110, 0.12);
+      display: grid;
+      gap: 0.55rem;
+    }
+
+    .cp-preview-title {
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--brand-deep);
+      font-weight: 800;
+    }
+
+    .cp-preview-line {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.75rem;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .cp-preview-line strong {
+      color: var(--text);
+      text-align: right;
+    }
+
+    .cp-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-top: 0.3rem;
+    }
+
+    .cp-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-pill);
+      background: #fff;
+      color: var(--text);
+      padding: 0.92rem 1.2rem;
+      font-size: 0.92rem;
+      font-weight: 800;
+      cursor: pointer;
+      text-decoration: none;
+      transition: transform var(--transition), box-shadow var(--transition), background var(--transition), border-color var(--transition);
+    }
+
+    .cp-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .cp-btn.primary {
+      background: linear-gradient(135deg, var(--brand), var(--brand-deep));
+      border-color: transparent;
+      color: #fff;
+      box-shadow: 0 18px 36px rgba(15, 118, 110, 0.20);
+    }
+
+    .cp-btn.primary:hover {
+      box-shadow: 0 20px 40px rgba(15, 118, 110, 0.24);
+    }
+
+    .cp-btn.secondary {
+      background: var(--accent-soft);
+      border-color: #fed7aa;
+      color: #9a3412;
+    }
+
+    .cp-alert {
+      display: none;
+      padding: 0.95rem 1rem;
+      border-radius: var(--radius-lg);
+      border: 1px solid transparent;
+      font-size: 0.9rem;
+      font-weight: 700;
+      line-height: 1.6;
+    }
+
+    .cp-alert.show {
+      display: block;
+    }
+
+    .cp-alert.success {
+      background: var(--good-soft);
+      border-color: #bbf7d0;
+      color: var(--good);
+    }
+
+    .cp-alert.error {
+      background: var(--danger-soft);
+      border-color: #fecaca;
+      color: var(--danger);
+    }
+
+    .cp-footnote {
+      color: var(--muted);
+      font-size: 0.8rem;
+      line-height: 1.7;
+    }
+
+    .cp-footer {
+      color: var(--muted);
+      text-align: center;
+      font-size: 0.85rem;
+      padding: 0.2rem 0 1rem;
+    }
+
+    @media (max-width: 1080px) {
+      .cp-main {
+        grid-template-columns: 1fr;
+      }
+
+      .cp-form-card {
+        position: static;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .cp-grid,
+      .cp-inline {
+        grid-template-columns: 1fr;
+      }
+
+      .cp-shell,
+      .cp-header-inner {
+        width: min(100%, calc(100% - 1rem));
+      }
+
+      .cp-card,
+      .cp-form-card,
+      .cp-info-card,
+      .cp-hero {
+        padding: 1.1rem;
+        border-radius: 22px;
+      }
+
+      .cp-nav {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="cp-header">
+    <div class="cp-header-inner">
+      <a class="cp-brand" href="index.html" aria-label="MatrixMarket home">
+        <span class="cp-brand-mark">MM</span>
+        <span class="cp-brand-copy">
+          <strong>MatrixMarket</strong>
+          <span>Payment Confirmation</span>
+        </span>
+      </a>
+
+      <nav class="cp-nav" aria-label="Payment page navigation">
+        <a href="index.html">Home</a>
+        <a href="shop.html">Shop</a>
+        <a href="payment-status.html">Payment Status</a>
+        <a class="active" href="confirm-payment.html">Confirm Payment</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="cp-shell">
+    <section class="cp-hero cp-card">
+      <span class="cp-kicker">Secure Review Flow</span>
+      <h1>Confirm Your Payment With Confidence</h1>
+      <p>Submit your payment request once, track the review status, and keep the rest of your marketplace flow moving. This page is built to make top-ups, subscriptions, and manual payment reviews feel clear and trustworthy.</p>
+      <div class="cp-pills">
+        <span class="cp-pill">⏱ Fast admin review</span>
+        <span class="cp-pill">🔒 Stored with your account session</span>
+        <span class="cp-pill">📋 Visible in payment status and admin queue</span>
+      </div>
+    </section>
+
+    <section class="cp-main">
+      <div class="cp-grid">
+        <article class="cp-info-card">
+          <h2>Your Account Snapshot</h2>
+          <p>The request will be tied to the active session below so the admin team can approve it correctly.</p>
+          <div class="cp-user-box" id="userBox">
+            <div class="cp-user-name" id="userName">Loading user...</div>
+            <div class="cp-user-meta" id="userMeta">Checking account details...</div>
+          </div>
+          <div class="cp-account-strip">
+            Manual payment number:
+            <code>6785316</code>
+            for
+            <strong>Wave</strong>
+            and
+            <strong>ComCash</strong>
+          </div>
+        </article>
+
+        <article class="cp-info-card">
+          <h2>What To Prepare</h2>
+          <p>Submitting complete payment details helps your request move through review faster.</p>
+          <div class="cp-step-list">
+            <div class="cp-step-item">
+              <strong>1. Choose the right request type</strong>
+              <span>Use top-up, subscription, or general payment review so the request lands in the right admin workflow.</span>
+            </div>
+            <div class="cp-step-item">
+              <strong>2. Add payer and transaction details</strong>
+              <span>Include the number used to pay and a reference or transaction ID if you already have one.</span>
+            </div>
+            <div class="cp-step-item">
+              <strong>3. Track the result on the status page</strong>
+              <span>After submission, the page redirects you to payment status so you can monitor approval.</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="cp-info-card">
+          <h2>Available Methods</h2>
+          <p>These options are kept aligned with your current marketplace payment flow.</p>
+          <div class="cp-method-list">
+            <div class="cp-method-item">
+              <strong>Wave</strong>
+              <span>Send to account number <strong>6785316</strong> and submit the amount plus transaction reference.</span>
+            </div>
+            <div class="cp-method-item">
+              <strong>ComCash</strong>
+              <span>Send to account number <strong>6785316</strong> and include the payer number or confirmation details.</span>
+            </div>
+            <div class="cp-method-item">
+              <strong>Wallet / Card Review</strong>
+              <span>Use this if your payment needs manual confirmation before your account flow continues.</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="cp-info-card">
+          <h2>Admin Review Notes</h2>
+          <p>These reminders reduce confusion and help avoid rejected or delayed requests.</p>
+          <div class="cp-step-list">
+            <div class="cp-step-item">
+              <strong>Double-check the amount</strong>
+              <span>Make sure the amount entered here matches the amount actually sent.</span>
+            </div>
+            <div class="cp-step-item">
+              <strong>Use the active account email</strong>
+              <span>The request is stored against the logged-in session, so stay on the correct account before submitting.</span>
+            </div>
+            <div class="cp-step-item">
+              <strong>Do not submit duplicates unless needed</strong>
+              <span>If you already sent one request, review the status page before sending another one.</span>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <section class="cp-form-card">
+        <div class="cp-form-head">
+          <h2>Submit Payment Request</h2>
+          <p>Clean, reviewable payment details help the admin team approve you faster.</p>
+        </div>
+
+        <div class="cp-alert success" id="successMsg">Your payment request was saved successfully. Redirecting to payment status...</div>
+        <div class="cp-alert error" id="errorMsg">Something went wrong. Please check the form and try again.</div>
+
+        <form id="paymentForm" class="cp-form-grid" novalidate>
+          <div class="cp-inline">
+            <div class="cp-field">
+              <div class="cp-label-row">
+                <label for="requestType">Request Type</label>
+                <span class="cp-help">Required</span>
+              </div>
+              <select class="cp-select" id="requestType">
+                <option value="Wallet Top-Up">Wallet Top-Up</option>
+                <option value="Subscription">Subscription</option>
+                <option value="Payment Review">Payment Review</option>
+              </select>
+            </div>
+
+            <div class="cp-field">
+              <div class="cp-label-row">
+                <label for="method">Payment Method</label>
+                <span class="cp-help">Required</span>
+              </div>
+              <select class="cp-select" id="method">
+                <option value="">Choose a method</option>
+                <option value="Wave">Wave</option>
+                <option value="ComCash">ComCash</option>
+                <option value="Wallet">Wallet</option>
+                <option value="Card">Card</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="cp-inline">
+            <div class="cp-field">
+              <div class="cp-label-row">
+                <label for="amount">Amount (GMD)</label>
+                <span class="cp-help">Required</span>
+              </div>
+              <input class="cp-input" type="number" id="amount" min="0" step="0.01" placeholder="Enter amount">
+            </div>
+
+            <div class="cp-field">
+              <div class="cp-label-row">
+                <label for="payerNumber">Payer Number</label>
+                <span class="cp-help">Recommended</span>
+              </div>
+              <input class="cp-input" type="text" id="payerNumber" placeholder="Phone or payment number used">
+            </div>
+          </div>
+
+          <div class="cp-field">
+            <div class="cp-label-row">
+              <label for="transactionId">Transaction / Reference ID</label>
+              <span class="cp-help">Recommended for manual methods</span>
+            </div>
+            <input class="cp-input" type="text" id="transactionId" placeholder="Enter transaction ID or reference">
+          </div>
+
+          <div class="cp-field">
+            <div class="cp-label-row">
+              <label for="note">Note For Admin</label>
+              <span class="cp-help">Optional</span>
+            </div>
+            <textarea class="cp-textarea" id="note" placeholder="Add anything helpful, such as what the payment is for or when it was sent."></textarea>
+          </div>
+
+          <div class="cp-preview" aria-live="polite">
+            <div class="cp-preview-title">Request Preview</div>
+            <div class="cp-preview-line"><span>Request Type</span><strong id="previewType">Wallet Top-Up</strong></div>
+            <div class="cp-preview-line"><span>Method</span><strong id="previewMethod">Not selected</strong></div>
+            <div class="cp-preview-line"><span>Amount</span><strong id="previewAmount">0.00 GMD</strong></div>
+            <div class="cp-preview-line"><span>Route</span><strong id="previewRoute">Choose a method to view routing</strong></div>
+          </div>
+
+          <div class="cp-actions">
+            <button class="cp-btn primary" type="submit">Submit Payment Request</button>
+            <a class="cp-btn secondary" href="payment-status.html">View Payment Status</a>
+            <a class="cp-btn" href="index.html">Back Home</a>
+          </div>
+
+          <div class="cp-footnote">
+            MatrixMarket stores this request in the admin payment queue and updates your current session to a pending payment state so the payment status page can reflect the review result.
+          </div>
+        </form>
+      </section>
+    </section>
+
+    <footer class="cp-footer">
+      MatrixMarket payment requests are reviewed through the existing admin approval flow.
+    </footer>
+  </main>
+
+  <script>
+    (function () {
+      const ROUTE_MAP = {
+        Wave: "Send to Wave account 6785316",
+        ComCash: "Send to ComCash account 6785316",
+        Wallet: "Wallet request will be reviewed manually",
+        Card: "Card review request will be reviewed manually"
+      };
+
+      const state = {
+        user: null,
+        sessionKey: ""
+      };
+
+      function byId(id) { return document.getElementById(id); }
+      function str(v) { return String(v == null ? "" : v).trim(); }
+      function num(v) { const n = Number(v); return Number.isFinite(n) ? n : 0; }
+      function money(v) { return num(v).toFixed(2) + " GMD"; }
+      function esc(v) {
+        return String(v == null ? "" : v)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/\"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function getStorage() {
+        if (window.MMStorage && typeof window.MMStorage.getItem === "function") return window.MMStorage;
+        try {
+          if (window.localStorage && typeof window.localStorage.getItem === "function") return window.localStorage;
+        } catch (_) {}
+        return {
+          getItem: function () { return null; },
+          setItem: function () {},
+          removeItem: function () {}
+        };
+      }
+
+      function readJson(key, fallback) {
+        try {
+          const raw = getStorage().getItem(key);
+          if (!raw) return fallback;
+          const parsed = JSON.parse(raw);
+          return parsed == null ? fallback : parsed;
+        } catch (_) {
+          return fallback;
+        }
+      }
+
+      function writeJson(key, value) {
+        try {
+          getStorage().setItem(key, JSON.stringify(value));
+        } catch (_) {}
+      }
+
+      function resolveCurrentUser() {
+        const store = getStorage();
+        const ordered = ["loggedInUser", "currentUser", "currentSeller"];
+        for (let i = 0; i < ordered.length; i += 1) {
+          const key = ordered[i];
+          const parsed = readJson(key, null);
+          if (parsed && typeof parsed === "object") {
+            state.sessionKey = key;
+            return parsed;
+          }
+        }
+        state.sessionKey = "";
+        return null;
+      }
+
+      function persistSessionUser(user) {
+        if (!user || typeof user !== "object") return;
+
+        if (state.sessionKey) {
+          writeJson(state.sessionKey, user);
+        }
+
+        const email = str(user.email).toLowerCase();
+        ["loggedInUser", "currentUser", "currentSeller"].forEach(function (key) {
+          const existing = readJson(key, null);
+          if (!existing || typeof existing !== "object") return;
+          const existingEmail = str(existing.email).toLowerCase();
+          if (key === state.sessionKey || (email && existingEmail && email === existingEmail)) {
+            writeJson(key, { ...existing, ...user });
+          }
+        });
+      }
+
+      function setAlert(type, message) {
+        const success = byId("successMsg");
+        const error = byId("errorMsg");
+        success.classList.remove("show");
+        error.classList.remove("show");
+
+        if (type === "success") {
+          success.textContent = message;
+          success.classList.add("show");
+          return;
+        }
+
+        error.textContent = message;
+        error.classList.add("show");
+      }
+
+      function updatePreview() {
+        const requestType = str(byId("requestType").value) || "Wallet Top-Up";
+        const method = str(byId("method").value);
+        const amount = byId("amount").value;
+
+        byId("previewType").textContent = requestType;
+        byId("previewMethod").textContent = method || "Not selected";
+        byId("previewAmount").textContent = money(amount);
+        byId("previewRoute").textContent = method ? (ROUTE_MAP[method] || "Manual review route") : "Choose a method to view routing";
+      }
+
+      function renderUser() {
+        const user = state.user;
+        const nameBox = byId("userName");
+        const metaBox = byId("userMeta");
+
+        if (!user) {
+          nameBox.textContent = "You must be logged in";
+          metaBox.textContent = "Open this page from an active buyer or seller session before submitting a payment request.";
+          return;
+        }
+
+        const name = str(user.fullName || user.name || user.username || user.email || "Unknown User");
+        const email = str(user.email || "No email saved");
+        const role = user.isSeller ? "Seller account" : "Buyer account";
+        const location = str(user.location || "Location not set");
+        const plan = str(user.plan || user.subscription || "Standard");
+
+        nameBox.textContent = name;
+        metaBox.innerHTML = esc(role) + "<br>" + esc(email) + "<br>" + esc(location) + "<br>Plan: " + esc(plan);
+      }
+
+      function normalizeRequests(raw) {
+        if (Array.isArray(raw)) return raw.slice();
+        if (raw && typeof raw === "object") {
+          return Object.keys(raw).map(function (key) {
+            const row = raw[key];
+            if (row && typeof row === "object") return { id: row.id || key, ...row };
+            return { id: key, value: row };
+          });
+        }
+        return [];
+      }
+
+      function submitRequest(event) {
+        event.preventDefault();
+
+        const method = str(byId("method").value);
+        const amount = num(byId("amount").value);
+        const requestType = str(byId("requestType").value) || "Wallet Top-Up";
+        const payerNumber = str(byId("payerNumber").value);
+        const transactionId = str(byId("transactionId").value);
+        const note = str(byId("note").value);
+
+        if (!state.user) {
+          setAlert("error", "You must be logged in before you can submit a payment request.");
+          return;
+        }
+
+        if (!method) {
+          setAlert("error", "Please choose a payment method before submitting.");
+          return;
+        }
+
+        if (!amount || amount <= 0) {
+          setAlert("error", "Please enter a valid payment amount greater than zero.");
+          return;
+        }
+
+        if ((method === "Wave" || method === "ComCash") && !payerNumber) {
+          setAlert("error", "Please enter the payer number used for the Wave or ComCash payment.");
+          return;
+        }
+
+        const requests = normalizeRequests(readJson("pendingRequests", []));
+        const user = { ...state.user };
+        const timestamp = new Date();
+        const name = str(user.fullName || user.name || user.username || user.email);
+        const email = str(user.email);
+
+        const request = {
+          id: "PAY-" + Date.now(),
+          name: name,
+          fullName: name,
+          email: email,
+          amount: amount,
+          method: method,
+          paymentMethod: method,
+          type: requestType,
+          payerNumber: payerNumber,
+          transactionId: transactionId,
+          note: note,
+          location: str(user.location || ""),
+          plan: str(user.plan || user.subscription || "Standard"),
+          role: user.isSeller ? "Seller" : "Buyer",
+          status: "Pending",
+          paymentStatus: "Pending",
+          createdAt: timestamp.toISOString(),
+          date: timestamp.toLocaleString()
+        };
+
+        requests.push(request);
+        writeJson("pendingRequests", requests);
+
+        user.paymentStatus = "Pending";
+        user.status = "Pending";
+        user.amount = amount;
+        user.method = method;
+        user.lastPaymentRequestId = request.id;
+        user.lastPaymentType = requestType;
+        user.lastPaymentSubmittedAt = request.createdAt;
+        persistSessionUser(user);
+        state.user = user;
+        renderUser();
+
+        setAlert("success", "Your payment request was saved successfully. Redirecting to the payment status page...");
+
+        window.setTimeout(function () {
+          window.location.href = "payment-status.html";
+        }, 1600);
+      }
+
+      function bind() {
+        ["requestType", "method", "amount"].forEach(function (id) {
+          byId(id).addEventListener("input", updatePreview);
+          byId(id).addEventListener("change", updatePreview);
+        });
+        byId("paymentForm").addEventListener("submit", submitRequest);
+      }
+
+      function start() {
+        state.user = resolveCurrentUser();
+        renderUser();
+        updatePreview();
+        bind();
+      }
+
+      const ready = window.MMStorage && window.MMStorage.ready;
+      if (ready && typeof ready.then === "function") {
+        ready.finally(start);
+      } else {
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", start);
+        } else {
+          start();
+        }
+      }
+    }());
+  </script>
+  <script defer src="upgrade.js"></script>
+  <script defer src="sw-register.js?v=20260226a"></script>
+  <script defer src="site-performance.js?v=20260226a"></script>
+</body>
+</html>

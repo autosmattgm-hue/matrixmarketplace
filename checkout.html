@@ -1,0 +1,1307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>MatrixMarket - Checkout</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body{margin:0;font-family:"Poppins",sans-serif;background:#f5f7fb;color:#1f2937}
+    header{background:#ffffff;border-bottom:1px solid #e5e7eb;box-shadow:0 2px 10px rgba(15,23,42,.06);display:flex;justify-content:space-between;align-items:center;padding:14px 18px;position:sticky;top:0;z-index:1000}
+    .logo{font-size:1.4rem;font-weight:800;color:#111827}nav{display:flex;gap:12px;flex-wrap:wrap}nav a{color:#374151;text-decoration:none;font-weight:600}
+    .page{width:min(1120px,100% - 20px);margin:18px auto 28px;display:grid;grid-template-columns:1.35fr .9fr;gap:14px}
+    .card{background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;padding:12px;box-shadow:0 8px 20px rgba(15,23,42,.05)}
+    h1,h2,h3,p{margin:0}.title{margin-bottom:10px;color:#111827}
+    .title-row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+    .chips{display:flex;gap:6px;flex-wrap:wrap}
+    .chip{border:1px solid #dbe4f0;background:#f8fafc;border-radius:999px;padding:4px 9px;font-size:.8rem;color:#334155}
+    .order-list{display:grid;gap:8px}.order-item{display:grid;grid-template-columns:66px 1fr auto;gap:9px;align-items:center;background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:8px}
+    .order-item img{width:66px;height:66px;border-radius:8px;object-fit:cover;background:#f3f4f6}.meta{font-size:.86rem;color:#6b7280}.name{font-weight:700;color:#111827}
+    .prod-meta{display:flex;gap:7px;flex-wrap:wrap;margin-top:4px}
+    .prod-meta span{font-size:.78rem;border:1px solid #dbe4f0;background:#ffffff;border-radius:999px;padding:2px 8px;color:#475569}
+    .item-tools{display:grid;gap:6px;justify-items:end}
+    .item-tools .item-total{font-weight:700}
+    .mini-action{border:1px solid #d1d5db;background:#fff;color:#1f2937;border-radius:8px;padding:6px 8px;font-size:.78rem;font-weight:700;cursor:pointer}
+    .mini-action:hover{border-color:#9ca3af;background:#f9fafb}
+    .qty-wrap{display:flex;gap:6px;align-items:center}
+    .qty-btn{border:1px solid #cbd5e1;background:#fff;color:#0f172a;border-radius:8px;padding:4px 9px;font-size:.85rem;font-weight:800;cursor:pointer}
+    .qty-btn:hover{background:#f8fafc}
+    .qty-value{min-width:26px;text-align:center;font-weight:700;color:#1f2937}
+    .line{display:flex;justify-content:space-between;gap:8px;font-size:.93rem;color:#374151}.total{margin-top:6px;padding-top:8px;border-top:1px solid #e5e7eb;font-size:1.04rem;font-weight:800;color:#111827}
+    .form-grid{display:grid;gap:8px}input,select,textarea{width:100%;border:1px solid #d1d5db;background:#ffffff;color:#111827;border-radius:10px;padding:10px;font:inherit}
+    textarea{min-height:86px;resize:vertical}.payment{display:grid;gap:8px;margin-top:8px}
+    .inline-actions{display:flex;gap:8px;flex-wrap:wrap}
+    .subtle{font-size:.82rem;color:#6b7280}
+    .wallet{background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:9px;font-size:.9rem;color:#1d4ed8}
+    .inline-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .btn{border:1px solid #1d4ed8;border-radius:10px;padding:10px 12px;font-weight:700;cursor:pointer;background:#2563eb;color:#fff}
+    .btn-alt{background:#ffffff;border:1px solid #d1d5db;color:#1f2937}
+    .actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}.msg{display:none;margin-top:10px;border-radius:10px;padding:10px;font-size:.9rem}
+    .msg.ok{background:#ecfdf3;border:1px solid #86efac;color:#166534}
+    .msg.err{background:#fef2f2;border:1px solid #fecaca;color:#b91c1c}
+    .empty{text-align:center;color:#6b7280;border:1px dashed #d1d5db;border-radius:10px;padding:16px}
+    .hint{margin-top:8px;color:#6b7280;font-size:.82rem}
+    @media (max-width:920px){.page{grid-template-columns:1fr}}
+    @media (max-width:700px){
+      header{align-items:flex-start;padding:12px 10px}
+      nav{width:100%;overflow-x:auto;padding-bottom:2px}
+      nav a{white-space:nowrap}
+      .inline-row{grid-template-columns:1fr}
+      .order-item{grid-template-columns:1fr}
+      .order-item img{width:100%;height:180px}
+      .item-tools{justify-items:start}
+      .actions .btn{width:100%;justify-content:center}
+      .chips{width:100%}
+    }
+  </style>
+  <link rel="stylesheet" href="upgrade.css">
+  <script src="firebase-online-storage.js"></script>
+</head>
+<body>
+  <header>
+    <div class="logo">MatrixMarket</div>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="shop.html">Shop</a>
+      <a href="cart.html">Cart</a>
+      <a href="buyers-orders.html">My Orders</a>
+    </nav>
+  </header>
+
+  <main class="page">
+    <section class="card">
+      <div class="title-row">
+        <h2 class="title" style="margin:0">Selected Products</h2>
+        <div class="chips">
+          <span id="selectedCount" class="chip">0 items</span>
+          <span id="selectedSellers" class="chip">0 sellers</span>
+          <span id="selectedSource" class="chip">Source: checkout</span>
+          <button id="clearSelectedBtn" type="button" class="mini-action">Clear Selected</button>
+        </div>
+      </div>
+      <div id="orderList" class="order-list"></div>
+      <div style="margin-top:10px;display:grid;gap:6px;" id="summaryBox">
+        <div class="line"><span>Items</span><span id="sumItems">0</span></div>
+        <div class="line"><span>Subtotal</span><span id="sumSubtotal">0.00 GMD</span></div>
+        <div class="line"><span>Discount</span><span id="sumDiscount">0.00 GMD</span></div>
+        <div class="line"><span>Delivery Fee</span><span id="sumDelivery">0.00 GMD</span></div>
+        <div class="line"><span>Shipping</span><span id="sumShipping">0.00 GMD</span></div>
+        <div class="line total"><span>Total</span><span id="sumTotal">0.00 GMD</span></div>
+      </div>
+      <p class="hint">Order ID will be generated when you place the order.</p>
+    </section>
+
+    <aside class="card">
+      <h3 class="title">Delivery & Payment</h3>
+      <div class="form-grid">
+        <input id="buyerName" type="text" placeholder="Full Name">
+        <input id="buyerPhone" type="text" placeholder="Phone Number">
+        <input id="buyerEmail" type="email" placeholder="Email Address">
+        <textarea id="buyerAddress" placeholder="Delivery Address"></textarea>
+        <div class="inline-row">
+          <select id="deliveryOption">
+            <option value="standard">Standard Delivery (0.00 GMD)</option>
+            <option value="express">Express Delivery (+35.00 GMD)</option>
+          </select>
+          <input id="deliveryDate" type="date">
+        </div>
+        <select id="deliveryWindow">
+          <option value="anytime">Delivery Window: Anytime</option>
+          <option value="morning">Morning (8:00 - 12:00)</option>
+          <option value="afternoon">Afternoon (12:00 - 17:00)</option>
+          <option value="evening">Evening (17:00 - 21:00)</option>
+        </select>
+        <textarea id="orderNote" placeholder="Order note (optional)"></textarea>
+        <div class="subtle" id="noteCount">0 / 300</div>
+      </div>
+
+      <div class="payment">
+        <select id="paymentMethod">
+          <option value="wallet">Pay from Wallet Balance</option>
+          <option value="cod">Cash on Delivery</option>
+        </select>
+        <label style="font-size:.88rem;color:#4b5563;"><input id="termsCheck" type="checkbox" style="width:auto; margin-right:6px;"> I confirm my order details are correct.</label>
+        <div class="inline-actions">
+          <button class="btn btn-alt" id="profileFillBtn" type="button">Use Saved Profile</button>
+          <span class="subtle" id="onlineStatus">Online storage: checking...</span>
+        </div>
+      </div>
+
+      <div class="wallet" id="walletInfo">Wallet Balance: 0.00 GMD</div>
+      <p class="hint" id="etaInfo">ETA: --</p>
+      <div class="actions">
+        <button class="btn" id="placeOrderBtn" type="button">Place Order</button>
+        <a class="btn btn-alt" href="settings.html" style="text-decoration:none;display:inline-flex;align-items:center;">Top Up Wallet</a>
+        <a class="btn btn-alt" href="cart.html" style="text-decoration:none;display:inline-flex;align-items:center;">Back to Cart</a>
+      </div>
+      <div id="okMsg" class="msg ok"></div>
+      <div id="errMsg" class="msg err"></div>
+    </aside>
+  </main>
+
+  <script src="seller-core.js?v=20260222g"></script>
+  <script src="api-client.js"></script>
+  <script>
+    const state = {
+      cart: [],
+      buyer: null,
+      meta: null,
+      totals: { items: 0, subtotal: 0, discount: 0, deliveryFee: 0, shipping: 0, total: 0 },
+      balance: 0,
+      isSellerBuyer: false,
+      deliveryOption: "standard",
+      placing: false,
+      onlineReady: false,
+      cartSource: "checkout"
+    };
+    const BUYER_SCOPE_PREFIX = "__mm_buyer__";
+    const SCOPED_EXACT_KEYS = new Set([
+      "cart",
+      "cartItems",
+      "buyerInfo",
+      "buyerInfoDraft",
+      "checkoutCart",
+      "checkoutMeta",
+      "checkoutDraft",
+      "cartCoupon",
+      "cartDeliveryMode",
+      "paymentStatus",
+      "buyerOrders",
+      "orderLineSnapshots"
+    ]);
+    const SCOPED_KEY_PREFIXES = ["buyerOrdersByEmail:", "buyerOrdersByPhone:", "orderItemsById:"];
+    const LEGACY_READ_THROUGH_KEYS = new Set([
+      "cart",
+      "cartItems",
+      "buyerInfo",
+      "buyerInfoDraft",
+      "checkoutCart",
+      "checkoutMeta",
+      "checkoutDraft",
+      "cartCoupon",
+      "cartDeliveryMode"
+    ]);
+    let cachedUserScope = null;
+
+    function byId(id) { return document.getElementById(id); }
+    const storage = (function () {
+      if (window.MMStorage && typeof window.MMStorage.getItem === "function") return window.MMStorage;
+      return null;
+    })();
+    function storageStatus() {
+      if (!window.MMStorage || typeof window.MMStorage.status !== "function") return null;
+      try { return window.MMStorage.status(); } catch (_) { return null; }
+    }
+    function apiReady() {
+      return Boolean(window.MMApi && typeof window.MMApi.isEnabled === "function" && window.MMApi.isEnabled());
+    }
+    function resolveOnlineReady() {
+      const status = storageStatus();
+      if (status) return Boolean(status.ready && status.writable && status.mode !== "memory");
+      return Boolean(window.MMStorage && typeof window.MMStorage.getItem === "function");
+    }
+    function applyOnlineStatusText() {
+      const status = storageStatus();
+      const apiOn = apiReady();
+      if (status) {
+        const base = status.mode === "memory" ? "memory fallback" : status.mode;
+        if (resolveOnlineReady()) {
+          byId("onlineStatus").textContent = "Online storage: " + base + " ready";
+          return;
+        }
+        if (apiOn) {
+          byId("onlineStatus").textContent = "Storage unavailable, API mode active";
+          return;
+        }
+        byId("onlineStatus").textContent = "Online storage: unavailable";
+        return;
+      }
+      byId("onlineStatus").textContent = apiOn ? "API mode active" : "Online storage: unavailable";
+    }
+    function num(v) { const n = Number(v); return Number.isFinite(n) ? n : 0; }
+    function money(v) { return num(v).toFixed(2) + " GMD"; }
+    function cleanEmail(v) { return String(v || "").trim().toLowerCase(); }
+    function cleanPhone(v) { return String(v || "").replace(/\D+/g, ""); }
+    function isValidEmail(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || "").trim()); }
+    function esc(v) { return String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;"); }
+    function todayIsoDate() { return new Date().toISOString().slice(0, 10); }
+    function deliveryFeeFor(option) { return option === "express" ? 35 : 0; }
+    function etaFromOption(option, dateValue) {
+      const base = option === "express" ? "Estimated next day delivery." : "Estimated delivery in 2-3 days.";
+      return dateValue ? (base + " Requested date: " + dateValue + ".") : base;
+    }
+    function parseStoredJson(raw, fallback) {
+      if (raw == null || raw === "") return fallback;
+      try {
+        const parsed = JSON.parse(raw);
+        return parsed == null ? fallback : parsed;
+      } catch (_) {
+        return fallback;
+      }
+    }
+    function parseDeepJson(raw, fallback) {
+      if (raw == null || raw === "") return fallback;
+      let value = raw;
+      for (let i = 0; i < 3; i += 1) {
+        if (typeof value !== "string") break;
+        const trimmed = value.trim();
+        if (!trimmed) return fallback;
+        try {
+          value = JSON.parse(trimmed);
+        } catch (_) {
+          return i === 0 ? fallback : value;
+        }
+      }
+      return value == null ? fallback : value;
+    }
+    function normalizeScopeToken(value) {
+      const token = String(value == null ? "" : value).trim().toLowerCase();
+      if (!token) return "";
+      return token.replace(/[^a-z0-9._:@-]+/g, "_");
+    }
+    function isGuestUser(user) {
+      if (!user || typeof user !== "object") return true;
+      if (user.isGuest) return true;
+      return normalizeScopeToken(user.email) === "guest@matrixmarket.local";
+    }
+    function readActiveSessionUser() {
+      const keys = ["currentUser", "loggedInUser", "currentSeller"];
+      let fallback = null;
+      for (let i = 0; i < keys.length; i += 1) {
+        const parsed = parseStoredJson(storage && storage.getItem(keys[i]), null);
+        if (!parsed || typeof parsed !== "object") continue;
+        if (!fallback) fallback = parsed;
+        if (!isGuestUser(parsed)) return parsed;
+      }
+      return fallback;
+    }
+    function persistSessionUser(nextUser) {
+      if (!nextUser || typeof nextUser !== "object") return;
+      const sessionEmail = cleanEmail(nextUser.email);
+      ["currentUser", "loggedInUser", "currentSeller"].forEach(function (key) {
+        const existing = read(key, null);
+        if (!existing || typeof existing !== "object") return;
+        const existingEmail = cleanEmail(existing.email);
+        if ((sessionEmail && existingEmail === sessionEmail) || key === "currentUser" || key === "loggedInUser") {
+          write(key, Object.assign({}, existing, nextUser));
+        }
+      });
+    }
+    function resolveUserScopeToken() {
+      const current = readActiveSessionUser() || {};
+      const email = normalizeScopeToken(current && current.email);
+      if (email && email !== "guest@matrixmarket.local") return email;
+      const uid = normalizeScopeToken(current && (current.id || current.uid || current.userId));
+      if (uid) return "id_" + uid;
+      const phone = normalizeScopeToken(current && current.phone);
+      if (phone) return "phone_" + phone;
+      const name = normalizeScopeToken(current && (current.username || current.name || current.fullName));
+      if (name) return "name_" + name;
+      return "guest";
+    }
+    function userScopeToken() {
+      if (cachedUserScope) return cachedUserScope;
+      cachedUserScope = resolveUserScopeToken();
+      return cachedUserScope;
+    }
+    function shouldScopeKey(key) {
+      const value = String(key || "");
+      if (SCOPED_EXACT_KEYS.has(value)) return true;
+      return SCOPED_KEY_PREFIXES.some(function (prefix) { return value.indexOf(prefix) === 0; });
+    }
+    function scopedStorageKey(key) {
+      return BUYER_SCOPE_PREFIX + userScopeToken() + "__" + String(key || "");
+    }
+    function guestScopedStorageKey(key) {
+      return BUYER_SCOPE_PREFIX + "guest__" + String(key || "");
+    }
+    function rawGet(key) {
+      if (!storage) return null;
+      const target = String(key || "");
+      try {
+        if (shouldScopeKey(target)) {
+          const scoped = storage.getItem(scopedStorageKey(target));
+          if (scoped != null && scoped !== "") return scoped;
+          if (LEGACY_READ_THROUGH_KEYS.has(target)) {
+            const guestScoped = storage.getItem(guestScopedStorageKey(target));
+            if (guestScoped != null && guestScoped !== "") return guestScoped;
+            const legacy = storage.getItem(target);
+            if (legacy != null && legacy !== "") return legacy;
+          }
+          if (userScopeToken() !== "guest") return null;
+        }
+        return storage.getItem(target);
+      } catch (_) { return null; }
+    }
+    function rawSet(key, value) {
+      if (!storage) return false;
+      const target = String(key || "");
+      try {
+        storage.setItem(shouldScopeKey(target) ? scopedStorageKey(target) : target, value);
+        return true;
+      } catch (error) { console.warn("Storage write failed for key:", key, error); return false; }
+    }
+    function rawRemove(key) {
+      if (!storage) return false;
+      const target = String(key || "");
+      try {
+        storage.removeItem(shouldScopeKey(target) ? scopedStorageKey(target) : target);
+        return true;
+      } catch (error) { console.warn("Storage remove failed for key:", key, error); return false; }
+    }
+    function read(key, fallback) {
+      try {
+        return parseDeepJson(rawGet(key), fallback);
+      } catch (_) {
+        return fallback;
+      }
+    }
+    function write(key, value) {
+      return rawSet(key, JSON.stringify(value));
+    }
+    function readBridgePayload() {
+      try {
+        const raw = String(window.name || "").trim();
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === "object" ? parsed : null;
+      } catch (_) {
+        return null;
+      }
+    }
+    function readDirectJson(storageKey, fallback) {
+      if (!storage) return fallback;
+      try {
+        const raw = storage.getItem(String(storageKey || ""));
+        if (raw == null || raw === "") return fallback;
+        return parseDeepJson(raw, fallback);
+      } catch (_) {
+        return fallback;
+      }
+    }
+    function recoverCheckoutRowsFromAnyKey() {
+      const keyPool = [
+        scopedStorageKey("checkoutCart"),
+        scopedStorageKey("cart"),
+        scopedStorageKey("cartItems"),
+        guestScopedStorageKey("checkoutCart"),
+        guestScopedStorageKey("cart"),
+        guestScopedStorageKey("cartItems"),
+        "checkoutCart",
+        "cart",
+        "cartItems"
+      ];
+      const seen = new Set();
+      let best = [];
+      keyPool.forEach(function (key) {
+        const target = String(key || "");
+        if (!target || seen.has(target)) return;
+        seen.add(target);
+        const rows = normalizeCart(readDirectJson(target, []));
+        if (rows.length > best.length) best = rows;
+      });
+      return best;
+    }
+    function ensureOnlineStorage() {
+      state.onlineReady = resolveOnlineReady() || apiReady();
+      applyOnlineStatusText();
+      if (state.onlineReady) return true;
+      showError("Online storage is unavailable. Please wait for connection or enable API mode.");
+      return false;
+    }
+
+    function saveCheckoutDraft() {
+      if (!byId("buyerName")) return;
+      const note = byId("orderNote").value.trim().slice(0, 300);
+      byId("orderNote").value = note;
+      const draft = {
+        name: byId("buyerName").value.trim(),
+        phone: byId("buyerPhone").value.trim(),
+        email: byId("buyerEmail").value.trim(),
+        address: byId("buyerAddress").value.trim(),
+        deliveryOption: byId("deliveryOption").value,
+        deliveryDate: byId("deliveryDate").value,
+        deliveryWindow: byId("deliveryWindow").value || "anytime",
+        orderNote: note
+      };
+      write("checkoutDraft", draft);
+      byId("noteCount").textContent = note.length + " / 300";
+      validateCheckoutForm();
+    }
+
+    function normalizeCart(raw) {
+      if (!Array.isArray(raw)) return [];
+      return raw.filter(function (item) { return item && item.name; }).map(function (item) {
+        return {
+          id: String(item.id || item.productId || item.productKey || ""),
+          productId: String(item.productId || item.id || item.productKey || ""),
+          name: String(item.name || "Product"),
+          seller: String(item.seller || "N/A"),
+          sellerEmail: String(item.sellerEmail || ""),
+          image: String(item.image || "matrixx.png"),
+          category: String(item.category || "general"),
+          price: num(item.price),
+          quantity: Math.max(1, Math.floor(num(item.quantity || 1)))
+        };
+      });
+    }
+
+    function normalizeSellers(raw) {
+      if (Array.isArray(raw)) return raw.slice();
+      if (raw && typeof raw === "object") {
+        return Object.keys(raw).map(function (name) {
+          const row = raw[name] || {};
+          return { ...row, name: row.name || name, fullName: row.fullName || row.name || name, store: row.store || name };
+        });
+      }
+      return [];
+    }
+
+    function detectSellerBuyerAccount() {
+      const current = readActiveSessionUser() || read("currentUser", null);
+      if (current && current.isSeller) return true;
+      const email = cleanEmail(current && current.email);
+      if (!email) return false;
+      const sellers = normalizeSellers(read("sellers", []));
+      return sellers.some(function (s) { return cleanEmail(s.email) === email; });
+    }
+
+    function findSellerIndex(sellers, item) {
+      const itemEmail = cleanEmail(item.sellerEmail);
+      const sellerName = String(item.seller || "").trim().toLowerCase();
+      if (itemEmail) {
+        const byEmail = sellers.findIndex(function (s) { return cleanEmail(s.email) === itemEmail; });
+        if (byEmail >= 0) return byEmail;
+      }
+      if (!sellerName) return -1;
+      return sellers.findIndex(function (s) {
+        const keys = [s.store, s.name, s.fullName, s.email].map(function (v) {
+          return String(v || "").trim().toLowerCase();
+        });
+        return keys.includes(sellerName);
+      });
+    }
+
+    function creditSellers(orderId, buyer, timestamp, paymentMethod) {
+      const sellersRaw = read("sellers", []);
+      const sellers = normalizeSellers(sellersRaw);
+      if (!sellers.length) return;
+
+      const payoutsRaw = read("sellerPayouts", []);
+      const payouts = Array.isArray(payoutsRaw) ? payoutsRaw : [];
+      state.cart.forEach(function (item) {
+        const idx = findSellerIndex(sellers, item);
+        if (idx < 0) return;
+        const amount = num(item.price) * Math.max(1, Math.floor(num(item.quantity || 1)));
+        sellers[idx].balance = num(sellers[idx].balance) + amount;
+        payouts.push({
+          id: "PAYOUT-" + Date.now() + "-" + Math.random().toString(36).slice(2, 7),
+          orderId: orderId,
+          sellerEmail: sellers[idx].email || item.sellerEmail || "",
+          sellerName: sellers[idx].store || sellers[idx].fullName || sellers[idx].name || item.seller || "Seller",
+          buyerEmail: buyer.email,
+          buyerName: buyer.name,
+          productName: item.name,
+          quantity: Math.max(1, Math.floor(num(item.quantity || 1))),
+          amount: amount,
+          source: "buyer_checkout",
+          paymentMethod: paymentMethod,
+          status: "credited",
+          createdAt: timestamp
+        });
+      });
+
+      write("sellers", sellers);
+      write("sellerPayouts", payouts);
+    }
+
+    function computeTotals() {
+      const items = state.cart.reduce(function (sum, item) { return sum + item.quantity; }, 0);
+      const subtotal = state.cart.reduce(function (sum, item) { return sum + (item.price * item.quantity); }, 0);
+      let discount = 0;
+      let shipping = subtotal >= 500 || subtotal === 0 ? 0 : 25;
+      const deliveryFee = deliveryFeeFor(state.deliveryOption);
+
+      if (state.meta && num(state.meta.discount) > 0) discount = num(state.meta.discount);
+      if (state.meta) {
+        const metaShipping = num(state.meta.shipping);
+        const metaDelivery = num(state.meta.deliveryFee || 0);
+        if (metaShipping > 0 || metaDelivery > 0) {
+          shipping = Math.max(0, metaShipping - metaDelivery);
+        }
+        if (state.meta.coupon === "FREEDEL") shipping = 0;
+      }
+      const total = Math.max(0, subtotal - discount + shipping + deliveryFee);
+      state.totals = {
+        items: items,
+        subtotal: subtotal,
+        discount: discount,
+        deliveryFee: deliveryFee,
+        shipping: shipping,
+        total: total
+      };
+    }
+
+    function renderSummary() {
+      computeTotals();
+      byId("sumItems").textContent = String(state.totals.items);
+      byId("sumSubtotal").textContent = money(state.totals.subtotal);
+      byId("sumDiscount").textContent = "- " + money(state.totals.discount);
+      byId("sumDelivery").textContent = money(state.totals.deliveryFee);
+      byId("sumShipping").textContent = money(state.totals.shipping);
+      byId("sumTotal").textContent = money(state.totals.total);
+      byId("etaInfo").textContent = "ETA: " + etaFromOption(state.deliveryOption, byId("deliveryDate").value);
+      validateCheckoutForm();
+    }
+
+    function renderOrderList() {
+      const list = byId("orderList");
+      if (!state.cart.length) {
+        list.innerHTML = '<div class="empty">No checkout cart found. Return to cart and try again.</div>';
+        byId("selectedCount").textContent = "0 items";
+        byId("selectedSellers").textContent = "0 sellers";
+        byId("selectedSource").textContent = "Source: " + state.cartSource;
+        byId("placeOrderBtn").disabled = true;
+        renderSummary();
+        return;
+      }
+
+      const sellerSet = new Set();
+      let totalUnits = 0;
+      list.innerHTML = state.cart.map(function (item, index) {
+        const img = String(item.image || "matrixx.png");
+        const safeImg = esc(img);
+        const safeName = esc(item.name);
+        const safeSeller = esc(item.seller);
+        const safeCategory = esc(item.category || "general");
+        const safeQty = Math.max(1, Math.floor(num(item.quantity || 1)));
+        sellerSet.add(String(item.seller || "").toLowerCase());
+        totalUnits += safeQty;
+        return `
+          <article class="order-item">
+                    <img loading="lazy" decoding="async" fetchpriority="low" src="${safeImg}" alt="${safeName}" onerror="this.onerror=null;this.src='matrixx.png';">
+            <div>
+              <div class="name">${safeName}</div>
+              <div class="meta">Seller: ${safeSeller}</div>
+              <div class="prod-meta">
+                <span>Qty: ${safeQty}</span>
+                <span>Unit: ${money(item.price)}</span>
+                <span>Category: ${safeCategory}</span>
+              </div>
+            </div>
+            <div class="item-tools">
+              <div class="item-total">${money(item.price * safeQty)}</div>
+              <div class="qty-wrap">
+                <button type="button" class="qty-btn" data-action="qty-dec" data-index="${index}" aria-label="Decrease quantity">-</button>
+                <span class="qty-value">${safeQty}</span>
+                <button type="button" class="qty-btn" data-action="qty-inc" data-index="${index}" aria-label="Increase quantity">+</button>
+              </div>
+              <button type="button" class="mini-action" data-action="deselect" data-index="${index}">Deselect</button>
+            </div>
+          </article>
+        `;
+      }).join("");
+      byId("selectedCount").textContent = totalUnits + " items";
+      byId("selectedSellers").textContent = sellerSet.size + " sellers";
+      byId("selectedSource").textContent = "Source: " + state.cartSource;
+      renderSummary();
+    }
+
+    function fillBuyer() {
+      const draft = read("checkoutDraft", null) || {};
+      const buyer = state.buyer || read("buyerInfoDraft", null) || readActiveSessionUser() || read("currentUser", null) || {};
+      byId("buyerName").value = draft.name || buyer.name || buyer.fullName || "";
+      byId("buyerPhone").value = draft.phone || buyer.phone || "";
+      byId("buyerEmail").value = draft.email || buyer.email || "";
+      byId("buyerAddress").value = draft.address || buyer.address || "";
+      const preferredOption = draft.deliveryOption || (state.meta && state.meta.deliveryMode) || "standard";
+      state.deliveryOption = preferredOption === "express" ? "express" : "standard";
+      byId("deliveryOption").value = state.deliveryOption;
+      byId("deliveryDate").min = todayIsoDate();
+      byId("deliveryDate").value = draft.deliveryDate || "";
+      byId("deliveryWindow").value = String(draft.deliveryWindow || "anytime");
+      if (byId("deliveryDate").value && byId("deliveryDate").value < byId("deliveryDate").min) {
+        byId("deliveryDate").value = "";
+      }
+      const note = String(draft.orderNote || "").slice(0, 300);
+      byId("orderNote").value = note;
+      byId("noteCount").textContent = note.length + " / 300";
+    }
+
+    function fillBuyerFromProfile() {
+      const buyer = readActiveSessionUser() || read("currentUser", null) || read("buyerInfo", null) || read("buyerInfoDraft", null) || {};
+      byId("buyerName").value = str(buyer.fullName || buyer.name || "");
+      byId("buyerPhone").value = str(buyer.phone || "");
+      byId("buyerEmail").value = str(buyer.email || "");
+      byId("buyerAddress").value = str(buyer.address || "");
+      saveCheckoutDraft();
+    }
+
+    function validateCheckoutForm() {
+      state.onlineReady = resolveOnlineReady() || apiReady();
+      applyOnlineStatusText();
+      const hasCore = Boolean(str(byId("buyerName").value) && str(byId("buyerPhone").value) && str(byId("buyerEmail").value) && str(byId("buyerAddress").value));
+      const termsAccepted = Boolean(byId("termsCheck").checked);
+      const btn = byId("placeOrderBtn");
+      const clearBtn = byId("clearSelectedBtn");
+      if (!btn) return;
+      btn.disabled = !state.onlineReady || state.placing || !state.cart.length || !hasCore || !termsAccepted;
+      if (clearBtn) clearBtn.disabled = state.placing || !state.cart.length;
+    }
+
+    function str(v) {
+      return String(v == null ? "" : v).trim();
+    }
+
+    function readBalance() {
+      const user = readActiveSessionUser() || read("currentUser", null);
+      const fallback = num(rawGet("userBalance") || rawGet("balance") || 0);
+      const value = (user && user.balance != null) ? num(user.balance) : fallback;
+      state.balance = value;
+      byId("walletInfo").textContent = "Wallet Balance: " + money(value);
+    }
+
+    function persistBalance(value) {
+      const next = Math.max(0, num(value));
+      const user = readActiveSessionUser() || read("currentUser", null);
+      if (user) {
+        user.balance = next;
+        persistSessionUser(user);
+        const users = read("users", []);
+        const currentEmail = cleanEmail(user && user.email);
+        const updated = Array.isArray(users) ? users.map(function (u) {
+          if (u && cleanEmail(u.email) && currentEmail && cleanEmail(u.email) === currentEmail) return { ...u, balance: next };
+          return u;
+        }) : [];
+        write("users", updated);
+      }
+      rawSet("userBalance", String(next));
+      rawSet("balance", String(next));
+      state.balance = next;
+      byId("walletInfo").textContent = "Wallet Balance: " + money(next);
+    }
+
+    function showError(text) {
+      const err = byId("errMsg");
+      const ok = byId("okMsg");
+      ok.style.display = "none";
+      err.textContent = text;
+      err.style.display = "block";
+    }
+
+    function showSuccess(text) {
+      const err = byId("errMsg");
+      const ok = byId("okMsg");
+      err.style.display = "none";
+      ok.textContent = text;
+      ok.style.display = "block";
+    }
+
+    function stockIssueText(issues) {
+      const rows = Array.isArray(issues) ? issues : [];
+      if (!rows.length) return "Some cart items are no longer available.";
+      return rows.map(function (issue) { return issue.message; }).join(" ");
+    }
+
+    function deriveMetaFromCart(cartRows) {
+      const cart = Array.isArray(cartRows) ? cartRows : [];
+      const subtotal = cart.reduce(function (sum, item) {
+        return sum + (num(item.price) * Math.max(1, Math.floor(num(item.quantity || 1))));
+      }, 0);
+      const coupon = String(rawGet("cartCoupon") || "").toUpperCase() || null;
+      const mode = rawGet("cartDeliveryMode") === "express" ? "express" : "standard";
+      const deliveryFee = deliveryFeeFor(mode);
+      let shipping = subtotal >= 500 || subtotal === 0 ? 0 : 25;
+      let discount = 0;
+      if (coupon === "SAVE10") discount = Math.min(subtotal * 0.10, 500);
+      if (coupon === "FREEDEL") shipping = 0;
+      const total = Math.max(0, subtotal - discount + shipping + deliveryFee);
+      return {
+        coupon: coupon,
+        subtotal: subtotal,
+        discount: discount,
+        shipping: shipping + deliveryFee,
+        deliveryFee: deliveryFee,
+        deliveryMode: mode,
+        etaText: etaFromOption(mode, ""),
+        total: total
+      };
+    }
+
+    function isMetaAlignedWithCart(meta, cartRows) {
+      if (!meta || typeof meta !== "object") return false;
+      const cart = normalizeCart(cartRows);
+      if (!cart.length) return true;
+      const subtotal = cart.reduce(function (sum, item) {
+        return sum + (num(item.price) * Math.max(1, Math.floor(num(item.quantity || 1))));
+      }, 0);
+      const metaSubtotal = num(meta.subtotal);
+      return Math.abs(subtotal - metaSubtotal) < 0.01;
+    }
+
+    function resolveInitialCartBundle() {
+      const candidates = [];
+      function addCandidate(rows, source, score) {
+        const cart = normalizeCart(rows);
+        if (!cart.length) return;
+        candidates.push({ cart: cart, source: source, score: num(score) });
+      }
+
+      addCandidate(read("checkoutCart", []), "checkout", 50);
+      addCandidate(read("cart", []), "cart", 40);
+      addCandidate(recoverCheckoutRowsFromAnyKey(), "recovered-storage", 45);
+
+      const bridge = readBridgePayload();
+      if (bridge) {
+        if (bridge.mmCheckoutBridge && Array.isArray(bridge.mmCheckoutBridge.cart)) {
+          addCandidate(bridge.mmCheckoutBridge.cart, "window-checkout-bridge", 60);
+        }
+        if (bridge.mmCartBridge && Array.isArray(bridge.mmCartBridge.cart)) {
+          addCandidate(bridge.mmCartBridge.cart, "window-cart-bridge", 55);
+        }
+      }
+
+      if (!candidates.length) {
+        return { cart: [], source: "checkout" };
+      }
+
+      candidates.sort(function (a, b) {
+        if (b.score !== a.score) return b.score - a.score;
+        return b.cart.length - a.cart.length;
+      });
+      return { cart: candidates[0].cart, source: candidates[0].source };
+    }
+
+    function setPlacing(active) {
+      state.placing = !!active;
+      state.onlineReady = resolveOnlineReady() || apiReady();
+      const btn = byId("placeOrderBtn");
+      if (!btn) return;
+      btn.disabled = !state.onlineReady || state.placing || !state.cart.length;
+      btn.textContent = state.placing ? "Placing..." : "Place Order";
+    }
+
+    function persistSelectedProducts() {
+      computeTotals();
+      const coupon = state.meta && state.meta.coupon ? state.meta.coupon : null;
+      state.meta = {
+        coupon: coupon,
+        subtotal: state.totals.subtotal,
+        discount: state.totals.discount,
+        shipping: state.totals.shipping + state.totals.deliveryFee,
+        deliveryFee: state.totals.deliveryFee,
+        deliveryMode: state.deliveryOption,
+        etaText: etaFromOption(state.deliveryOption, byId("deliveryDate").value),
+        total: state.totals.total
+      };
+      const okA = write("checkoutCart", state.cart);
+      const okB = write("checkoutMeta", state.meta);
+      const okC = write("cart", state.cart);
+      const okD = write("cartItems", state.cart);
+      return okA && okB && okC && okD;
+    }
+
+    function deselectProduct(index) {
+      if (!Number.isInteger(index) || index < 0 || index >= state.cart.length) return;
+      state.cart.splice(index, 1);
+      if (!persistSelectedProducts()) {
+        showError("Could not update selected products. Please try again.");
+      } else {
+        showSuccess("Product removed from selection.");
+      }
+      renderOrderList();
+      validateCheckoutForm();
+    }
+
+    function updateProductQuantity(index, delta) {
+      if (!Number.isInteger(index) || index < 0 || index >= state.cart.length) return;
+      const row = state.cart[index];
+      if (!row) return;
+      const current = Math.max(1, Math.floor(num(row.quantity || 1)));
+      const next = Math.max(1, Math.min(99, current + Math.floor(num(delta))));
+      if (next === current) return;
+      row.quantity = next;
+      if (!persistSelectedProducts()) {
+        showError("Could not update quantity. Please try again.");
+        return;
+      }
+      showSuccess("Quantity updated.");
+      renderOrderList();
+      validateCheckoutForm();
+    }
+
+    function clearSelectedProducts() {
+      if (!state.cart.length) return;
+      if (!confirm("Remove all selected products from checkout?")) return;
+      state.cart = [];
+      if (!persistSelectedProducts()) {
+        showError("Could not clear selected products. Please try again.");
+      } else {
+        showSuccess("Selected products cleared.");
+      }
+      renderOrderList();
+      validateCheckoutForm();
+    }
+
+    function upsertOrderInKey(storageKey, order) {
+      if (!order || typeof order !== "object") return;
+      const rows = read(storageKey, []);
+      const list = Array.isArray(rows) ? rows.slice() : [];
+      const orderId = String(order.id || order.orderNumber || order.orderId || "").trim();
+      const index = list.findIndex(function (row) {
+        const id = String((row && (row.id || row.orderNumber || row.orderId)) || "").trim();
+        return id && id === orderId;
+      });
+      if (index >= 0) {
+        list[index] = Object.assign({}, list[index], order);
+      } else {
+        list.unshift(order);
+      }
+      return write(storageKey, list);
+    }
+
+    function upsertBuyerOrder(order, buyer) {
+      const primarySaved = upsertOrderInKey("buyerOrders", order);
+      const email = cleanEmail((order && (order.ownerEmail || order.accountEmail)) || (buyer && buyer.email));
+      const phone = String((order && (order.ownerPhone || order.accountPhone)) || (buyer && buyer.phone) || "").replace(/\D+/g, "");
+      if (email) upsertOrderInKey("buyerOrdersByEmail:" + email, order);
+      if (phone) upsertOrderInKey("buyerOrdersByPhone:" + phone, order);
+      return primarySaved;
+    }
+
+    function toSnapshotItems(cartRows) {
+      return normalizeCart(cartRows).map(function (item, index) {
+        const qty = Math.max(1, Math.floor(num(item.quantity || 1)));
+        const unit = num(item.price);
+        return {
+          id: String(item.id || item.productId || ("LINE-" + index)),
+          productId: String(item.productId || item.id || ""),
+          name: String(item.name || "Product"),
+          image: String(item.image || "matrixx.png"),
+          seller: String(item.seller || ""),
+          sellerEmail: String(item.sellerEmail || ""),
+          category: String(item.category || "general"),
+          quantity: qty,
+          unitPrice: unit,
+          lineTotal: unit * qty
+        };
+      });
+    }
+
+    function saveOrderSnapshot(order, buyer) {
+      if (!order || typeof order !== "object") return false;
+      const orderId = String(order.id || order.orderNumber || order.orderId || "").trim();
+      if (!orderId) return false;
+
+      const items = toSnapshotItems(order.cart || []);
+      if (!items.length) return false;
+
+      const snapshot = {
+        id: orderId,
+        orderId: orderId,
+        fullName: String(order.fullName || (buyer && buyer.name) || ""),
+        email: String(order.email || (buyer && buyer.email) || ""),
+        phone: String(order.phone || (buyer && buyer.phone) || ""),
+        ownerEmail: String(order.ownerEmail || order.accountEmail || ""),
+        ownerPhone: String(order.ownerPhone || order.accountPhone || ""),
+        ownerName: String(order.ownerName || order.accountName || ""),
+        address: String(order.address || (buyer && buyer.address) || ""),
+        status: String(order.status || "pending"),
+        paymentMethod: String(order.paymentMethod || "wallet"),
+        subtotal: num(order.subtotal || items.reduce(function (sum, it) { return sum + it.lineTotal; }, 0)),
+        shipping: num(order.shipping || 0),
+        discount: num(order.discount || 0),
+        total: num(order.total || 0),
+        placedAt: order.placedAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        note: String(order.note || ""),
+        items: items
+      };
+
+      const map = read("orderLineSnapshots", {});
+      const nextMap = (map && typeof map === "object") ? map : {};
+      nextMap[orderId] = snapshot;
+      const okMap = write("orderLineSnapshots", nextMap);
+      const okDirect = write("orderItemsById:" + orderId, snapshot);
+      return okMap && okDirect;
+    }
+
+    function safeRun(label, fn) {
+      try {
+        fn();
+        return true;
+      } catch (error) {
+        console.warn(label + " failed:", error);
+        return false;
+      }
+    }
+
+    async function placeOrder() {
+      if (state.placing) return;
+      if (!ensureOnlineStorage()) return;
+      setPlacing(true);
+      try {
+
+      if (!state.cart.length) {
+        showError("No checkout cart found.");
+        setPlacing(false);
+        return;
+      }
+
+      const buyer = {
+        name: byId("buyerName").value.trim(),
+        phone: byId("buyerPhone").value.trim(),
+        email: byId("buyerEmail").value.trim().toLowerCase(),
+        address: byId("buyerAddress").value.trim(),
+        deliveryOption: byId("deliveryOption").value === "express" ? "express" : "standard",
+        deliveryDate: byId("deliveryDate").value,
+        deliveryWindow: byId("deliveryWindow").value || "anytime",
+        orderNote: byId("orderNote").value.trim().slice(0, 300)
+      };
+      state.deliveryOption = buyer.deliveryOption;
+      renderSummary();
+      saveCheckoutDraft();
+
+      if (!buyer.name || !buyer.phone || !buyer.email || !buyer.address) {
+        showError("Please complete delivery information.");
+        setPlacing(false);
+        return;
+      }
+      if (!isValidEmail(buyer.email)) {
+        showError("Enter a valid email address.");
+        setPlacing(false);
+        return;
+      }
+      const phoneDigits = cleanPhone(buyer.phone);
+      if (phoneDigits.length < 7) {
+        showError("Enter a valid phone number.");
+        setPlacing(false);
+        return;
+      }
+      buyer.phone = phoneDigits;
+
+      if (buyer.deliveryDate && buyer.deliveryDate < todayIsoDate()) {
+        showError("Delivery date cannot be in the past.");
+        setPlacing(false);
+        return;
+      }
+
+      if (!byId("termsCheck").checked) {
+        showError("Please confirm your order details.");
+        setPlacing(false);
+        return;
+      }
+
+      const paymentMethod = byId("paymentMethod").value;
+      if (state.isSellerBuyer && paymentMethod === "wallet") {
+        showError("Seller accounts cannot use seller/subscription wallet funds to buy products. Use Cash on Delivery.");
+        setPlacing(false);
+        return;
+      }
+      if (paymentMethod === "wallet" && state.balance < state.totals.total) {
+        showError("Insufficient wallet balance. Top up your account or use Cash on Delivery.");
+        setPlacing(false);
+        return;
+      }
+
+      const nowIso = new Date().toISOString();
+      let orderId = "ORD-" + String(Date.now());
+      const sessionOwner = readActiveSessionUser() || {};
+      const ownerEmail = cleanEmail(sessionOwner && sessionOwner.email) || buyer.email;
+      const ownerPhone = cleanPhone(sessionOwner && sessionOwner.phone) || buyer.phone;
+      const ownerName = str((sessionOwner && (sessionOwner.fullName || sessionOwner.name)) || buyer.name);
+
+      const order = {
+        id: orderId,
+        fullName: buyer.name,
+        address: buyer.address,
+        phone: buyer.phone,
+        email: buyer.email,
+        ownerEmail: ownerEmail,
+        ownerPhone: ownerPhone,
+        ownerName: ownerName,
+        accountEmail: ownerEmail,
+        accountPhone: ownerPhone,
+        accountName: ownerName,
+        cart: state.cart,
+        subtotal: state.totals.subtotal,
+        discount: state.totals.discount,
+        shipping: state.totals.shipping + state.totals.deliveryFee,
+        deliveryFee: state.totals.deliveryFee,
+        deliveryOption: buyer.deliveryOption,
+        deliveryDate: buyer.deliveryDate || null,
+        deliveryWindow: buyer.deliveryWindow,
+        etaText: etaFromOption(buyer.deliveryOption, buyer.deliveryDate),
+        note: buyer.orderNote || "",
+        total: state.totals.total,
+        status: "pending",
+        paymentMethod: paymentMethod,
+        coupon: state.meta ? (state.meta.coupon || null) : null,
+        placedAt: nowIso
+      };
+
+      if (window.SellerCore && typeof window.SellerCore.validateCartStock === "function") {
+        const stockCheck = window.SellerCore.validateCartStock(state.cart);
+        if (!stockCheck.ok) {
+          showError(stockIssueText(stockCheck.issues));
+          setPlacing(false);
+          return;
+        }
+      }
+
+      if (window.SellerCore && typeof window.SellerCore.applyStockDeduction === "function") {
+        const stockResult = window.SellerCore.applyStockDeduction(state.cart);
+        if (!stockResult.ok) {
+          showError(stockIssueText(stockResult.issues));
+          setPlacing(false);
+          return;
+        }
+      }
+
+      const apiEnabled = Boolean(window.MMApi && typeof window.MMApi.createOrder === "function" && (apiReady() || !resolveOnlineReady()));
+      let savedToApi = false;
+      let apiFallbackReason = "";
+      if (apiEnabled) {
+        try {
+          const saved = await window.MMApi.createOrder(order);
+          const serverId = String((saved && (saved.orderNumber || saved.orderId)) || "").trim();
+          if (serverId) {
+            orderId = serverId;
+            order.id = serverId;
+          }
+          savedToApi = true;
+        } catch (error) {
+          apiFallbackReason = (error && error.message ? error.message : "Unknown error");
+          console.warn("Order API unavailable, using online storage fallback:", apiFallbackReason);
+        }
+      }
+
+      // Persist in MMStorage online keys used by My Orders.
+      const persistentStorageReady = resolveOnlineReady();
+      const orderSaved = upsertBuyerOrder(order, buyer);
+      if (!savedToApi && (!persistentStorageReady || !orderSaved)) {
+        throw new Error("Order could not be persisted online. Check connection/API and try again.");
+      }
+
+      const snapshotSaved = saveOrderSnapshot(order, buyer);
+
+      if (paymentMethod === "wallet") {
+        persistBalance(state.balance - state.totals.total);
+      }
+
+      let partialWarning = false;
+      partialWarning = !safeRun("Purchases write", function () {
+        const purchases = read("purchases", []);
+        state.cart.forEach(function (item) {
+          purchases.push({
+            orderId: orderId,
+            productName: item.name,
+            sellerEmail: item.sellerEmail || "",
+            sellerName: item.seller,
+            seller: item.seller,
+            buyerEmail: buyer.email,
+            buyerName: buyer.name,
+            ownerEmail: ownerEmail,
+            ownerPhone: ownerPhone,
+            ownerName: ownerName,
+            quantity: item.quantity,
+            price: item.price,
+            total: item.price * item.quantity,
+            date: nowIso
+          });
+        });
+        if (!write("purchases", purchases)) throw new Error("Failed to save purchases.");
+      }) || partialWarning;
+
+      partialWarning = !safeRun("Seller queue write", function () {
+        const sellerQueues = read("sellerOrderQueues", {});
+        state.cart.forEach(function (item) {
+          const key = item.seller || "Unknown Seller";
+          if (!sellerQueues[key]) sellerQueues[key] = [];
+          sellerQueues[key].push({
+            orderId: orderId,
+            buyer: buyer.name,
+            email: buyer.email,
+            phone: buyer.phone,
+            ownerEmail: ownerEmail,
+            ownerPhone: ownerPhone,
+            ownerName: ownerName,
+            address: buyer.address,
+            deliveryOption: buyer.deliveryOption,
+            deliveryDate: buyer.deliveryDate || null,
+            deliveryWindow: buyer.deliveryWindow,
+            note: buyer.orderNote || "",
+            item: item.name,
+            quantity: item.quantity,
+            amount: item.price * item.quantity,
+            status: "pending",
+            date: nowIso
+          });
+        });
+        if (!write("sellerOrderQueues", sellerQueues)) throw new Error("Failed to save seller queue.");
+      }) || partialWarning;
+      partialWarning = !safeRun("Seller payout write", function () {
+        creditSellers(orderId, buyer, nowIso, paymentMethod);
+      }) || partialWarning;
+
+      safeRun("Checkout cleanup", function () {
+        rawSet("paymentStatus", "pending");
+        rawRemove("checkoutCart");
+        rawRemove("checkoutMeta");
+        rawRemove("checkoutDraft");
+        write("cart", []);
+        write("cartItems", []);
+        write("buyerInfo", buyer);
+      });
+
+      if (window.MMStorage && typeof window.MMStorage.syncNow === "function") {
+        try {
+          await window.MMStorage.syncNow();
+        } catch (syncError) {
+          console.warn("Online storage sync delayed:", syncError);
+        }
+      }
+
+      const fallbackNote = (apiEnabled && !savedToApi)
+        ? " Server unavailable, order saved to online storage."
+        : ((!orderSaved && savedToApi) ? " Online storage unavailable, order saved to API." : "");
+      const partialNote = partialWarning ? " Some internal logs will sync later." : "";
+      const snapshotNote = snapshotSaved ? "" : " Item snapshot may sync shortly.";
+
+      // Redirect bridge: keeps the just-placed order available across navigation
+      // even if online storage sync is still catching up.
+      try {
+        window.name = JSON.stringify({
+          type: "MM_LAST_ORDER",
+          createdAt: nowIso,
+          order: order
+        });
+      } catch (_) {}
+
+      showSuccess("Order placed successfully. Order ID: " + orderId + "." + fallbackNote + partialNote + snapshotNote + " Redirecting to My Orders...");
+      byId("placeOrderBtn").disabled = true;
+      setTimeout(function () {
+        const q = new URLSearchParams();
+        q.set("orderId", orderId);
+        window.location.href = "buyers-orders.html" + (q.toString() ? ("?" + q.toString()) : "");
+      }, 1800);
+      } catch (error) {
+        console.error("Place order failed:", error);
+        showError("Order could not be completed. " + (error && error.message ? error.message : "Please try again."));
+        setPlacing(false);
+      }
+    }
+
+    function init() {
+      state.onlineReady = resolveOnlineReady() || apiReady();
+      applyOnlineStatusText();
+      if (!state.onlineReady) {
+        showError("Online storage is unavailable. Orders cannot persist until storage or API is connected.");
+      }
+
+      const bundle = resolveInitialCartBundle();
+      state.cart = bundle.cart;
+      state.cartSource = bundle.source;
+      state.buyer = read("buyerInfo", null);
+      state.meta = read("checkoutMeta", null);
+      const bridge = readBridgePayload();
+      if ((!state.buyer || typeof state.buyer !== "object" || !Object.keys(state.buyer).length) && bridge && bridge.mmCartBridge && bridge.mmCartBridge.buyer) {
+        state.buyer = bridge.mmCartBridge.buyer;
+      }
+      if ((!state.meta || typeof state.meta !== "object") && bridge && bridge.mmCartBridge && bridge.mmCartBridge.meta) {
+        state.meta = bridge.mmCartBridge.meta;
+      }
+
+      if (!isMetaAlignedWithCart(state.meta, state.cart)) {
+        state.meta = state.cart.length ? deriveMetaFromCart(state.cart) : null;
+      } else if (!state.meta && state.cart.length) {
+        state.meta = deriveMetaFromCart(state.cart);
+      }
+
+      if (state.cart.length) {
+        write("checkoutCart", state.cart);
+        if (state.meta) write("checkoutMeta", state.meta);
+        if (state.buyer && typeof state.buyer === "object" && Object.keys(state.buyer).length) {
+          write("buyerInfo", state.buyer);
+        }
+      }
+      state.isSellerBuyer = detectSellerBuyerAccount();
+
+      renderOrderList();
+      fillBuyer();
+      readBalance();
+      renderSummary();
+      setPlacing(false);
+
+      if (state.isSellerBuyer) {
+        const method = byId("paymentMethod");
+        Array.from(method.options).forEach(function (option) {
+          if (option.value === "wallet") option.disabled = true;
+        });
+        method.value = "cod";
+        byId("walletInfo").textContent = "Seller account detected: wallet/subscription funds are blocked for purchases.";
+      }
+
+      byId("placeOrderBtn").addEventListener("click", placeOrder);
+      byId("clearSelectedBtn").addEventListener("click", clearSelectedProducts);
+      byId("orderList").addEventListener("click", function (event) {
+        const btn = event.target.closest("button[data-action][data-index]");
+        if (!btn) return;
+        const action = String(btn.getAttribute("data-action") || "");
+        const idx = Number(btn.getAttribute("data-index"));
+        if (!Number.isInteger(idx)) return;
+        if (action === "deselect") {
+          deselectProduct(idx);
+          return;
+        }
+        if (action === "qty-inc") {
+          updateProductQuantity(idx, 1);
+          return;
+        }
+        if (action === "qty-dec") {
+          updateProductQuantity(idx, -1);
+        }
+      });
+      byId("profileFillBtn").addEventListener("click", fillBuyerFromProfile);
+      ["buyerName", "buyerPhone", "buyerEmail", "buyerAddress", "orderNote"].forEach(function (id) {
+        byId(id).addEventListener("input", saveCheckoutDraft);
+      });
+      byId("termsCheck").addEventListener("change", validateCheckoutForm);
+      byId("deliveryOption").addEventListener("change", function () {
+        state.deliveryOption = this.value === "express" ? "express" : "standard";
+        renderSummary();
+        saveCheckoutDraft();
+      });
+      byId("deliveryWindow").addEventListener("change", saveCheckoutDraft);
+      byId("deliveryDate").addEventListener("change", function () {
+        renderSummary();
+        saveCheckoutDraft();
+      });
+      byId("paymentMethod").addEventListener("change", function () {
+        if (this.value === "cod") {
+          byId("walletInfo").textContent = "Cash on Delivery selected. Wallet will not be charged now.";
+        } else {
+          readBalance();
+        }
+      });
+      validateCheckoutForm();
+    }
+
+    window.addEventListener("load", function () {
+      const ready = window.MMStorage && window.MMStorage.ready;
+      if (ready && typeof ready.then === "function") {
+        ready.finally(init);
+        return;
+      }
+      init();
+    });
+  </script>
+  <script defer src="upgrade.js"></script>
+  <script defer src="sw-register.js?v=20260226a"></script>
+  <script defer src="site-performance.js?v=20260226a"></script>
+</body>
+</html>
+
+
+
+

@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Admin Communications - MatrixMarket</title>
+    <link rel="stylesheet" href="admin-layout.css?v=20260227a">
+    <link rel="stylesheet" href="upgrade.css">
+    <script src="firebase-online-storage.js"></script>
+    <style>
+        .comms-grid { display:grid; grid-template-columns:340px 1fr; gap:.75rem; }
+        .thread-list { display:grid; gap:.45rem; max-height:60vh; overflow:auto; }
+        .thread-item { border:1px solid var(--adm-border); background:rgba(2,6,23,.5); border-radius:10px; padding:.5rem; cursor:pointer; display:grid; gap:.2rem; }
+        .thread-item.active { border-color:rgba(103,232,249,.55); background:rgba(6,182,212,.13); }
+        .thread-name { font-weight:700; display:flex; justify-content:space-between; gap:.4rem; }
+        .thread-meta { color:var(--adm-muted); font-size:.78rem; }
+        .thread-preview { color:#cbd5e1; font-size:.82rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .chat-box { border:1px solid var(--adm-border); border-radius:12px; background:rgba(2,6,23,.45); display:grid; grid-template-rows:auto 1fr auto; min-height:60vh; overflow:hidden; }
+        .chat-head { border-bottom:1px solid var(--adm-border); padding:.65rem .7rem; background:rgba(2,6,23,.65); display:flex; align-items:center; justify-content:space-between; gap:.5rem; flex-wrap:wrap; }
+        .chat-head h3 { margin:0; font-size:1rem; color:#67e8f9; }
+        .chat-meta { color:var(--adm-muted); font-size:.8rem; }
+        .message-list { padding:.75rem; display:flex; flex-direction:column; gap:.5rem; overflow:auto; max-height:62vh; background:rgba(2,6,23,.62); }
+        .msg { max-width:82%; padding:.5rem .65rem; border-radius:11px; line-height:1.35; word-break:break-word; }
+        .msg.me { align-self:flex-end; background:rgba(6,182,212,.22); border:1px solid rgba(6,182,212,.4); }
+        .msg.other { align-self:flex-start; background:rgba(51,65,85,.75); border:1px solid rgba(148,163,184,.28); }
+        .msg small { display:block; margin-top:.2rem; color:var(--adm-muted); font-size:.72rem; }
+        .chat-compose { border-top:1px solid var(--adm-border); padding:.65rem; display:grid; gap:.45rem; }
+        .chat-row { display:grid; grid-template-columns:1fr auto; gap:.45rem; }
+        .quick-row { display:flex; flex-wrap:wrap; gap:.35rem; }
+        .quick-row button { border:1px solid var(--adm-border); border-radius:8px; padding:.34rem .55rem; background:rgba(30,41,59,.75); color:var(--adm-text); cursor:pointer; font:inherit; font-size:.8rem; }
+        .level-badge { display:inline-flex; border-radius:999px; padding:.14rem .48rem; border:1px solid transparent; font-size:.7rem; font-weight:700; text-transform:uppercase; }
+        .level-badge.high { color:#fca5a5; border-color:rgba(239,68,68,.45); background:rgba(239,68,68,.14); }
+        .level-badge.medium { color:#fde68a; border-color:rgba(245,158,11,.45); background:rgba(245,158,11,.14); }
+        .level-badge.low { color:#86efac; border-color:rgba(34,197,94,.4); background:rgba(34,197,94,.14); }
+        .rating { font-weight:700; color:#fde68a; }
+        .summary-box { display:grid; gap:.45rem; max-height:34vh; overflow:auto; }
+        .summary-item { border:1px solid var(--adm-border); border-radius:10px; background:rgba(2,6,23,.5); padding:.45rem .55rem; }
+        @media (max-width:1080px){ .comms-grid{ grid-template-columns:1fr; } }
+    </style>
+</head>
+<body class="admin-page">
+    <div id="adminHeader"></div>
+    <main class="admin-shell">
+        <section class="admin-titlebar">
+            <h1>Admin Communications Center</h1>
+            <div class="admin-actions">
+                <button class="btn-adm" id="refreshBtn" type="button">Refresh</button>
+                <button class="btn-adm" id="exportComplaintsBtn" type="button">Export Complaints</button>
+                <button class="btn-adm" id="exportRatingsBtn" type="button">Export Ratings</button>
+                <button class="btn-adm" id="exportNotificationsBtn" type="button">Export Notifications</button>
+            </div>
+        </section>
+
+        <section class="admin-grid cols-3">
+            <article class="kpi"><div class="label">Support Threads</div><div class="value" id="kpiThreads">0</div></article>
+            <article class="kpi"><div class="label">Unread Messages</div><div class="value" id="kpiUnread">0</div></article>
+            <article class="kpi"><div class="label">Open Complaints</div><div class="value" id="kpiComplaints">0</div></article>
+            <article class="kpi"><div class="label">Average Seller Rating</div><div class="value" id="kpiAvgRating">0.00</div></article>
+            <article class="kpi"><div class="label">Low Ratings (<=2)</div><div class="value" id="kpiLowRatings">0</div></article>
+            <article class="kpi"><div class="label">Active Notifications</div><div class="value" id="kpiNotifications">0</div></article>
+        </section>
+
+        <section class="admin-card">
+            <div class="comms-grid">
+                <aside class="admin-card" style="padding:.7rem;">
+                    <h3 style="margin-top:0;">Support Conversations</h3>
+                    <div class="admin-form-grid">
+                        <input class="adm" id="threadSearch" type="text" placeholder="Search contact">
+                        <select class="adm" id="threadRoleFilter">
+                            <option value="">All Roles</option>
+                            <option value="seller">Seller</option>
+                            <option value="buyer">Buyer</option>
+                            <option value="unknown">Unknown</option>
+                        </select>
+                        <div class="adm-inline-actions">
+                            <button class="btn-adm" id="startThreadBtn" type="button">Start New Thread</button>
+                            <button class="btn-adm danger" id="clearThreadBtn" type="button">Clear Thread</button>
+                        </div>
+                    </div>
+                    <div class="thread-list" id="threadList"></div>
+                </aside>
+
+                <section class="chat-box">
+                    <div class="chat-head">
+                        <div>
+                            <h3 id="chatTitle">Support Inbox</h3>
+                            <div class="chat-meta" id="chatMeta">Select a conversation to begin.</div>
+                        </div>
+                        <div class="adm-inline-actions">
+                            <button class="btn-adm" id="exportThreadBtn" type="button">Export Thread</button>
+                        </div>
+                    </div>
+                    <div class="message-list" id="messageList"></div>
+                    <div class="chat-compose">
+                        <div class="quick-row">
+                            <button type="button" data-quick="Thanks for contacting support. We are reviewing this now.">Acknowledged</button>
+                            <button type="button" data-quick="Please share order ID and proof to continue this case.">Request order proof</button>
+                            <button type="button" data-quick="Your request has been escalated to admin review.">Escalated</button>
+                        </div>
+                        <input class="adm" id="messageSearch" type="text" placeholder="Filter current thread messages">
+                        <div class="chat-row">
+                            <textarea class="adm" id="messageInput" rows="2" placeholder="Type reply and press Enter"></textarea>
+                            <button class="btn-adm primary" id="sendMessageBtn" type="button">Send</button>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </section>
+
+        <section class="admin-card">
+            <h3 style="margin-top:0;">Broadcast And Direct Notifications</h3>
+            <div class="admin-form-grid cols-2">
+                <select class="adm" id="notifAudience">
+                    <option value="all">All users and sellers</option>
+                    <option value="buyers">Buyers only</option>
+                    <option value="sellers">Sellers only</option>
+                    <option value="seller">One seller by email</option>
+                    <option value="buyer">One buyer by email</option>
+                </select>
+                <input class="adm" id="notifTargetEmail" type="email" placeholder="Target email (for single buyer/seller)">
+                <select class="adm" id="notifPriority">
+                    <option value="normal">Priority: Normal</option>
+                    <option value="high">Priority: High</option>
+                    <option value="urgent">Priority: Urgent</option>
+                </select>
+                <input class="adm" id="notifExpiry" type="datetime-local" placeholder="Optional expiry">
+                <textarea class="adm" id="notifMessage" placeholder="Notification message"></textarea>
+                <div class="adm-inline-actions">
+                    <button class="btn-adm primary" id="sendNotifBtn" type="button">Send Notification</button>
+                    <button class="btn-adm" id="clearNotifFormBtn" type="button">Clear</button>
+                </div>
+            </div>
+            <div class="adm-toolbar" style="margin-top:.7rem; grid-template-columns:1fr 1fr 1fr auto;">
+                <input class="adm" id="notifSearch" type="text" placeholder="Search notifications">
+                <select class="adm" id="notifAudienceFilter">
+                    <option value="">All Audiences</option>
+                    <option value="all">All</option>
+                    <option value="buyers">Buyers</option>
+                    <option value="sellers">Sellers</option>
+                    <option value="buyer">One buyer</option>
+                    <option value="seller">One seller</option>
+                </select>
+                <select class="adm" id="notifStatusFilter">
+                    <option value="">All Status</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                    <option value="expired">Expired</option>
+                </select>
+                <button class="btn-adm" id="notifResetBtn" type="button">Reset</button>
+            </div>
+            <div class="adm-table-wrap" style="margin-top:.6rem;"><table class="adm-table" id="notificationTable"></table></div>
+        </section>
+
+        <section class="admin-grid cols-2">
+            <article class="admin-card">
+                <h3 style="margin-top:0;">Seller Complaints</h3>
+                <div class="adm-toolbar" style="grid-template-columns:1fr 1fr 1fr auto;">
+                    <input class="adm" id="complaintSearch" type="text" placeholder="Search seller, buyer, message">
+                    <select class="adm" id="complaintStatusFilter">
+                        <option value="">All Status</option>
+                        <option value="new">New</option>
+                        <option value="in_review">In Review</option>
+                        <option value="resolved">Resolved</option>
+                        <option value="rejected">Rejected</option>
+                    </select>
+                    <select class="adm" id="complaintSeverityFilter">
+                        <option value="">All Severity</option>
+                        <option value="high">High</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                    </select>
+                    <button class="btn-adm" id="complaintResetBtn" type="button">Reset</button>
+                </div>
+                <div class="adm-table-wrap" style="margin-top:.6rem;"><table class="adm-table" id="complaintTable"></table></div>
+            </article>
+
+            <article class="admin-card">
+                <h3 style="margin-top:0;">Seller Ratings</h3>
+                <div class="adm-toolbar" style="grid-template-columns:1fr 1fr auto auto;">
+                    <input class="adm" id="ratingSearch" type="text" placeholder="Search seller, buyer, note">
+                    <select class="adm" id="ratingMinFilter">
+                        <option value="0">Min Rating: All</option><option value="1">1+</option><option value="2">2+</option><option value="3">3+</option><option value="4">4+</option><option value="5">5 only</option>
+                    </select>
+                    <select class="adm" id="ratingSortFilter">
+                        <option value="latest">Sort: Latest</option><option value="lowest">Sort: Lowest first</option><option value="highest">Sort: Highest first</option>
+                    </select>
+                    <button class="btn-adm" id="ratingResetBtn" type="button">Reset</button>
+                </div>
+                <div class="summary-box" id="ratingSummary" style="margin:.6rem 0;"></div>
+                <div class="adm-table-wrap"><table class="adm-table" id="ratingTable"></table></div>
+            </article>
+        </section>
+
+        <div class="adm-foot">Admin actions here update local data immediately and are logged in admin logs.</div>
+    </main>
+
+    <script src="admin-core.js?v=20260222c"></script>
+    <script>
+        const SUPPORT_IDENTITY = "Support";
+        const state = {
+            sellers: [], users: [], threads: [], filteredThreads: [], activeThreadId: "",
+            notifications: [], filteredNotifications: [], complaints: [], filteredComplaints: [], ratings: [], filteredRatings: []
+        };
+
+        function byId(id) { return document.getElementById(id); }
+        function str(v) { return AdminCore.str(v); }
+        function num(v) { return AdminCore.num(v); }
+        function nowIso() { return new Date().toISOString(); }
+        function read(key, fallback) { return AdminCore.readJSON(key, fallback); }
+        function write(key, value) { return AdminCore.writeJSON(key, value); }
+        function cleanLower(value) { return str(value).toLowerCase(); }
+        function makeId(prefix) { return prefix + "-" + Date.now() + "-" + Math.random().toString(36).slice(2, 7); }
+        function esc(value) { return String(value == null ? "" : value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;").replace(/'/g, "&#39;"); }
+        function sortedPair(a, b) { return [str(a), str(b)].sort(function (x, y) { return x.localeCompare(y); }); }
+        function threadId(a, b) { const p = sortedPair(a, b); return p[0] + "::" + p[1]; }
+        function legacyKey(a, b) { const p = sortedPair(a, b); return "chat_" + p[0] + "_" + p[1]; }
+
+        function normalizeAccounts() {
+            state.sellers = AdminCore.getSellers();
+            state.users = AdminCore.getUsers();
+        }
+
+        function inferRole(contact) {
+            const key = cleanLower(contact);
+            const seller = state.sellers.find(function (s) { return [s.email, s.store, s.fullName, s.name].map(cleanLower).includes(key); });
+            if (seller) return "seller";
+            const buyer = state.users.find(function (u) { return [u.email, u.fullName, u.name].map(cleanLower).includes(key); });
+            if (buyer) return "buyer";
+            return key.includes("@") ? "buyer" : "unknown";
+        }
+
+        function normalizeMessage(message, idx) {
+            return {
+                id: str(message.id || ("msg-" + idx + "-" + Date.now())),
+                sender: str(message.sender || "Unknown"),
+                text: str(message.text || ""),
+                timeIso: str(message.timeIso || message.createdAt || message.date || nowIso())
+            };
+        }
+
+        function loadThreads() {
+            const raw = read("chatThreads", {});
+            const rows = [];
+            Object.keys(raw || {}).forEach(function (id) {
+                const parts = id.split("::");
+                if (parts.length !== 2) return;
+                const left = str(parts[0]);
+                const right = str(parts[1]);
+                const leftSupport = cleanLower(left) === cleanLower(SUPPORT_IDENTITY);
+                const rightSupport = cleanLower(right) === cleanLower(SUPPORT_IDENTITY);
+                if (!leftSupport && !rightSupport) return;
+
+                const contact = leftSupport ? right : left;
+                const source = Array.isArray(raw[id]) ? raw[id] : [];
+                const messages = source.map(normalizeMessage).sort(function (a, b) { return String(a.timeIso).localeCompare(String(b.timeIso)); });
+                const last = messages.length ? messages[messages.length - 1] : null;
+                let lastSupportIndex = -1;
+                messages.forEach(function (m, idx) { if (cleanLower(m.sender) === cleanLower(SUPPORT_IDENTITY)) lastSupportIndex = idx; });
+                let unread = 0;
+                for (let i = lastSupportIndex + 1; i < messages.length; i += 1) if (cleanLower(messages[i].sender) !== cleanLower(SUPPORT_IDENTITY)) unread += 1;
+
+                rows.push({ id: id, contact: contact, role: inferRole(contact), messages: messages, lastAt: last ? last.timeIso : "", preview: last ? last.text : "No messages yet", unread: unread });
+            });
+            rows.sort(function (a, b) { return String(b.lastAt).localeCompare(String(a.lastAt)); });
+            state.threads = rows;
+        }
+
+        function persistThread(thread) {
+            const map = read("chatThreads", {});
+            map[thread.id] = thread.messages;
+            write("chatThreads", map);
+            const parts = thread.id.split("::");
+            if (parts.length === 2) MMStorage.setItem(legacyKey(parts[0], parts[1]), JSON.stringify(thread.messages));
+        }
+
+        function getThreadById(id) { return state.threads.find(function (t) { return t.id === id; }) || null; }
+        function findSeller(contactName, contactEmail) {
+            const emailKey = cleanLower(contactEmail);
+            const nameKey = cleanLower(contactName);
+            return state.sellers.find(function (s) {
+                if (emailKey && cleanLower(s.email) === emailKey) return true;
+                return nameKey && [s.store, s.fullName, s.name, s.email].map(cleanLower).includes(nameKey);
+            }) || null;
+        }
+        function sellerAlias(seller) { return str(seller.store || seller.fullName || seller.name || seller.email); }
+
+        function applyThreadFilters() {
+            const q = cleanLower(byId("threadSearch").value);
+            const roleFilter = cleanLower(byId("threadRoleFilter").value);
+            state.filteredThreads = state.threads.filter(function (thread) {
+                const hay = [thread.contact, thread.preview, thread.role].join(" ").toLowerCase();
+                return (!q || hay.includes(q)) && (!roleFilter || cleanLower(thread.role) === roleFilter);
+            });
+        }
+
+        function renderThreadList() {
+            const box = byId("threadList");
+            if (!state.filteredThreads.length) {
+                box.innerHTML = '<div class="adm-empty">No support threads found.</div>';
+                return;
+            }
+            box.innerHTML = state.filteredThreads.map(function (thread) {
+                const active = thread.id === state.activeThreadId ? "active" : "";
+                const unread = thread.unread > 0 ? '<span class="badge pending">' + thread.unread + ' new</span>' : "";
+                return '<article class="thread-item ' + active + '" data-thread="' + esc(thread.id) + '">' +
+                    '<div class="thread-name"><span>' + esc(thread.contact) + '</span>' + unread + '</div>' +
+                    '<div class="thread-meta">' + esc(thread.role) + ' | ' + esc(AdminCore.fmtDate(thread.lastAt)) + '</div>' +
+                    '<div class="thread-preview">' + esc(thread.preview) + '</div>' +
+                    '</article>';
+            }).join("");
+        }
+
+        function renderMessages() {
+            const container = byId("messageList");
+            const thread = getThreadById(state.activeThreadId);
+            if (!thread) {
+                container.innerHTML = '<div class="adm-empty">Select a thread to read and reply.</div>';
+                byId("chatTitle").textContent = "Support Inbox";
+                byId("chatMeta").textContent = "Select a conversation to begin.";
+                return;
+            }
+            const q = cleanLower(byId("messageSearch").value);
+            const filtered = thread.messages.filter(function (m) { return !q || cleanLower(m.text).includes(q) || cleanLower(m.sender).includes(q); });
+            byId("chatTitle").textContent = "Chat with " + thread.contact;
+            byId("chatMeta").textContent = "Role: " + thread.role + " | Thread ID: " + thread.id;
+            if (!filtered.length) {
+                container.innerHTML = '<div class="adm-empty">No messages in this thread.</div>';
+                return;
+            }
+            container.innerHTML = filtered.map(function (m) {
+                const mine = cleanLower(m.sender) === cleanLower(SUPPORT_IDENTITY);
+                return '<article class="msg ' + (mine ? 'me' : 'other') + '">' + esc(m.text) + '<small>' + esc(m.sender) + ' | ' + esc(AdminCore.fmtDate(m.timeIso)) + '</small></article>';
+            }).join("");
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function openThread(id) { state.activeThreadId = str(id); renderThreadList(); renderMessages(); }
+        function ensureThread(contact) {
+            const target = str(contact);
+            if (!target) return "";
+            const id = threadId(SUPPORT_IDENTITY, target);
+            const map = read("chatThreads", {});
+            if (!Array.isArray(map[id])) {
+                map[id] = [];
+                write("chatThreads", map);
+            }
+            return id;
+        }
+
+        function startThread() {
+            const contact = prompt("Enter buyer/seller name or email to start support chat:");
+            if (!contact || !str(contact)) return;
+            const id = ensureThread(contact);
+            loadThreads();
+            applyThreadFilters();
+            openThread(id);
+            AdminCore.log("support_thread_started", { contact: str(contact), threadId: id });
+        }
+
+        function sendMessage() {
+            const thread = getThreadById(state.activeThreadId);
+            if (!thread) {
+                alert("Select or start a thread first.");
+                return;
+            }
+            const input = byId("messageInput");
+            const messageText = str(input.value);
+            if (!messageText) return;
+
+            thread.messages.push({ id: makeId("msg"), sender: SUPPORT_IDENTITY, text: messageText, timeIso: nowIso() });
+            persistThread(thread);
+            input.value = "";
+            AdminCore.log("support_message_sent", { contact: thread.contact, threadId: thread.id });
+
+            loadThreads();
+            applyThreadFilters();
+            openThread(thread.id);
+        }
+
+        function clearCurrentThread() {
+            const thread = getThreadById(state.activeThreadId);
+            if (!thread) {
+                alert("No active thread selected.");
+                return;
+            }
+            if (!confirm("Clear all messages in this thread?")) return;
+            thread.messages = [];
+            persistThread(thread);
+            AdminCore.log("support_thread_cleared", { threadId: thread.id });
+            loadThreads();
+            applyThreadFilters();
+            openThread(thread.id);
+        }
+
+        function exportCurrentThread() {
+            const thread = getThreadById(state.activeThreadId);
+            if (!thread) {
+                alert("No active thread selected.");
+                return;
+            }
+            AdminCore.exportJSON({ threadId: thread.id, contact: thread.contact, role: thread.role, exportedAt: nowIso(), messages: thread.messages }, "support-thread-" + thread.contact.replace(/\s+/g, "-").toLowerCase() + ".json");
+        }
+
+        function loadNotifications() {
+            const rows = read("adminNotifications", []);
+            state.notifications = (Array.isArray(rows) ? rows : []).map(function (row) {
+                const expiresAt = row.expiresAt || row.expiry || "";
+                const expired = expiresAt && new Date(expiresAt).getTime() < Date.now();
+                const rawStatus = cleanLower(row.status || "active");
+                return {
+                    id: str(row.id || makeId("notf")),
+                    audience: str(row.audience || "all"),
+                    targetEmail: str(row.targetEmail || ""),
+                    targetName: str(row.targetName || ""),
+                    message: str(row.message || ""),
+                    priority: str(row.priority || "normal"),
+                    createdAt: row.createdAt || row.date || nowIso(),
+                    expiresAt: expiresAt,
+                    status: expired ? "expired" : (rawStatus || "active")
+                };
+            }).sort(function (a, b) { return String(b.createdAt).localeCompare(String(a.createdAt)); });
+        }
+
+        function persistNotifications() { write("adminNotifications", state.notifications); }
+
+        function applyNotificationFilters() {
+            const q = cleanLower(byId("notifSearch").value);
+            const audience = cleanLower(byId("notifAudienceFilter").value);
+            const status = cleanLower(byId("notifStatusFilter").value);
+            state.filteredNotifications = state.notifications.filter(function (row) {
+                const hay = [row.audience, row.targetEmail, row.targetName, row.message, row.priority].join(" ").toLowerCase();
+                return (!q || hay.includes(q)) && (!audience || cleanLower(row.audience) === audience) && (!status || cleanLower(row.status) === status);
+            });
+        }
+
+        function renderNotificationTable() {
+            const table = byId("notificationTable");
+            const head = '<thead><tr><th>Date</th><th>Audience</th><th>Priority</th><th>Target</th><th>Message</th><th>Expiry</th><th>Status</th><th>Actions</th></tr></thead>';
+            if (!state.filteredNotifications.length) {
+                table.innerHTML = head + '<tbody><tr><td colspan="8" class="adm-empty">No notifications found.</td></tr></tbody>';
+                return;
+            }
+            table.innerHTML = head + '<tbody>' + state.filteredNotifications.map(function (row) {
+                const target = row.targetEmail || row.targetName || "-";
+                return '<tr>' +
+                    '<td>' + esc(AdminCore.fmtDate(row.createdAt)) + '</td>' +
+                    '<td>' + esc(row.audience) + '</td>' +
+                    '<td>' + AdminCore.badge(row.priority) + '</td>' +
+                    '<td>' + esc(target) + '</td>' +
+                    '<td>' + esc(row.message) + '</td>' +
+                    '<td>' + esc(AdminCore.fmtDate(row.expiresAt)) + '</td>' +
+                    '<td>' + AdminCore.badge(row.status) + '</td>' +
+                    '<td><div class="adm-inline-actions"><button class="btn-adm warning" data-notif-action="toggle" data-id="' + esc(row.id) + '">' + (row.status === "active" ? "Deactivate" : "Activate") + '</button><button class="btn-adm danger" data-notif-action="delete" data-id="' + esc(row.id) + '">Delete</button></div></td>' +
+                    '</tr>';
+            }).join("") + '</tbody>';
+        }
+
+        function clearNotificationForm() {
+            byId("notifAudience").value = "all";
+            byId("notifTargetEmail").value = "";
+            byId("notifPriority").value = "normal";
+            byId("notifExpiry").value = "";
+            byId("notifMessage").value = "";
+        }
+
+        function pushNotification(input) {
+            state.notifications.unshift({
+                id: makeId("notf"),
+                audience: str(input.audience || "all"),
+                targetEmail: str(input.targetEmail || ""),
+                targetName: str(input.targetName || ""),
+                message: str(input.message || ""),
+                priority: str(input.priority || "normal"),
+                createdAt: nowIso(),
+                expiresAt: input.expiresAt || "",
+                status: "active"
+            });
+            persistNotifications();
+        }
+
+        function sendNotificationFromForm() {
+            const audience = str(byId("notifAudience").value || "all");
+            const targetEmail = str(byId("notifTargetEmail").value);
+            const priority = str(byId("notifPriority").value || "normal");
+            const expiresAt = byId("notifExpiry").value ? new Date(byId("notifExpiry").value).toISOString() : "";
+            const message = str(byId("notifMessage").value);
+
+            if (!message) { alert("Notification message is required."); return; }
+            if ((audience === "seller" || audience === "buyer") && !targetEmail) { alert("Target email is required for direct notification."); return; }
+
+            let targetName = "";
+            if (audience === "seller" && targetEmail) {
+                const seller = findSeller("", targetEmail);
+                targetName = seller ? sellerAlias(seller) : targetEmail;
+            }
+            if (audience === "buyer" && targetEmail) {
+                const buyer = state.users.find(function (u) { return cleanLower(u.email) === cleanLower(targetEmail); }) || null;
+                targetName = buyer ? str(buyer.fullName || buyer.name || buyer.email) : targetEmail;
+            }
+
+            pushNotification({ audience: audience, targetEmail: targetEmail, targetName: targetName, priority: priority, expiresAt: expiresAt, message: message });
+            AdminCore.log("admin_notification_sent", { audience: audience, targetEmail: targetEmail, priority: priority });
+            clearNotificationForm();
+            loadNotifications();
+            applyNotificationFilters();
+            renderNotificationTable();
+            updateKpis();
+            alert("Notification sent.");
+        }
+
+        function updateNotificationStatus(id, mode) {
+            const target = str(id);
+            const row = state.notifications.find(function (n) { return n.id === target; });
+            if (!row) return;
+            if (mode === "delete") state.notifications = state.notifications.filter(function (n) { return n.id !== target; });
+            else if (mode === "toggle") row.status = row.status === "active" ? "inactive" : "active";
+            persistNotifications();
+            loadNotifications();
+            applyNotificationFilters();
+            renderNotificationTable();
+            updateKpis();
+        }
+
+        function complaintSeverity(textValue) {
+            const t = cleanLower(textValue);
+            const highWords = ["scam", "fraud", "fake", "stolen", "abuse", "threat", "hack", "suspend"];
+            const mediumWords = ["late", "delay", "damaged", "wrong", "rude", "poor", "refund"];
+            if (highWords.some(function (w) { return t.includes(w); })) return "high";
+            if (mediumWords.some(function (w) { return t.includes(w); })) return "medium";
+            return "low";
+        }
+
+        function loadComplaints() {
+            const rows = read("sellerComplaints", []);
+            state.complaints = (Array.isArray(rows) ? rows : []).map(function (row, idx) {
+                return {
+                    id: str(row.id || ("CMP-" + idx)),
+                    seller: str(row.sellerName || row.seller || row.sellerEmail || ""),
+                    sellerEmail: str(row.sellerEmail || ""),
+                    buyer: str(row.buyerName || row.buyerEmail || ""),
+                    buyerEmail: str(row.buyerEmail || ""),
+                    text: str(row.text || row.complaint || ""),
+                    status: str(row.status || "new"),
+                    severity: complaintSeverity(row.text || row.complaint || ""),
+                    createdAt: row.createdAt || row.date || nowIso(),
+                    updatedAt: row.updatedAt || ""
+                };
+            }).sort(function (a, b) { return String(b.createdAt).localeCompare(String(a.createdAt)); });
+        }
+
+        function persistComplaints() { write("sellerComplaints", state.complaints); }
+
+        function applyComplaintFilters() {
+            const q = cleanLower(byId("complaintSearch").value);
+            const status = cleanLower(byId("complaintStatusFilter").value);
+            const severity = cleanLower(byId("complaintSeverityFilter").value);
+            state.filteredComplaints = state.complaints.filter(function (row) {
+                const hay = [row.seller, row.sellerEmail, row.buyer, row.buyerEmail, row.text].join(" ").toLowerCase();
+                return (!q || hay.includes(q)) && (!status || cleanLower(row.status) === status) && (!severity || cleanLower(row.severity) === severity);
+            });
+        }
+
+        function renderComplaintTable() {
+            const table = byId("complaintTable");
+            const head = '<thead><tr><th>Date</th><th>Seller</th><th>Buyer</th><th>Complaint</th><th>Severity</th><th>Status</th><th>Actions</th></tr></thead>';
+            if (!state.filteredComplaints.length) {
+                table.innerHTML = head + '<tbody><tr><td colspan="7" class="adm-empty">No complaints found.</td></tr></tbody>';
+                return;
+            }
+            table.innerHTML = head + '<tbody>' + state.filteredComplaints.map(function (row) {
+                return '<tr>' +
+                    '<td>' + esc(AdminCore.fmtDate(row.createdAt)) + '</td>' +
+                    '<td>' + esc(row.seller || row.sellerEmail || "-") + '</td>' +
+                    '<td>' + esc(row.buyer || row.buyerEmail || "-") + '</td>' +
+                    '<td>' + esc(row.text) + '</td>' +
+                    '<td><span class="level-badge ' + esc(row.severity) + '">' + esc(row.severity) + '</span></td>' +
+                    '<td>' + AdminCore.badge(row.status) + '</td>' +
+                    '<td><div class="adm-inline-actions"><button class="btn-adm" data-complaint-action="review" data-id="' + esc(row.id) + '">In Review</button><button class="btn-adm success" data-complaint-action="resolve" data-id="' + esc(row.id) + '">Resolve</button><button class="btn-adm warning" data-complaint-action="warn" data-id="' + esc(row.id) + '">Warn Seller</button><button class="btn-adm danger" data-complaint-action="suspend" data-id="' + esc(row.id) + '">Suspend</button><button class="btn-adm" data-complaint-action="unsuspend" data-id="' + esc(row.id) + '">Unsuspend</button><button class="btn-adm" data-complaint-action="chat" data-id="' + esc(row.id) + '">Chat</button></div></td>' +
+                    '</tr>';
+            }).join("") + '</tbody>';
+        }
+
+        function updateComplaint(id, patch) {
+            const row = state.complaints.find(function (c) { return c.id === str(id); });
+            if (!row) return null;
+            Object.assign(row, patch || {}, { updatedAt: nowIso() });
+            persistComplaints();
+            return row;
+        }
+        function setCurrentSellerSnapshotStatus(email, status) {
+            const currentSeller = read("currentSeller", null);
+            if (currentSeller && cleanLower(currentSeller.email) === cleanLower(email)) {
+                currentSeller.status = status;
+                write("currentSeller", currentSeller);
+            }
+            const currentUser = read("currentUser", null);
+            if (currentUser && cleanLower(currentUser.email) === cleanLower(email)) {
+                currentUser.status = status;
+                write("currentUser", currentUser);
+            }
+        }
+
+        function setSellerStatusFromComplaint(complaint, nextStatus, reason) {
+            const seller = findSeller(complaint.seller, complaint.sellerEmail);
+            if (!seller) { alert("Seller account was not found."); return false; }
+            AdminCore.updateAccountByEmail(seller.email, { status: nextStatus });
+            setCurrentSellerSnapshotStatus(seller.email, nextStatus);
+            pushNotification({ audience: "seller", targetEmail: seller.email, targetName: sellerAlias(seller), priority: cleanLower(nextStatus) === "suspended" ? "urgent" : "normal", message: reason, expiresAt: "" });
+            persistNotifications();
+            normalizeAccounts();
+            return true;
+        }
+
+        function openSupportForSeller(contactName, contactEmail) {
+            const seller = findSeller(contactName, contactEmail);
+            const contact = seller ? sellerAlias(seller) : (str(contactName) || str(contactEmail));
+            const id = ensureThread(contact);
+            loadThreads();
+            applyThreadFilters();
+            openThread(id);
+        }
+
+        function handleComplaintAction(id, action) {
+            const row = state.complaints.find(function (c) { return c.id === str(id); });
+            if (!row) return;
+
+            if (action === "review") {
+                updateComplaint(row.id, { status: "in_review" });
+                AdminCore.log("complaint_review_started", { id: row.id, seller: row.sellerEmail || row.seller });
+            }
+            if (action === "resolve") {
+                updateComplaint(row.id, { status: "resolved" });
+                AdminCore.log("complaint_resolved", { id: row.id, seller: row.sellerEmail || row.seller });
+            }
+            if (action === "warn") {
+                const seller = findSeller(row.seller, row.sellerEmail);
+                if (!seller) alert("Seller account was not found.");
+                else {
+                    pushNotification({ audience: "seller", targetEmail: seller.email, targetName: sellerAlias(seller), priority: "high", message: "Admin warning: complaint received. Improve service to avoid suspension.", expiresAt: "" });
+                    persistNotifications();
+                    updateComplaint(row.id, { status: "in_review" });
+                    AdminCore.log("seller_warned_from_complaint", { id: row.id, sellerEmail: seller.email });
+                }
+            }
+            if (action === "suspend") {
+                if (setSellerStatusFromComplaint(row, "Suspended", "Your seller account has been suspended after complaint review.")) {
+                    updateComplaint(row.id, { status: "in_review" });
+                    AdminCore.log("seller_suspended", { complaintId: row.id, seller: row.sellerEmail || row.seller });
+                }
+            }
+            if (action === "unsuspend") {
+                if (setSellerStatusFromComplaint(row, "Approved", "Your seller account suspension was lifted by admin.")) {
+                    updateComplaint(row.id, { status: "resolved" });
+                    AdminCore.log("seller_unsuspended", { complaintId: row.id, seller: row.sellerEmail || row.seller });
+                }
+            }
+            if (action === "chat") openSupportForSeller(row.seller, row.sellerEmail);
+
+            loadNotifications(); applyNotificationFilters(); renderNotificationTable();
+            loadComplaints(); applyComplaintFilters(); renderComplaintTable();
+            updateKpis();
+        }
+
+        function loadRatings() {
+            const rows = read("sellerRatings", []);
+            state.ratings = (Array.isArray(rows) ? rows : []).map(function (row, idx) {
+                return {
+                    id: str(row.id || ("RAT-" + idx)),
+                    seller: str(row.sellerName || row.seller || row.sellerEmail || ""),
+                    sellerEmail: str(row.sellerEmail || ""),
+                    buyer: str(row.buyerName || row.buyerEmail || ""),
+                    buyerEmail: str(row.buyerEmail || ""),
+                    rating: Math.max(1, Math.min(5, Math.round(num(row.rating || 0) || 0))),
+                    note: str(row.note || ""),
+                    status: str(row.status || "new"),
+                    createdAt: row.createdAt || row.date || nowIso()
+                };
+            }).sort(function (a, b) { return String(b.createdAt).localeCompare(String(a.createdAt)); });
+        }
+
+        function persistRatings() { write("sellerRatings", state.ratings); }
+
+        function applyRatingFilters() {
+            const q = cleanLower(byId("ratingSearch").value);
+            const min = num(byId("ratingMinFilter").value || 0);
+            const sort = byId("ratingSortFilter").value || "latest";
+            state.filteredRatings = state.ratings.filter(function (row) {
+                const hay = [row.seller, row.sellerEmail, row.buyer, row.buyerEmail, row.note].join(" ").toLowerCase();
+                return (!q || hay.includes(q)) && row.rating >= min;
+            });
+            state.filteredRatings.sort(function (a, b) {
+                if (sort === "lowest") return a.rating - b.rating || String(b.createdAt).localeCompare(String(a.createdAt));
+                if (sort === "highest") return b.rating - a.rating || String(b.createdAt).localeCompare(String(a.createdAt));
+                return String(b.createdAt).localeCompare(String(a.createdAt));
+            });
+        }
+
+        function renderRatingSummary() {
+            const box = byId("ratingSummary");
+            if (!state.ratings.length) { box.innerHTML = '<div class="adm-empty">No ratings submitted yet.</div>'; return; }
+            const grouped = {};
+            state.ratings.forEach(function (r) {
+                const key = cleanLower(r.sellerEmail || r.seller || "unknown");
+                if (!grouped[key]) grouped[key] = { seller: r.seller || r.sellerEmail || "Unknown", sellerEmail: r.sellerEmail || "", sum: 0, count: 0 };
+                grouped[key].sum += r.rating;
+                grouped[key].count += 1;
+            });
+            const rows = Object.keys(grouped).map(function (k) { const g = grouped[k]; return { seller: g.seller, sellerEmail: g.sellerEmail, average: g.count ? (g.sum / g.count) : 0, count: g.count }; }).sort(function (a, b) { return a.average - b.average || b.count - a.count; });
+            box.innerHTML = rows.slice(0, 6).map(function (row) {
+                return '<div class="summary-item"><div><strong>' + esc(row.seller) + '</strong></div><div class="adm-note">' + esc(row.sellerEmail || "-") + '</div><div class="rating">Avg ' + row.average.toFixed(2) + ' / 5 from ' + row.count + ' rating(s)</div></div>';
+            }).join("");
+        }
+
+        function renderRatingTable() {
+            const table = byId("ratingTable");
+            const head = '<thead><tr><th>Date</th><th>Seller</th><th>Buyer</th><th>Rating</th><th>Note</th><th>Status</th><th>Actions</th></tr></thead>';
+            if (!state.filteredRatings.length) {
+                table.innerHTML = head + '<tbody><tr><td colspan="7" class="adm-empty">No ratings found.</td></tr></tbody>';
+                return;
+            }
+            table.innerHTML = head + '<tbody>' + state.filteredRatings.map(function (row) {
+                return '<tr><td>' + esc(AdminCore.fmtDate(row.createdAt)) + '</td><td>' + esc(row.seller || row.sellerEmail || "-") + '</td><td>' + esc(row.buyer || row.buyerEmail || "-") + '</td><td><span class="rating">' + esc(String(row.rating)) + '/5</span></td><td>' + esc(row.note || "-") + '</td><td>' + AdminCore.badge(row.status) + '</td><td><div class="adm-inline-actions"><button class="btn-adm" data-rating-action="ack" data-id="' + esc(row.id) + '">Acknowledge</button><button class="btn-adm warning" data-rating-action="flag" data-id="' + esc(row.id) + '">Flag</button><button class="btn-adm" data-rating-action="chat" data-id="' + esc(row.id) + '">Chat</button><button class="btn-adm success" data-rating-action="thank" data-id="' + esc(row.id) + '">Thank</button></div></td></tr>';
+            }).join("") + '</tbody>';
+        }
+
+        function updateRating(id, patch) {
+            const row = state.ratings.find(function (r) { return r.id === str(id); });
+            if (!row) return null;
+            Object.assign(row, patch || {});
+            persistRatings();
+            return row;
+        }
+
+        function pushComplaintFromRating(ratingRow) {
+            const complaint = {
+                id: makeId("CMP"), seller: ratingRow.seller, sellerEmail: ratingRow.sellerEmail,
+                buyer: ratingRow.buyer, buyerEmail: ratingRow.buyerEmail,
+                text: "Auto complaint from low rating (" + ratingRow.rating + "/5): " + (ratingRow.note || "No note"),
+                status: "new", severity: ratingRow.rating <= 2 ? "high" : "medium", createdAt: nowIso(), updatedAt: nowIso()
+            };
+            state.complaints.unshift(complaint);
+            persistComplaints();
+            return complaint;
+        }
+
+        function handleRatingAction(id, action) {
+            const row = state.ratings.find(function (r) { return r.id === str(id); });
+            if (!row) return;
+            if (action === "ack") { updateRating(row.id, { status: "acknowledged" }); AdminCore.log("rating_acknowledged", { id: row.id }); }
+            if (action === "flag") {
+                updateRating(row.id, { status: "flagged" });
+                const complaint = pushComplaintFromRating(row);
+                AdminCore.log("rating_flagged", { id: row.id, complaintId: complaint.id });
+            }
+            if (action === "chat") openSupportForSeller(row.seller, row.sellerEmail);
+            if (action === "thank") {
+                const seller = findSeller(row.seller, row.sellerEmail);
+                if (!seller) alert("Seller account was not found.");
+                else {
+                    pushNotification({ audience: "seller", targetEmail: seller.email, targetName: sellerAlias(seller), priority: "normal", message: "Admin update: New customer feedback received. Keep delivering quality service.", expiresAt: "" });
+                    persistNotifications();
+                    updateRating(row.id, { status: "acknowledged" });
+                    AdminCore.log("seller_feedback_notification_sent", { sellerEmail: seller.email, ratingId: row.id });
+                }
+            }
+            loadNotifications(); applyNotificationFilters(); renderNotificationTable();
+            loadComplaints(); applyComplaintFilters(); renderComplaintTable();
+            loadRatings(); applyRatingFilters(); renderRatingSummary(); renderRatingTable();
+            updateKpis();
+        }
+
+        function updateKpis() {
+            byId("kpiThreads").textContent = String(state.threads.length);
+            byId("kpiUnread").textContent = String(state.threads.reduce(function (sum, t) { return sum + t.unread; }, 0));
+            byId("kpiComplaints").textContent = String(state.complaints.filter(function (c) { const s = cleanLower(c.status); return s !== "resolved" && s !== "rejected"; }).length);
+            const ratingCount = state.ratings.length;
+            const ratingSum = state.ratings.reduce(function (sum, r) { return sum + r.rating; }, 0);
+            byId("kpiAvgRating").textContent = ratingCount ? (ratingSum / ratingCount).toFixed(2) : "0.00";
+            byId("kpiLowRatings").textContent = String(state.ratings.filter(function (r) { return r.rating <= 2; }).length);
+            byId("kpiNotifications").textContent = String(state.notifications.filter(function (n) { return cleanLower(n.status) === "active"; }).length);
+        }
+
+        function exportComplaints() {
+            const rows = state.filteredComplaints.map(function (row) { return { id: row.id, seller: row.seller, sellerEmail: row.sellerEmail, buyer: row.buyer, buyerEmail: row.buyerEmail, text: row.text, severity: row.severity, status: row.status, createdAt: AdminCore.fmtDate(row.createdAt), updatedAt: AdminCore.fmtDate(row.updatedAt) }; });
+            if (!rows.length) { alert("No complaints to export."); return; }
+            AdminCore.exportCSV(rows, "admin-complaints.csv");
+        }
+
+        function exportRatings() {
+            const rows = state.filteredRatings.map(function (row) { return { id: row.id, seller: row.seller, sellerEmail: row.sellerEmail, buyer: row.buyer, buyerEmail: row.buyerEmail, rating: row.rating, note: row.note, status: row.status, createdAt: AdminCore.fmtDate(row.createdAt) }; });
+            if (!rows.length) { alert("No ratings to export."); return; }
+            AdminCore.exportCSV(rows, "admin-ratings.csv");
+        }
+
+        function exportNotifications() {
+            const rows = state.filteredNotifications.map(function (row) { return { id: row.id, audience: row.audience, targetEmail: row.targetEmail, targetName: row.targetName, priority: row.priority, message: row.message, status: row.status, createdAt: AdminCore.fmtDate(row.createdAt), expiresAt: AdminCore.fmtDate(row.expiresAt) }; });
+            if (!rows.length) { alert("No notifications to export."); return; }
+            AdminCore.exportCSV(rows, "admin-notifications.csv");
+        }
+
+        function refreshAll(keepSelection) {
+            const selected = keepSelection ? state.activeThreadId : "";
+            normalizeAccounts();
+            loadThreads();
+            applyThreadFilters();
+            if (selected && state.threads.some(function (t) { return t.id === selected; })) state.activeThreadId = selected;
+            else if (!state.activeThreadId && state.filteredThreads.length) state.activeThreadId = state.filteredThreads[0].id;
+            else if (state.activeThreadId && !state.threads.some(function (t) { return t.id === state.activeThreadId; })) state.activeThreadId = "";
+            renderThreadList();
+            renderMessages();
+
+            loadNotifications(); applyNotificationFilters(); renderNotificationTable();
+            loadComplaints(); applyComplaintFilters(); renderComplaintTable();
+            loadRatings(); applyRatingFilters(); renderRatingSummary(); renderRatingTable();
+            updateKpis();
+        }
+
+        function bindEvents() {
+            byId("refreshBtn").addEventListener("click", function () { refreshAll(true); });
+            byId("exportComplaintsBtn").addEventListener("click", exportComplaints);
+            byId("exportRatingsBtn").addEventListener("click", exportRatings);
+            byId("exportNotificationsBtn").addEventListener("click", exportNotifications);
+
+            byId("threadSearch").addEventListener("input", function () { applyThreadFilters(); renderThreadList(); });
+            byId("threadRoleFilter").addEventListener("change", function () { applyThreadFilters(); renderThreadList(); });
+            byId("threadList").addEventListener("click", function (event) { const item = event.target.closest("[data-thread]"); if (item) openThread(item.getAttribute("data-thread")); });
+            byId("messageSearch").addEventListener("input", renderMessages);
+            byId("startThreadBtn").addEventListener("click", startThread);
+            byId("sendMessageBtn").addEventListener("click", sendMessage);
+            byId("clearThreadBtn").addEventListener("click", clearCurrentThread);
+            byId("exportThreadBtn").addEventListener("click", exportCurrentThread);
+            byId("messageInput").addEventListener("keydown", function (event) { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); sendMessage(); } });
+            document.querySelectorAll("button[data-quick]").forEach(function (button) { button.addEventListener("click", function () { byId("messageInput").value = str(button.getAttribute("data-quick")); byId("messageInput").focus(); }); });
+
+            byId("sendNotifBtn").addEventListener("click", sendNotificationFromForm);
+            byId("clearNotifFormBtn").addEventListener("click", clearNotificationForm);
+            byId("notifSearch").addEventListener("input", function () { applyNotificationFilters(); renderNotificationTable(); });
+            byId("notifAudienceFilter").addEventListener("change", function () { applyNotificationFilters(); renderNotificationTable(); });
+            byId("notifStatusFilter").addEventListener("change", function () { applyNotificationFilters(); renderNotificationTable(); });
+            byId("notifResetBtn").addEventListener("click", function () { byId("notifSearch").value = ""; byId("notifAudienceFilter").value = ""; byId("notifStatusFilter").value = ""; applyNotificationFilters(); renderNotificationTable(); });
+            byId("notificationTable").addEventListener("click", function (event) { const button = event.target.closest("button[data-notif-action]"); if (button) updateNotificationStatus(button.getAttribute("data-id"), button.getAttribute("data-notif-action")); });
+
+            byId("complaintSearch").addEventListener("input", function () { applyComplaintFilters(); renderComplaintTable(); });
+            byId("complaintStatusFilter").addEventListener("change", function () { applyComplaintFilters(); renderComplaintTable(); });
+            byId("complaintSeverityFilter").addEventListener("change", function () { applyComplaintFilters(); renderComplaintTable(); });
+            byId("complaintResetBtn").addEventListener("click", function () { byId("complaintSearch").value = ""; byId("complaintStatusFilter").value = ""; byId("complaintSeverityFilter").value = ""; applyComplaintFilters(); renderComplaintTable(); });
+            byId("complaintTable").addEventListener("click", function (event) { const button = event.target.closest("button[data-complaint-action]"); if (button) handleComplaintAction(button.getAttribute("data-id"), button.getAttribute("data-complaint-action")); });
+
+            byId("ratingSearch").addEventListener("input", function () { applyRatingFilters(); renderRatingTable(); });
+            byId("ratingMinFilter").addEventListener("change", function () { applyRatingFilters(); renderRatingTable(); });
+            byId("ratingSortFilter").addEventListener("change", function () { applyRatingFilters(); renderRatingTable(); });
+            byId("ratingResetBtn").addEventListener("click", function () { byId("ratingSearch").value = ""; byId("ratingMinFilter").value = "0"; byId("ratingSortFilter").value = "latest"; applyRatingFilters(); renderRatingTable(); });
+            byId("ratingTable").addEventListener("click", function (event) { const button = event.target.closest("button[data-rating-action]"); if (button) handleRatingAction(button.getAttribute("data-id"), button.getAttribute("data-rating-action")); });
+
+            window.addEventListener("storage", function () { refreshAll(true); });
+        }
+
+        function initAdminCommunicationsPage() {
+            byId("adminHeader").innerHTML = AdminCore.renderAdminHeader("admin-communications.html");
+            bindEvents();
+            refreshAll(false);
+        }
+
+        function startAdminCommunicationsPage() {
+            const ready = window.MMStorage && window.MMStorage.ready;
+            if (ready && typeof ready.then === "function") {
+                ready.finally(initAdminCommunicationsPage);
+                return;
+            }
+            initAdminCommunicationsPage();
+        }
+
+        if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", startAdminCommunicationsPage);
+        else startAdminCommunicationsPage();
+    </script>
+    <script defer src="upgrade.js"></script>
+  <script defer src="sw-register.js?v=20260226a"></script>
+  <script defer src="site-performance.js?v=20260226a"></script>
+</body>
+</html>
+
+
+
+
+

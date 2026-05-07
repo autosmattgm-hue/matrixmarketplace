@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>MatrixMarket - Access Code</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body {
+            margin: 0;
+            font-family: "Poppins", sans-serif;
+            background: linear-gradient(135deg, #0f172a, #1e293b, #4f46e5, #06b6d4);
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            box-sizing: border-box;
+        }
+
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .card {
+            width: min(620px, 100%);
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 18px;
+            padding: 28px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+            text-align: center;
+        }
+
+        h1 {
+            margin: 0 0 8px;
+            font-size: 2rem;
+        }
+
+        .hint {
+            color: #cbd5e1;
+            margin: 0 0 22px;
+        }
+
+        .code-box {
+            font-size: 1.9rem;
+            letter-spacing: 0.14em;
+            font-weight: 700;
+            padding: 14px 16px;
+            border-radius: 12px;
+            background: rgba(15, 23, 42, 0.65);
+            border: 1px dashed rgba(6, 182, 212, 0.8);
+            word-break: break-word;
+            margin: 0 0 16px;
+        }
+
+        .meta {
+            text-align: left;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 14px;
+        }
+
+        .meta p {
+            margin: 8px 0;
+            color: #e2e8f0;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 18px;
+        }
+
+        .btn {
+            border: 0;
+            border-radius: 12px;
+            padding: 12px 18px;
+            font-weight: 600;
+            cursor: pointer;
+            color: white;
+        }
+
+        .btn.primary { background: linear-gradient(45deg, #06b6d4, #4f46e5); }
+        .btn.secondary { background: rgba(255, 255, 255, 0.2); }
+        .status {
+            margin-top: 10px;
+            min-height: 20px;
+            color: #cbd5e1;
+            font-size: 0.95rem;
+        }
+    </style>
+    <script src="firebase-online-storage.js"></script>
+    <link rel="stylesheet" href="upgrade.css">
+</head>
+<body>
+    <main class="card">
+        <h1 id="title">Access Code</h1>
+        <p class="hint" id="hint">Your payment details are synced online.</p>
+        <div class="code-box" id="codeValue">Loading...</div>
+
+        <section class="meta">
+            <p><strong>Name:</strong> <span id="nameValue">N/A</span></p>
+            <p><strong>Plan:</strong> <span id="planValue">N/A</span></p>
+            <p><strong>Amount:</strong> <span id="amountValue">0 GMD</span></p>
+        </section>
+
+        <div class="actions">
+            <button class="btn primary" id="copyBtn" type="button">Copy Code</button>
+            <button class="btn secondary" id="homeBtn" type="button">Back Home</button>
+        </div>
+        <p class="status" id="statusText"></p>
+    </main>
+
+    <script>
+        function byId(id) { return document.getElementById(id); }
+
+        function queryValue(key) {
+            return new URLSearchParams(window.location.search).get(key) || "";
+        }
+
+        function readJSON(key, fallback) {
+            try {
+                const raw = MMStorage.getItem(key);
+                if (raw == null) return fallback;
+                const parsed = JSON.parse(raw);
+                return parsed == null ? fallback : parsed;
+            } catch (_) {
+                return fallback;
+            }
+        }
+
+        function stableCode(input) {
+            const source = String(input || "MATRIXMARKET");
+            let hash = 2166136261;
+            for (let i = 0; i < source.length; i += 1) {
+                hash ^= source.charCodeAt(i);
+                hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);
+            }
+            const base = Math.abs(hash >>> 0).toString(36).toUpperCase();
+            return ("MM-" + base + "000000").slice(0, 11);
+        }
+
+        function fillMeta(name, plan, amount) {
+            byId("nameValue").textContent = name || "N/A";
+            byId("planValue").textContent = plan || "N/A";
+            byId("amountValue").textContent = (amount ? String(amount) : "0") + " GMD";
+        }
+
+        function loadPage() {
+            const storedUser = readJSON("currentUser", null) || readJSON("currentSeller", null) || {};
+            const payment = readJSON("lastPayment", {});
+            const assigned = readJSON("assignedCodes", {});
+
+            const name = queryValue("name") || payment.name || storedUser.fullName || storedUser.name || "";
+            const plan = queryValue("plan") || payment.plan || MMStorage.getItem("paymentPlan") || storedUser.plan || "";
+            const amount = queryValue("amount") || payment.amount || MMStorage.getItem("paymentAmount") || storedUser.amount || "";
+            const email = String(storedUser.email || payment.email || "").toLowerCase();
+
+            let code = "";
+            if (email && assigned[email] && assigned[email].value) {
+                code = String(assigned[email].value).toUpperCase();
+                byId("hint").textContent = "Your assigned code is synced online.";
+            } else {
+                const seed = [name, plan, amount, email].join("|");
+                code = stableCode(seed || Date.now());
+                byId("title").textContent = "Payment Reference";
+                byId("hint").textContent = "No assigned code found yet. This is your reference ID.";
+            }
+
+            byId("codeValue").textContent = code;
+            fillMeta(name, plan, amount);
+
+            byId("copyBtn").onclick = function () {
+                navigator.clipboard.writeText(code).then(function () {
+                    byId("statusText").textContent = "Copied to clipboard.";
+                }).catch(function () {
+                    byId("statusText").textContent = "Copy failed. Please copy manually.";
+                });
+            };
+            byId("homeBtn").onclick = function () {
+                window.location.href = "index.html";
+            };
+        }
+
+        window.onload = function () {
+            const ready = window.MMStorage && window.MMStorage.ready;
+            if (ready && typeof ready.then === "function") {
+                ready.finally(loadPage);
+                return;
+            }
+            loadPage();
+        };
+    </script>
+    <script defer src="upgrade.js"></script>
+  <script defer src="sw-register.js?v=20260226a"></script>
+  <script defer src="site-performance.js?v=20260226a"></script>
+</body>
+</html>
+
+

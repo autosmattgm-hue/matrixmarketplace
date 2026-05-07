@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Admin Codes - MatrixMarket</title>
+    <link rel="stylesheet" href="admin-layout.css?v=20260227a">
+    <link rel="stylesheet" href="upgrade.css">
+    <script src="firebase-online-storage.js"></script>
+</head>
+<body class="admin-page">
+    <div id="adminHeader"></div>
+    <main class="admin-shell">
+        <section class="admin-titlebar">
+            <h1>Subscription Code Manager</h1>
+            <div class="admin-actions">
+                <button class="btn-adm" id="refreshBtn" type="button">Refresh</button>
+                <button class="btn-adm" id="exportBtn" type="button">Export Codes</button>
+                <button class="btn-adm danger" id="expireBtn" type="button">Remove Expired</button>
+            </div>
+        </section>
+
+        <section class="admin-card">
+            <div class="admin-form-grid cols-2">
+                <select class="adm" id="sellerSelect"></select>
+                <div class="adm-split">
+                    <input class="adm" id="manualCode" type="text" placeholder="Manual code (optional)">
+                    <button class="btn-adm" id="generateBtn" type="button">Generate</button>
+                </div>
+                <input class="adm" id="expiryDate" type="date">
+                <button class="btn-adm primary" id="assignBtn" type="button">Assign / Update Code</button>
+            </div>
+            <p class="adm-note" style="margin-top:.45rem;">Assigning a code sets seller status to approved and subscription active.</p>
+        </section>
+
+        <section class="admin-card">
+            <div class="adm-toolbar">
+                <input class="adm" id="searchInput" type="text" placeholder="Search by email or code">
+                <select class="adm" id="statusFilter">
+                    <option value="">All Code Status</option>
+                    <option value="active">Active</option>
+                    <option value="expired">Expired</option>
+                </select>
+                <div></div>
+                <button class="btn-adm" id="copyBtn" type="button">Copy Selected Code</button>
+            </div>
+        </section>
+
+        <section class="admin-card">
+            <div class="adm-table-wrap">
+                <table class="adm-table" id="codeTable"></table>
+            </div>
+        </section>
+
+        <div class="adm-foot">Subscription codes synced with seller accounts.</div>
+    </main>
+
+    <script src="admin-core.js?v=20260222c"></script>
+    <script>
+        const state = { rows: [], filtered: [], selectedEmail: "" };
+
+        function setHeader() {
+            document.getElementById("adminHeader").innerHTML = AdminCore.renderAdminHeader("admin-code.html");
+        }
+
+        function populateSellerSelect() {
+            const sellers = AdminCore.getSellers().sort(function (a, b) { return a.fullName.localeCompare(b.fullName); });
+            const select = document.getElementById("sellerSelect");
+            select.innerHTML = '<option value="">Select seller</option>' + sellers.map(function (s) {
+                return '<option value="' + s.email + '">' + s.fullName + ' (' + s.email + ')</option>';
+            }).join("");
+        }
+
+        function readRows() {
+            const codes = AdminCore.getCodes();
+            state.rows = Object.keys(codes).map(function (email) {
+                const row = codes[email] || {};
+                const expiry = row.expiry || new Date().toISOString();
+                const expired = new Date(expiry).getTime() < Date.now();
+                return {
+                    email: email,
+                    code: AdminCore.str(row.value),
+                    expiry: expiry,
+                    status: expired ? "expired" : "active",
+                    daysLeft: Math.max(0, Math.ceil((new Date(expiry).getTime() - Date.now()) / 86400000))
+                };
+            }).sort(function (a, b) { return String(a.expiry).localeCompare(String(b.expiry)); });
+        }
+
+        function applyFilters() {
+            const q = AdminCore.str(document.getElementById("searchInput").value).toLowerCase();
+            const status = AdminCore.str(document.getElementById("statusFilter").value).toLowerCase();
+            state.filtered = state.rows.filter(function (r) {
+                const hay = [r.email, r.code].join(" ").toLowerCase();
+                return (!q || hay.includes(q)) && (!status || r.status === status);
+            });
+        }
+
+        function renderTable() {
+            const table = document.getElementById("codeTable");
+            const head = '<thead><tr><th>Select</th><th>Email</th><th>Code</th><th>Expiry</th><th>Days Left</th><th>Status</th><th>Actions</th></tr></thead>';
+
+            if (!state.filtered.length) {
+                table.innerHTML = head + '<tbody><tr><td colspan="7" class="adm-empty">No codes found.</td></tr></tbody>';
+                return;
+            }
+
+            table.innerHTML = head + '<tbody>' + state.filtered.map(function (r) {
+                const e = encodeURIComponent(r.email);
+                return '<tr>' +
+                    '<td><input type="radio" name="selectedCode" value="' + e + '"></td>' +
+                    '<td>' + r.email + '</td>' +
+                    '<td><strong>' + r.code + '</strong></td>' +
+                    '<td>' + AdminCore.fmtDate(r.expiry) + '</td>' +
+                    '<td>' + r.daysLeft + '</td>' +
+                    '<td>' + AdminCore.badge(r.status) + '</td>' +
+                    '<td><div class="adm-inline-actions">' +
+                    '<button class="btn-adm" data-action="renew" data-email="' + e + '">Renew 30d</button>' +
+                    '<button class="btn-adm danger" data-action="remove" data-email="' + e + '">Deactivate</button>' +
+                    '</div></td>' +
+                    '</tr>';
+            }).join("") + '</tbody>';
+        }
+
+        function refresh() {
+            populateSellerSelect();
+            readRows();
+            applyFilters();
+            renderTable();
+        }
+
+        function assignCode() {
+            const email = AdminCore.str(document.getElementById("sellerSelect").value).toLowerCase();
+            if (!email) {
+                alert("Select a seller first.");
+                return;
+            }
+            const manual = AdminCore.str(document.getElementById("manualCode").value).toUpperCase();
+            const code = manual || AdminCore.createCode(8);
+            const expiryInput = document.getElementById("expiryDate").value;
+            const expiry = expiryInput
+                ? new Date(expiryInput + "T23:59:59").toISOString()
+                : new Date(Date.now() + 30 * 86400000).toISOString();
+
+            AdminCore.upsertCode(email, { value: code, expiry: expiry, status: "active" });
+            AdminCore.log("code_assigned", { email: email, code: code });
+            alert("Code assigned: " + code);
+            refresh();
+        }
+
+        function renewCode(encodedEmail) {
+            const email = decodeURIComponent(encodedEmail);
+            const codes = AdminCore.getCodes();
+            if (!codes[email]) return;
+            const nextExpiry = new Date(Date.now() + 30 * 86400000).toISOString();
+            AdminCore.upsertCode(email, {
+                value: codes[email].value,
+                expiry: nextExpiry,
+                status: "active"
+            });
+            AdminCore.log("code_renewed", { email: email, expiry: nextExpiry });
+            refresh();
+        }
+
+        function removeCode(encodedEmail) {
+            const email = decodeURIComponent(encodedEmail);
+            if (!confirm("Deactivate this code and seller subscription?")) return;
+            AdminCore.removeCode(email);
+            AdminCore.log("code_deactivated", { email: email });
+            refresh();
+        }
+
+        function initAdminCodePage() {
+            setHeader();
+            refresh();
+            window.addEventListener("storage", refresh);
+
+            document.getElementById("refreshBtn").addEventListener("click", refresh);
+            document.getElementById("generateBtn").addEventListener("click", function () {
+                document.getElementById("manualCode").value = AdminCore.createCode(8);
+            });
+            document.getElementById("assignBtn").addEventListener("click", assignCode);
+            document.getElementById("searchInput").addEventListener("input", refresh);
+            document.getElementById("statusFilter").addEventListener("change", refresh);
+
+            document.getElementById("copyBtn").addEventListener("click", function () {
+                const selected = document.querySelector('input[name="selectedCode"]:checked');
+                if (!selected) {
+                    alert("Select a row first.");
+                    return;
+                }
+                const email = decodeURIComponent(selected.value);
+                const row = state.rows.find(function (r) { return r.email === email; });
+                if (!row) return;
+                navigator.clipboard.writeText(row.code).then(function () {
+                    alert("Code copied: " + row.code);
+                }).catch(function () {
+                    alert("Could not copy code.");
+                });
+            });
+
+            document.getElementById("expireBtn").addEventListener("click", function () {
+                const expired = state.rows.filter(function (r) { return r.status === "expired"; });
+                expired.forEach(function (r) { AdminCore.removeCode(r.email); });
+                AdminCore.log("expired_codes_removed", { count: expired.length });
+                refresh();
+            });
+
+            document.getElementById("exportBtn").addEventListener("click", function () {
+                AdminCore.exportCSV(state.filtered, "admin-codes.csv");
+                AdminCore.log("codes_csv_exported", { count: state.filtered.length });
+            });
+
+            document.getElementById("codeTable").addEventListener("click", function (e) {
+                const btn = e.target.closest("button[data-action]");
+                if (!btn) return;
+                if (btn.dataset.action === "renew") renewCode(btn.dataset.email);
+                if (btn.dataset.action === "remove") removeCode(btn.dataset.email);
+            });
+        }
+
+        function startAdminCodePage() {
+            const ready = window.MMStorage && window.MMStorage.ready;
+            if (ready && typeof ready.then === "function") {
+                ready.finally(initAdminCodePage);
+                return;
+            }
+            initAdminCodePage();
+        }
+
+        if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", startAdminCodePage);
+        else startAdminCodePage();
+    </script>
+    <script defer src="upgrade.js"></script>
+  <script defer src="sw-register.js?v=20260226a"></script>
+  <script defer src="site-performance.js?v=20260226a"></script>
+</body>
+</html>
+
+
+
+

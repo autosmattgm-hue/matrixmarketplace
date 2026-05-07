@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Sellers Shop - MatrixMarket</title>
+    <link rel="stylesheet" href="seller-layout.css" />
+    <link rel="stylesheet" href="upgrade.css" />
+    <script src="firebase-online-storage.js"></script>
+    <style>
+        .shop-shell {
+            width: min(1220px, 100% - 1.2rem);
+            margin: 1rem auto 1.4rem;
+            display: grid;
+            gap: 0.8rem;
+        }
+
+        .market-grid {
+            display: grid;
+            gap: 0.75rem;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        }
+
+        .product-card {
+            border: 1px solid var(--sel-border);
+            border-radius: 14px;
+            background: rgba(2, 6, 23, 0.58);
+            overflow: hidden;
+            display: grid;
+            grid-template-rows: auto 1fr;
+        }
+
+        .product-media {
+            aspect-ratio: 16 / 10;
+            width: 100%;
+            object-fit: cover;
+            background: #020617;
+        }
+
+        .product-body {
+            padding: 0.72rem;
+            display: grid;
+            gap: 0.38rem;
+        }
+
+        .product-body h3 {
+            margin: 0;
+            font-size: 1.02rem;
+            color: #e2e8f0;
+        }
+
+        .price {
+            font-weight: 800;
+            color: #67e8f9;
+        }
+
+        .seller-line {
+            font-size: 0.86rem;
+            color: var(--sel-muted);
+        }
+
+        .desc {
+            color: #cbd5e1;
+            font-size: 0.86rem;
+            line-height: 1.35;
+            min-height: 2.45em;
+        }
+
+        .tag-row {
+            display: flex;
+            gap: 0.32rem;
+            flex-wrap: wrap;
+        }
+
+        .tag {
+            border: 1px solid var(--sel-border);
+            border-radius: 999px;
+            font-size: 0.72rem;
+            padding: 0.13rem 0.45rem;
+            color: #bfdbfe;
+            background: rgba(30, 41, 59, 0.45);
+        }
+
+        .summary-row {
+            display: grid;
+            gap: 0.6rem;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        }
+
+        .summary-box {
+            border: 1px solid var(--sel-border);
+            border-radius: 12px;
+            background: rgba(2, 6, 23, 0.55);
+            padding: 0.65rem;
+        }
+
+        .summary-box .label {
+            color: var(--sel-muted);
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .summary-box .value {
+            margin-top: 0.2rem;
+            font-size: 1.28rem;
+            font-weight: 800;
+        }
+
+        @media (max-width: 900px) {
+            .summary-row {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body class="seller-page">
+    <header class="seller-header">
+        <div class="seller-header-inner">
+            <div class="seller-brand">MatrixMarket Seller Shop</div>
+            <nav class="seller-nav">
+                <a href="index.html">Home</a>
+                <a href="shop.html">Main Shop</a>
+                <a href="sellers.html">Sellers</a>
+                <a class="active" href="sellers-shop.html">Seller Shop</a>
+                <a href="cart.html">Cart</a>
+                <a href="seller-login.html">Seller Login</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="shop-shell">
+        <section class="seller-titlebar">
+            <h1>Sellers Product Marketplace</h1>
+            <div class="seller-actions">
+                <button class="btn-sel" id="refreshBtn" type="button">Refresh</button>
+                <a class="btn-sel" href="sellers.html">Seller Directory</a>
+                <a class="btn-sel primary" href="cart.html">Open Cart</a>
+            </div>
+        </section>
+
+        <section class="summary-row" id="summaryRow"></section>
+
+        <section class="seller-card">
+            <div class="sel-toolbar">
+                <input class="sel" id="searchInput" type="search" placeholder="Search product, category, seller" />
+                <select class="sel" id="sellerFilter"><option value="">All Sellers</option></select>
+                <select class="sel" id="categoryFilter"><option value="">All Categories</option></select>
+                <select class="sel" id="sortFilter">
+                    <option value="newest">Newest</option>
+                    <option value="priceAsc">Price Low</option>
+                    <option value="priceDesc">Price High</option>
+                    <option value="nameAsc">Name A-Z</option>
+                    <option value="stockDesc">Stock High</option>
+                </select>
+            </div>
+        </section>
+
+        <section id="productGrid" class="market-grid" aria-live="polite"></section>
+
+        <div class="sel-foot">Products listed by MatrixMarket sellers</div>
+    </main>
+
+    <script src="seller-core.js?v=20260222g"></script>
+    <script>
+        const state = { products: [], filtered: [], sellers: [], soldOutHidden: 0 };
+
+        function byId(id) { return document.getElementById(id); }
+
+        function normalizeProducts() {
+            const all = SellerCore.getMarketplaceProducts({ includeOutOfStock: true, includeHidden: true });
+            state.soldOutHidden = all.filter(function (row) { return row.stock <= 0 || row.isVisible === false; }).length;
+            state.products = all.filter(function (row) { return row.stock > 0 && row.isVisible !== false; });
+        }
+
+        function normalizeSellers() {
+            state.sellers = SellerCore.getSellers();
+        }
+
+        function sellerNameForProduct(product) {
+            return SellerCore.str(product.seller || "Unknown Seller");
+        }
+
+        function sellerOptionValue(product) {
+            const email = SellerCore.cleanEmail(product.sellerEmail || "");
+            if (email) return "email:" + email;
+            return "name:" + sellerNameForProduct(product).toLowerCase();
+        }
+
+        function productMatchesSeller(product, selectedValue) {
+            if (!selectedValue) return true;
+            const email = SellerCore.cleanEmail(product.sellerEmail || "");
+            const name = sellerNameForProduct(product).toLowerCase();
+            if (selectedValue.startsWith("email:")) return email === selectedValue.slice(6);
+            if (selectedValue.startsWith("name:")) return name === selectedValue.slice(5);
+            return true;
+        }
+
+        function fillSellerFilter() {
+            const optionMap = new Map();
+
+            state.products.forEach(function (product) {
+                const value = sellerOptionValue(product);
+                const label = sellerNameForProduct(product);
+                if (!optionMap.has(value)) optionMap.set(value, label);
+            });
+
+            const sorted = Array.from(optionMap.entries()).sort(function (a, b) {
+                return a[1].localeCompare(b[1]);
+            });
+
+            const select = byId("sellerFilter");
+            select.innerHTML = '<option value="">All Sellers</option>' + sorted.map(function (entry) {
+                return '<option value="' + entry[0] + '">' + entry[1] + '</option>';
+            }).join("");
+
+            const querySeller = SellerCore.str(new URLSearchParams(window.location.search).get("seller"));
+            if (querySeller) {
+                const queryEmail = SellerCore.cleanEmail(querySeller);
+                const emailValue = "email:" + queryEmail;
+                const nameValue = "name:" + querySeller.toLowerCase();
+                if (select.querySelector('option[value="' + emailValue + '"]')) select.value = emailValue;
+                else if (select.querySelector('option[value="' + nameValue + '"]')) select.value = nameValue;
+            }
+        }
+
+        function fillCategoryFilter() {
+            const cats = Array.from(new Set(state.products.map(function (product) {
+                return SellerCore.str(product.category || "general").toLowerCase();
+            }).filter(Boolean))).sort();
+
+            byId("categoryFilter").innerHTML = '<option value="">All Categories</option>' + cats.map(function (cat) {
+                return '<option value="' + cat + '">' + cat + '</option>';
+            }).join("");
+        }
+
+        function applyFilters() {
+            const query = SellerCore.str(byId("searchInput").value).toLowerCase();
+            const sellerValue = byId("sellerFilter").value;
+            const category = SellerCore.str(byId("categoryFilter").value).toLowerCase();
+            const sort = SellerCore.str(byId("sortFilter").value);
+
+            state.filtered = state.products.filter(function (product) {
+                const hay = [product.name, product.category, product.description, product.seller, product.sellerEmail].join(" ").toLowerCase();
+                const cat = SellerCore.str(product.category || "general").toLowerCase();
+                return (!query || hay.includes(query)) && (!category || category === cat) && productMatchesSeller(product, sellerValue);
+            });
+
+            state.filtered.sort(function (a, b) {
+                if (sort === "priceAsc") return a.price - b.price;
+                if (sort === "priceDesc") return b.price - a.price;
+                if (sort === "nameAsc") return a.name.localeCompare(b.name);
+                if (sort === "stockDesc") return b.stock - a.stock;
+                return String(b.createdAt).localeCompare(String(a.createdAt));
+            });
+        }
+
+        function renderSummary() {
+            const activeSellerValues = new Set(state.filtered.map(function (p) { return sellerOptionValue(p); }));
+            const totalStock = state.filtered.reduce(function (sum, p) { return sum + p.stock; }, 0);
+
+            byId("summaryRow").innerHTML = [
+                ["Products", state.filtered.length],
+                ["Sellers", activeSellerValues.size],
+                ["Stock Units", totalStock]
+            ].map(function (row) {
+                return '<article class="summary-box"><div class="label">' + row[0] + '</div><div class="value">' + row[1] + '</div></article>';
+            }).join("") + '<article class="summary-box"><div class="label">Hidden Sold Out</div><div class="value">' + state.soldOutHidden + '</div></article>';
+        }
+
+        function renderProducts() {
+            const grid = byId("productGrid");
+            if (!state.filtered.length) {
+                grid.innerHTML = '<div class="sel-empty">No products found with the selected filters.</div>';
+                renderSummary();
+                return;
+            }
+
+            grid.innerHTML = state.filtered.map(function (product) {
+                const sellerLabel = sellerNameForProduct(product);
+                const safeId = encodeURIComponent(product.id);
+                const safeSeller = encodeURIComponent(sellerLabel);
+                const maxQty = Math.max(1, Math.floor(SellerCore.num(product.stock || 1)));
+                return '<article class="product-card">' +
+                '<img class="product-media" loading="lazy" decoding="async" fetchpriority="low" src="' + ((product.image || "matrixx.png").includes("via.placeholder.com") ? "matrixx.png" : (product.image || "matrixx.png")) + '" alt="' + product.name + '">' +
+                    '<div class="product-body">' +
+                    '<h3>' + product.name + '</h3>' +
+                    '<div class="price">' + SellerCore.fmtMoney(product.price) + '</div>' +
+                    '<div class="seller-line">Seller: ' + sellerLabel + '</div>' +
+                    '<div class="desc">' + (product.description || "No description") + '</div>' +
+                    '<div class="tag-row">' +
+                    '<span class="tag">' + (product.category || "general") + '</span>' +
+                    '<span class="tag">Stock: ' + product.stock + '</span>' +
+                    (product.location ? '<span class="tag">' + product.location + '</span>' : '') +
+                    '</div>' +
+                    '<div class="seller-actions" style="margin-top:.35rem;">' +
+                    '<input class="sel" type="number" min="1" max="' + maxQty + '" value="1" data-qty-id="' + safeId + '" style="max-width:86px;">' +
+                    '<button class="btn-sel" type="button" data-action="add" data-id="' + safeId + '">Add to Cart</button>' +
+                    '<button class="btn-sel primary" type="button" data-action="buy" data-id="' + safeId + '">Buy Now</button>' +
+                    '<button class="btn-sel" type="button" data-action="chat" data-seller="' + safeSeller + '">Chat</button>' +
+                    '</div>' +
+                    '</div>' +
+                    '</article>';
+            }).join("");
+
+            renderSummary();
+        }
+
+        function persistCart(cart) {
+            MMStorage.setItem("cart", JSON.stringify(cart));
+            MMStorage.setItem("cartItems", JSON.stringify(cart));
+        }
+
+        function readCart() {
+            const existing = SellerCore.readJSON("cart", null);
+            if (Array.isArray(existing)) return existing;
+            const legacy = SellerCore.readJSON("cartItems", []);
+            return Array.isArray(legacy) ? legacy : [];
+        }
+
+        function productById(id) {
+            return state.products.find(function (p) { return p.id === id; }) || null;
+        }
+
+        function productToCartItem(product) {
+            return {
+                id: product.id,
+                name: product.name,
+                price: SellerCore.num(product.price),
+                image: product.image,
+                seller: sellerNameForProduct(product),
+                sellerEmail: SellerCore.cleanEmail(product.sellerEmail || ""),
+                category: product.category || "general",
+                quantity: 1
+            };
+        }
+
+        function qtyForProduct(id, maxStock) {
+            const inputs = document.querySelectorAll("input[data-qty-id]");
+            for (let i = 0; i < inputs.length; i += 1) {
+                if (decodeURIComponent(inputs[i].getAttribute("data-qty-id") || "") === id) {
+                    const qty = Math.max(1, Math.floor(SellerCore.num(inputs[i].value || 1)));
+                    return Math.min(maxStock, qty);
+                }
+            }
+            return 1;
+        }
+
+        function addToCart(product, quantity, silent) {
+            if (!product || product.stock <= 0) return false;
+            const cart = readCart();
+            const next = productToCartItem(product);
+            const qty = Math.max(1, Math.floor(SellerCore.num(quantity || 1)));
+            const existing = cart.find(function (item) {
+                return SellerCore.str(item.id) === SellerCore.str(next.id) ||
+                    (SellerCore.str(item.name) === SellerCore.str(next.name) && SellerCore.str(item.seller) === SellerCore.str(next.seller));
+            });
+
+            if (existing) {
+                const base = Math.max(1, Math.floor(SellerCore.num(existing.quantity || 1)));
+                existing.quantity = Math.min(product.stock, base + qty);
+            } else {
+                next.quantity = Math.min(product.stock, qty);
+                cart.push(next);
+            }
+
+            persistCart(cart);
+            if (!silent) alert(product.name + " added to cart.");
+            return true;
+        }
+
+        function buyNow(product) {
+            if (!product) return;
+            const quantity = qtyForProduct(product.id, Math.max(1, product.stock));
+            addToCart(product, quantity, true);
+            const item = productToCartItem(product);
+            item.quantity = quantity;
+            const subtotal = item.price * item.quantity;
+            const shipping = subtotal >= 500 ? 0 : 25;
+            MMStorage.setItem("checkoutCart", JSON.stringify([item]));
+            MMStorage.setItem("checkoutMeta", JSON.stringify({
+                coupon: null,
+                subtotal: subtotal,
+                discount: 0,
+                shipping: shipping,
+                total: subtotal + shipping
+            }));
+            window.location.href = "checkout.html";
+        }
+
+        function startChat(sellerLabel) {
+            const target = decodeURIComponent(sellerLabel || "");
+            if (!target) return;
+            MMStorage.setItem("chatWith", target);
+            window.location.href = "chat.html?seller=" + encodeURIComponent(target);
+        }
+
+        function refresh() {
+            applyFilters();
+            renderProducts();
+        }
+
+        function initSellersShopPage() {
+            normalizeProducts();
+            normalizeSellers();
+            fillSellerFilter();
+            fillCategoryFilter();
+            refresh();
+
+            byId("refreshBtn").addEventListener("click", function () {
+                normalizeProducts();
+                normalizeSellers();
+                fillSellerFilter();
+                fillCategoryFilter();
+                refresh();
+            });
+
+            byId("searchInput").addEventListener("input", refresh);
+            byId("sellerFilter").addEventListener("change", refresh);
+            byId("categoryFilter").addEventListener("change", refresh);
+            byId("sortFilter").addEventListener("change", refresh);
+
+            byId("productGrid").addEventListener("click", function (event) {
+                const btn = event.target.closest("button[data-action]");
+                if (!btn) return;
+                const action = btn.dataset.action;
+                if (action === "chat") {
+                    startChat(btn.dataset.seller || "");
+                    return;
+                }
+                const id = decodeURIComponent(btn.dataset.id || "");
+                const product = productById(id);
+                if (!product) return;
+                const quantity = qtyForProduct(id, Math.max(1, product.stock));
+                if (action === "add") addToCart(product, quantity, false);
+                if (action === "buy") buyNow(product);
+            });
+
+            window.addEventListener("storage", function () {
+                normalizeProducts();
+                normalizeSellers();
+                fillSellerFilter();
+                fillCategoryFilter();
+                refresh();
+            });
+        }
+
+        function startSellersShopPage() {
+            const ready = window.MMStorage && window.MMStorage.ready;
+            if (ready && typeof ready.then === "function") {
+                ready.finally(initSellersShopPage);
+                return;
+            }
+            initSellersShopPage();
+        }
+
+        if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", startSellersShopPage);
+        else startSellersShopPage();
+    </script>
+    <script defer src="upgrade.js"></script>
+  <script defer src="sw-register.js?v=20260226a"></script>
+  <script defer src="site-performance.js?v=20260226a"></script>
+</body>
+</html>
+
+
+
+

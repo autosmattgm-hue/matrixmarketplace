@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Seller Register - MatrixMarket</title>
+  <link rel="stylesheet" href="seller-layout.css" />
+  <link rel="stylesheet" href="upgrade.css" />
+  <style>
+    .register-wrap{width:min(980px,100% - 18px);margin:1rem auto;display:grid;grid-template-columns:1.2fr .9fr;gap:.8rem}
+    .plan-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.55rem}
+    .plan{border:1px solid var(--sel-border);background:rgba(2,6,23,.45);border-radius:10px;padding:.65rem;cursor:pointer}
+    .plan.active{border-color:rgba(103,232,249,.65);background:rgba(6,182,212,.14)}
+    .plan .price{font-weight:800;color:#67e8f9}
+    .msg{display:none;border-radius:10px;padding:.55rem .65rem;margin-top:.65rem;font-size:.88rem}
+    .msg.ok{background:rgba(34,197,94,.18);border:1px solid rgba(34,197,94,.35);color:#86efac}
+    .msg.err{background:rgba(239,68,68,.18);border:1px solid rgba(239,68,68,.35);color:#fca5a5}
+    @media (max-width:960px){.register-wrap{grid-template-columns:1fr}.plan-grid{grid-template-columns:1fr}}
+  </style>
+    <script src="firebase-online-storage.js"></script>
+</head>
+<body class="seller-page">
+  <header class="seller-header">
+    <div class="seller-header-inner">
+      <div class="seller-brand">MatrixMarket Seller</div>
+      <nav class="seller-nav">
+        <a href="index.html">Home</a>
+        <a href="seller-login.html">Login</a>
+        <a href="sellers.html">Directory</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="seller-shell">
+    <section class="register-wrap">
+      <article class="seller-card">
+        <h1 style="margin:0 0 .5rem;">Create Seller Account</h1>
+        <p class="sel-note" style="margin:0 0 .65rem;">Register your store and choose a subscription plan.</p>
+
+        <div class="seller-form-grid cols-2">
+          <input class="sel" id="fullName" type="text" placeholder="Full Name" />
+          <input class="sel" id="email" type="email" placeholder="Business Email" />
+          <input class="sel" id="store" type="text" placeholder="Store Name" />
+          <input class="sel" id="phone" type="text" placeholder="Phone" />
+          <input class="sel" id="country" type="text" placeholder="Country" />
+          <input class="sel" id="category" type="text" placeholder="Category (electronics, fashion...)" />
+          <textarea class="sel" id="address" placeholder="Business Address" style="grid-column:1 / -1;"></textarea>
+          <select class="sel" id="paymentMethod">
+            <option value="Wave">Wave</option>
+            <option value="Comcash">Comcash</option>
+          </select>
+          <input class="sel" id="payerNumber" type="text" placeholder="Your Wave/Comcash Number" />
+          <input class="sel" id="transactionId" type="text" placeholder="Payment Transaction ID / Reference" style="grid-column:1 / -1;" />
+          <input class="sel" id="password" type="password" placeholder="Password" />
+          <input class="sel" id="confirmPassword" type="password" placeholder="Confirm Password" />
+        </div>
+        <p class="sel-note" style="margin-top:.45rem;">Subscription payment account number: <strong>6785316</strong> (Wave or Comcash).</p>
+        <label class="sel-note"><input id="showPass" type="checkbox" style="width:auto; margin-right:6px;" />Show password</label>
+
+        <h3 style="margin:.75rem 0 .4rem;">Choose Plan</h3>
+        <div class="plan-grid" id="planGrid">
+          <div class="plan active" data-plan="Weekly - GMD1000/week"><strong>Weekly</strong><div class="price">GMD 1000</div><div class="sel-note">Best for starters</div></div>
+          <div class="plan" data-plan="Monthly - GMD3000/month"><strong>Monthly</strong><div class="price">GMD 3000</div><div class="sel-note">Most popular</div></div>
+          <div class="plan" data-plan="Yearly - GMD20500/year"><strong>Yearly</strong><div class="price">GMD 20500</div><div class="sel-note">Best value</div></div>
+        </div>
+
+        <div class="seller-actions" style="margin-top:.7rem;">
+          <button class="btn-sel primary" id="registerBtn" type="button">Register Seller</button>
+          <a class="btn-sel" href="seller-login.html">Already registered?</a>
+        </div>
+
+        <div id="okMsg" class="msg ok"></div>
+        <div id="errMsg" class="msg err"></div>
+      </article>
+
+      <article class="seller-card">
+        <h3 style="margin:0 0 .55rem;">What Happens Next?</h3>
+        <div class="sel-list">
+          <div class="sel-list-item">1. Your seller profile is saved in pending mode.</div>
+          <div class="sel-list-item">2. Pay with Wave or Comcash to account number <strong>6785316</strong>.</div>
+          <div class="sel-list-item">3. Your payment request is reviewed by admin.</div>
+          <div class="sel-list-item">4. Once approved, you can log in and manage products/orders.</div>
+        </div>
+        <p class="sel-note" style="margin-top:.6rem;">After registration, you will be redirected to <code>payment-status-sellers.html</code>.</p>
+      </article>
+    </section>
+  </main>
+
+  <script src="seller-core.js?v=20260222g"></script>
+  <script>
+    const state = { plan: "Weekly - GMD1000/week" };
+    function byId(id){ return document.getElementById(id); }
+    function show(type, text){
+      byId("okMsg").style.display = type === "ok" ? "block" : "none";
+      byId("errMsg").style.display = type === "err" ? "block" : "none";
+      (type === "ok" ? byId("okMsg") : byId("errMsg")).textContent = text;
+    }
+
+    async function syncStorage() {
+      const sync = window.MMStorage && window.MMStorage.syncNow;
+      if (sync && typeof sync === "function") {
+        try { await sync(); } catch (_) {}
+      }
+    }
+
+    async function registerSeller(){
+      const fullName = byId("fullName").value.trim();
+      const email = byId("email").value.trim();
+      const store = byId("store").value.trim();
+      const phone = byId("phone").value.trim();
+      const country = byId("country").value.trim();
+      const category = byId("category").value.trim();
+      const address = byId("address").value.trim();
+      const paymentMethod = byId("paymentMethod").value;
+      const payerNumber = byId("payerNumber").value.trim();
+      const transactionId = byId("transactionId").value.trim();
+      const password = byId("password").value;
+      const confirmPassword = byId("confirmPassword").value;
+
+      if (!fullName || !email || !store || !phone || !password) {
+        show("err", "Please fill all required fields.");
+        return;
+      }
+
+      if (!payerNumber || !transactionId) {
+        show("err", "Enter your payment number and transaction reference.");
+        return;
+      }
+
+      if (password.length < 4) {
+        show("err", "Password must be at least 4 characters.");
+        return;
+      }
+
+      if (password !== confirmPassword) {
+        show("err", "Passwords do not match.");
+        return;
+      }
+
+      const result = SellerCore.registerSeller({
+        fullName: fullName,
+        email: email,
+        store: store,
+        phone: phone,
+        country: country || "Unknown",
+        category: category || "general",
+        address: address,
+        password: password,
+        plan: state.plan
+      });
+
+      if (!result.ok) {
+        show("err", result.error || "Registration failed.");
+        return;
+      }
+
+      SellerCore.ensurePendingRequest(result.seller, {
+        type: "Subscription",
+        amount: SellerCore.planAmount(state.plan),
+        method: paymentMethod,
+        payerNumber: payerNumber,
+        transactionId: transactionId,
+        proof: "Paid via " + paymentMethod + " from " + payerNumber + " to 6785316. Ref: " + transactionId
+      });
+
+      show("ok", "Seller registered. Redirecting to payment status...");
+      await syncStorage();
+      window.location.href = "payment-status-sellers.html";
+    }
+
+    function initSellerRegisterPage() {
+      byId("registerBtn").addEventListener("click", registerSeller);
+
+      document.querySelectorAll(".plan").forEach(function(el){
+        el.addEventListener("click", function(){
+          document.querySelectorAll(".plan").forEach(function(x){ x.classList.remove("active"); });
+          el.classList.add("active");
+          state.plan = el.getAttribute("data-plan") || state.plan;
+        });
+      });
+
+      byId("showPass").addEventListener("change", function(){
+        const type = this.checked ? "text" : "password";
+        byId("password").type = type;
+        byId("confirmPassword").type = type;
+      });
+    }
+
+    function startSellerRegisterPage() {
+      const ready = window.MMStorage && window.MMStorage.ready;
+      if (ready && typeof ready.then === "function") {
+        ready.finally(initSellerRegisterPage);
+        return;
+      }
+      initSellerRegisterPage();
+    }
+
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", startSellerRegisterPage);
+    else startSellerRegisterPage();
+  </script>
+  <script defer src="upgrade.js"></script>
+  <script defer src="sw-register.js?v=20260226a"></script>
+  <script defer src="site-performance.js?v=20260226a"></script>
+</body>
+</html>
+
+
+

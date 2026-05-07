@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Admin Orders - MatrixMarket</title>
+    <link rel="stylesheet" href="admin-layout.css?v=20260227a">
+    <link rel="stylesheet" href="upgrade.css">
+    <script src="firebase-online-storage.js"></script>
+</head>
+<body class="admin-page">
+    <div id="adminHeader"></div>
+    <main class="admin-shell">
+        <section class="admin-titlebar">
+            <h1>Order Management</h1>
+            <div class="admin-actions">
+                <button class="btn-adm" id="refreshBtn" type="button">Refresh</button>
+                <button class="btn-adm" id="exportBtn" type="button">Export CSV</button>
+                <button class="btn-adm primary" id="markDeliveredBtn" type="button">Mark Filtered Delivered</button>
+            </div>
+        </section>
+
+        <section class="admin-card">
+            <div class="adm-toolbar">
+                <input class="adm" id="searchInput" type="text" placeholder="Search order ID, buyer, email, phone">
+                <select class="adm" id="statusFilter">
+                    <option value="">All Status</option>
+                    <option value="pending">Pending</option>
+                    <option value="approved">Approved</option>
+                    <option value="completed">Completed</option>
+                    <option value="delivered">Delivered</option>
+                    <option value="declined">Declined</option>
+                </select>
+                <select class="adm" id="methodFilter">
+                    <option value="">All Payment Methods</option>
+                    <option value="wallet">Wallet</option>
+                    <option value="cod">Cash on Delivery</option>
+                </select>
+                <button class="btn-adm" id="resetBtn" type="button">Reset</button>
+            </div>
+        </section>
+
+        <section class="admin-card">
+            <div class="adm-table-wrap">
+                <table class="adm-table" id="orderTable"></table>
+            </div>
+        </section>
+
+        <div class="adm-foot">Order status changes are logged in admin logs.</div>
+    </main>
+
+    <script src="admin-core.js?v=20260228a"></script>
+    <script src="api-client.js"></script>
+    <script>
+        const state = { rows: [], filtered: [] };
+
+        function setHeader() {
+            document.getElementById("adminHeader").innerHTML = AdminCore.renderAdminHeader("admin-orders.html");
+        }
+
+        async function readRows() {
+            const apiEnabled = Boolean(window.MMApi && typeof window.MMApi.getOrders === "function" && window.MMApi.isEnabled());
+            if (apiEnabled) {
+                try {
+                    const response = await window.MMApi.getOrders({ limit: 200 });
+                    const list = (response && Array.isArray(response.orders)) ? response.orders : [];
+                    state.rows = list.map(function (o, i) {
+                        return {
+                            index: i,
+                            remote: true,
+                            id: AdminCore.str(o.id || o.orderNumber || ("ORD-" + i)),
+                            buyer: AdminCore.str(o.buyerName || o.fullName || o.name || "-"),
+                            email: AdminCore.str(o.buyerEmail || o.email || ""),
+                            phone: AdminCore.str(o.buyerPhone || o.phone || ""),
+                            total: AdminCore.num(o.total || 0),
+                            status: AdminCore.str(o.status || "pending"),
+                            paymentMethod: AdminCore.str(o.paymentMethod || "wallet"),
+                            items: Array.isArray(o.cart) ? o.cart.length : 0,
+                            placedAt: o.placedAt || o.createdAt || new Date().toISOString(),
+                            raw: o
+                        };
+                    }).sort(function (a, b) {
+                        return String(b.placedAt).localeCompare(String(a.placedAt));
+                    });
+                    return;
+                } catch (_error) {
+                    // Fall back to local rows if API is unreachable.
+                }
+            }
+
+            state.rows = AdminCore.getOrders().map(function (o, i) {
+                return {
+                    index: i,
+                    remote: false,
+                    id: AdminCore.str(o.id || ("ORD-" + i)),
+                    buyer: AdminCore.str(o.fullName || o.name || "-"),
+                    email: AdminCore.str(o.email || ""),
+                    phone: AdminCore.str(o.phone || ""),
+                    total: AdminCore.num(o.total || 0),
+                    status: AdminCore.str(o.status || "pending"),
+                    paymentMethod: AdminCore.str(o.paymentMethod || "wallet"),
+                    items: Array.isArray(o.cart) ? o.cart.length : 0,
+                    placedAt: o.placedAt || o.createdAt || new Date().toISOString(),
+                    raw: o
+                };
+            }).sort(function (a, b) {
+                return String(b.placedAt).localeCompare(String(a.placedAt));
+            });
+        }
+
+        function applyFilters() {
+            const q = AdminCore.str(document.getElementById("searchInput").value).toLowerCase();
+            const s = AdminCore.str(document.getElementById("statusFilter").value).toLowerCase();
+            const m = AdminCore.str(document.getElementById("methodFilter").value).toLowerCase();
+            state.filtered = state.rows.filter(function (r) {
+                const hay = [r.id, r.buyer, r.email, r.phone].join(" ").toLowerCase();
+                const statusOk = !s || r.status.toLowerCase().includes(s);
+                const methodOk = !m || r.paymentMethod.toLowerCase().includes(m);
+                return (!q || hay.includes(q)) && statusOk && methodOk;
+            });
+        }
+
+        function actions(orderId) {
+            const safeId = encodeURIComponent(AdminCore.str(orderId || ""));
+            return '<div class="adm-inline-actions">' +
+                '<button class="btn-adm" data-action="pending" data-id="' + safeId + '">Pending</button>' +
+                '<button class="btn-adm success" data-action="approved" data-id="' + safeId + '">Approve</button>' +
+                '<button class="btn-adm success" data-action="delivered" data-id="' + safeId + '">Deliver</button>' +
+                '<button class="btn-adm danger" data-action="declined" data-id="' + safeId + '">Decline</button>' +
+                '</div>';
+        }
+
+        function renderTable() {
+            const table = document.getElementById("orderTable");
+            const head = '<thead><tr><th>Order ID</th><th>Buyer</th><th>Email</th><th>Phone</th><th>Items</th><th>Total</th><th>Status</th><th>Method</th><th>Date</th><th>Actions</th></tr></thead>';
+            function td(label, value) {
+                return '<td data-label="' + label + '">' + value + '</td>';
+            }
+
+            if (!state.filtered.length) {
+                table.innerHTML = head + '<tbody><tr><td data-label="Result" colspan="10" class="adm-empty">No orders found.</td></tr></tbody>';
+                return;
+            }
+
+            table.innerHTML = head + '<tbody>' + state.filtered.map(function (r) {
+                return '<tr>' +
+                    td("Order ID", r.id) +
+                    td("Buyer", r.buyer) +
+                    td("Email", (r.email || "-")) +
+                    td("Phone", (r.phone || "-")) +
+                    td("Items", r.items) +
+                    td("Total", AdminCore.fmtMoney(r.total)) +
+                    td("Status", AdminCore.badge(r.status)) +
+                    td("Method", r.paymentMethod) +
+                    td("Date", AdminCore.fmtDate(r.placedAt)) +
+                    td("Actions", actions(r.id)) +
+                    '</tr>';
+            }).join("") + '</tbody>';
+        }
+
+        async function refresh() {
+            await readRows();
+            applyFilters();
+            renderTable();
+        }
+
+        async function updateStatus(orderId, status) {
+            const map = {
+                pending: "pending",
+                approved: "approved",
+                delivered: "delivered",
+                declined: "declined"
+            };
+            let targetId = AdminCore.str(orderId || "");
+            try { targetId = decodeURIComponent(targetId); } catch (_) {}
+            if (!targetId) return;
+            const row = state.rows.find(function (item) {
+                return AdminCore.str(item.id).toLowerCase() === targetId.toLowerCase();
+            }) || null;
+            if (!row) return;
+
+            const next = map[status] || "pending";
+            if (row.remote && window.MMApi && typeof window.MMApi.updateOrderStatus === "function" && window.MMApi.isEnabled()) {
+                try {
+                    await window.MMApi.updateOrderStatus(row.id, next);
+                } catch (error) {
+                    alert("Could not update server order status: " + (error && error.message ? error.message : "Unknown error"));
+                    return;
+                }
+            } else {
+                AdminCore.updateOrderStatus(targetId, next);
+            }
+            await refresh();
+        }
+
+        async function initAdminOrdersPage() {
+            setHeader();
+            await refresh();
+            window.addEventListener("storage", function () { refresh(); });
+
+            document.getElementById("searchInput").addEventListener("input", refresh);
+            document.getElementById("statusFilter").addEventListener("change", refresh);
+            document.getElementById("methodFilter").addEventListener("change", refresh);
+            document.getElementById("refreshBtn").addEventListener("click", refresh);
+
+            document.getElementById("resetBtn").addEventListener("click", function () {
+                document.getElementById("searchInput").value = "";
+                document.getElementById("statusFilter").value = "";
+                document.getElementById("methodFilter").value = "";
+                refresh();
+            });
+
+            document.getElementById("markDeliveredBtn").addEventListener("click", async function () {
+                for (const row of state.filtered) {
+                    await updateStatus(row.id, "delivered");
+                }
+                AdminCore.log("bulk_orders_delivered", { count: state.filtered.length });
+                await refresh();
+            });
+
+            document.getElementById("exportBtn").addEventListener("click", function () {
+                const rows = state.filtered.map(function (r) {
+                    return {
+                        id: r.id,
+                        buyer: r.buyer,
+                        email: r.email,
+                        phone: r.phone,
+                        items: r.items,
+                        total: r.total,
+                        status: r.status,
+                        paymentMethod: r.paymentMethod,
+                        placedAt: AdminCore.fmtDate(r.placedAt)
+                    };
+                });
+                AdminCore.exportCSV(rows, "admin-orders.csv");
+                AdminCore.log("orders_csv_exported", { count: rows.length });
+            });
+
+            document.getElementById("orderTable").addEventListener("click", async function (e) {
+                const btn = e.target.closest("button[data-action]");
+                if (!btn) return;
+                await updateStatus(btn.dataset.id, btn.dataset.action);
+            });
+        }
+
+        function startAdminOrdersPage() {
+            const ready = window.MMStorage && window.MMStorage.ready;
+            if (ready && typeof ready.then === "function") {
+                ready.finally(function () { initAdminOrdersPage(); });
+                return;
+            }
+            initAdminOrdersPage();
+        }
+
+        if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", startAdminOrdersPage);
+        else startAdminOrdersPage();
+    </script>
+    <script defer src="upgrade.js"></script>
+  <script defer src="sw-register.js?v=20260226a"></script>
+  <script defer src="site-performance.js?v=20260226a"></script>
+</body>
+</html>
+
+

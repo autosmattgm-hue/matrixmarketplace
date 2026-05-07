@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Seller Products - MatrixMarket</title>
+  <link rel="stylesheet" href="seller-layout.css" />
+  <link rel="stylesheet" href="upgrade.css" />
+  <script src="firebase-online-storage.js"></script>
+  <style>
+    .stats{display:grid;gap:.6rem;grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+    .stat{border:1px solid var(--sel-border);border-radius:12px;background:rgba(2,6,23,.58);padding:.62rem}
+    .stat .k{color:var(--sel-muted);font-size:.75rem;text-transform:uppercase;letter-spacing:.04em}
+    .stat .v{margin-top:.2rem;font-size:1.15rem;font-weight:800}
+    .bulk{margin-top:.55rem;display:flex;gap:.38rem;flex-wrap:wrap;align-items:center}
+    .bulk-note{color:var(--sel-muted);font-size:.82rem;margin-right:auto}
+  </style>
+</head>
+<body class="seller-page">
+  <div id="sellerHeader"></div>
+  <main class="seller-shell">
+    <section class="seller-titlebar">
+      <h1>My Products</h1>
+      <div class="seller-actions">
+        <button class="btn-sel" id="refreshBtn" type="button">Refresh</button>
+        <button class="btn-sel" id="clearFormBtn" type="button">Clear Form</button>
+        <a class="btn-sel primary" href="sellers-shop.html">View Seller Shop</a>
+      </div>
+    </section>
+
+    <section class="seller-card"><div id="inventoryStats" class="stats"></div></section>
+
+    <section class="seller-card">
+      <h3 style="margin:0 0 .5rem;">Add / Edit Product</h3>
+      <div id="postLockNote" class="sel-note" style="margin:0 0 .55rem;"></div>
+      <div class="seller-form-grid cols-2">
+        <input class="sel" id="name" type="text" placeholder="Product Name">
+        <input class="sel" id="category" type="text" placeholder="Category">
+        <input class="sel" id="price" type="number" min="0.01" step="0.01" placeholder="Price (GMD)">
+        <input class="sel" id="stock" type="number" min="0" step="1" placeholder="Stock Quantity">
+        <input class="sel" id="productKey" type="text" placeholder="Product Key" readonly>
+        <button class="btn-sel" id="generateKeyBtn" type="button">Generate URL</button>
+        <input class="sel" id="location" type="text" placeholder="Pickup/Delivery Location">
+        <input class="sel" id="image" type="url" placeholder="Image URL (optional)">
+        <input class="sel" id="imageFile" type="file" accept="image/*">
+        <textarea class="sel" id="description" placeholder="Description" style="grid-column:1 / -1;"></textarea>
+      </div>
+      <p class="sel-note" style="margin-top:.42rem;">Type product name then click Generate URL for auto image URL + preview. Click again to try another image source.</p>
+      <div id="imagePreviewWrap" style="display:none;margin-top:.45rem;">
+        <img id="imagePreview" alt="preview" style="display:none;max-width:250px;width:100%;height:auto;border-radius:10px;border:1px solid rgba(255,255,255,.2);">
+      </div>
+      <div class="seller-actions" style="margin-top:.6rem;">
+        <button class="btn-sel primary" id="saveBtn" type="button">Save Product</button>
+        <button class="btn-sel" id="testImageBtn" type="button">Test Image</button>
+      </div>
+      <p class="sel-note" style="margin-top:.45rem;">Form draft auto-saves in this browser.</p>
+    </section>
+
+    <section class="seller-card">
+      <div class="sel-toolbar">
+        <input class="sel" id="searchInput" type="text" placeholder="Search name/category/key">
+        <select class="sel" id="categoryFilter"><option value="">All Categories</option></select>
+        <select class="sel" id="statusFilter">
+          <option value="">All Status</option>
+          <option value="active">Active</option>
+          <option value="low">Low Stock</option>
+          <option value="soldout">Sold Out</option>
+          <option value="hidden">Hidden</option>
+        </select>
+        <select class="sel" id="sortFilter">
+          <option value="newest">Newest</option>
+          <option value="priceAsc">Price Low</option>
+          <option value="priceDesc">Price High</option>
+          <option value="nameAsc">Name A-Z</option>
+          <option value="stockDesc">Stock High</option>
+        </select>
+        <input class="sel" id="stockFilter" type="number" min="0" step="1" placeholder="Min stock">
+        <button class="btn-sel" id="exportBtn" type="button">Export CSV</button>
+      </div>
+      <div class="bulk">
+        <span class="bulk-note" id="bulkInfo">0 selected</span>
+        <button class="btn-sel" id="bulkShowBtn" type="button">Show</button>
+        <button class="btn-sel warning" id="bulkHideBtn" type="button">Hide</button>
+        <button class="btn-sel warning" id="bulkRestockBtn" type="button">Restock</button>
+        <button class="btn-sel danger" id="bulkDeleteBtn" type="button">Delete</button>
+        <button class="btn-sel" id="clearSelectionBtn" type="button">Clear Selection</button>
+      </div>
+    </section>
+
+    <section class="seller-card"><div class="sel-table-wrap"><table class="sel-table" id="productTable"></table></div></section>
+    <section class="seller-card" id="soldOutCard" style="display:none;"><h3 style="margin:0 0 .45rem;">Sold Out Products</h3><div id="soldOutList" class="sel-table-wrap"></div></section>
+    <div class="sel-foot">Product manager</div>
+  </main>
+
+  <script src="seller-core.js?v=20260222g"></script>
+  <script>
+    let seller=null;const MAX_IMAGE_BYTES=2*1024*1024,LOW=3;
+    const state={products:[],filtered:[],soldOut:[],categories:[],editId:null,selected:new Set(),generateTick:0};
+    const byId=id=>document.getElementById(id);
+    const esc=v=>String(v==null?"":v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\"/g,"&quot;").replace(/'/g,"&#39;");
+    const draftKey=()=> "sellerProductDraft:"+String((seller&&seller.email)||"unknown").toLowerCase();
+    function setHeader(){byId("sellerHeader").innerHTML=SellerCore.renderSellerHeader("seller-products.html");}
+    const generatedUrlSamples=[
+      "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQbuoY8igz-uGRoxpxQfpoXGSQLno39HwiMNeAuw9AK9fiaL6o-gZgUKr7F69QJnPlEoKuzfSj1_FxYTWA3FuxYLJjoF1tL80HuTUZZc351IEGW7-h2lkAwa0k5gv6OBg&s=10&ec=121532766",
+      "https://i.pinimg.com/736x/64/92/51/649251467ddca1f37e2efcc806d953ca.jpg"
+    ];
+    function hashText(input){let h=0;const s=String(input||"");for(let i=0;i<s.length;i+=1){h=((h<<5)-h)+s.charCodeAt(i);h|=0;}return Math.abs(h);}
+    function generatedImageCandidates(name,category,key){
+      const q=[name||"product",category||"general","product photo"].join(" ");
+      const seed=encodeURIComponent((key||name||"product")+"-"+(category||"general"));
+      return [
+        generatedUrlSamples[0],
+        generatedUrlSamples[1],
+        "https://source.unsplash.com/640x360/?"+encodeURIComponent(q)+"&sig="+encodeURIComponent(key||Date.now().toString()),
+        "https://picsum.photos/seed/"+seed+"/640/360",
+        "https://loremflickr.com/640/360/"+encodeURIComponent(String(category||"product").toLowerCase())
+      ];
+    }
+    function generatedImageUrl(name,category,key){
+      const list=generatedImageCandidates(name,category,key);
+      const start=hashText((name||"")+"|"+(category||"")+"|"+(key||""))%list.length;
+      const idx=(start+state.generateTick)%list.length;
+      state.generateTick=(state.generateTick+1)%list.length;
+      return list[idx];
+    }
+    function statusFor(p){if(p.isVisible===false||String(p.status||"").toLowerCase()==="hidden")return"hidden";if(SellerCore.num(p.stock)<=0)return"soldout";if(SellerCore.num(p.stock)<=LOW)return"low";return"active";}
+    function currentPayload(){const stockRaw=String(byId("stock").value||"").trim();const stockValue=stockRaw===""?1:Math.max(0,Math.floor(SellerCore.num(stockRaw)));return{name:byId("name").value.trim(),category:byId("category").value.trim()||"general",price:SellerCore.num(byId("price").value),stock:stockValue,productKey:byId("productKey").value.trim(),location:byId("location").value.trim(),image:byId("image").value.trim(),description:byId("description").value.trim()};}
+    function saveDraft(){const d=currentPayload();d.editId=state.editId||null;MMStorage.setItem(draftKey(),JSON.stringify(d));}
+    function loadDraft(){const d=SellerCore.readJSON(draftKey(),null);if(!d||state.editId)return;["name","category","price","location","image","description","productKey"].forEach(id=>byId(id).value=d[id]||"");byId("stock").value=typeof d.stock==="number"?d.stock:"";setImagePreview(d.image||"");}
+    function clearDraft(){MMStorage.removeItem(draftKey());}
+    function setImagePreview(src){const img=byId("imagePreview"),w=byId("imagePreviewWrap"),v=String(src||"").trim();if(!v){img.removeAttribute("src");img.style.display="none";w.style.display="none";return;}img.referrerPolicy="no-referrer";img.src=v;img.style.display="block";w.style.display="block";img.onerror=()=>{img.style.display="none";};}
+    function clearImageFileInput(){byId("imageFile").value="";}
+    function fileToDataUrl(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(String(e.target.result||""));r.onerror=()=>rej(new Error("read fail"));r.readAsDataURL(file);});}
+    async function onImageFileChange(){const f=byId("imageFile").files&&byId("imageFile").files[0]?byId("imageFile").files[0]:null;if(!f)return;if(f.size>MAX_IMAGE_BYTES){alert("Image too large (max 2MB).");clearImageFileInput();return;}try{const d=await fileToDataUrl(f);byId("image").value=d;setImagePreview(d);saveDraft();}catch(_e){alert("Could not read file.");clearImageFileInput();}}
+    function testImageUrl(){const u=byId("image").value.trim();if(!u){alert("Enter image URL first.");return;}const i=new Image();i.referrerPolicy="no-referrer";i.onload=()=>{setImagePreview(u);alert("Image URL looks valid.");};i.onerror=()=>alert("Image URL could not be loaded. Click Generate URL again for another source.");i.src=u;}
+    function generateProductKeyAndImage(){const n=byId("name").value.trim();if(!n){alert("Type product name first, then click Generate URL.");byId("name").focus();return;}const c=byId("category").value.trim()||"general";const k=SellerCore.generateProductKey(n,c);byId("productKey").value=k;const u=generatedImageUrl(n,c,k);byId("image").value=u;setImagePreview(u);if(!byId("description").value.trim())byId("description").value="Generated listing for "+n+" in "+c+" category.";saveDraft();}
+    function resetForm(){state.editId=null;["name","category","price","stock","productKey","location","image","description"].forEach(id=>byId(id).value="");clearImageFileInput();setImagePreview("");byId("saveBtn").textContent="Save Product";clearDraft();}
+    function readProducts(){state.products=SellerCore.getSellerProducts(seller);state.soldOut=SellerCore.getSellerSoldOutProducts(seller);state.categories=Array.from(new Set(state.products.map(p=>SellerCore.str(p.category||"general").toLowerCase()).filter(Boolean))).sort();}
+    function populateCategoryFilter(){const s=byId("categoryFilter"),cur=s.value;s.innerHTML='<option value="">All Categories</option>'+state.categories.map(c=>'<option value="'+esc(c)+'">'+esc(c)+'</option>').join("");if(state.categories.includes(cur))s.value=cur;}
+    function applyFilters(){const q=byId("searchInput").value.toLowerCase().trim(),sort=byId("sortFilter").value,min=SellerCore.num(byId("stockFilter").value||0),cat=byId("categoryFilter").value.toLowerCase().trim(),st=byId("statusFilter").value.toLowerCase().trim();state.filtered=state.products.filter(p=>{const hay=[p.name,p.category,p.description,p.productKey,p.location].join(" ").toLowerCase();return(!q||hay.includes(q))&&(!cat||String(p.category||"").toLowerCase()===cat)&&(SellerCore.num(p.stock)>=min)&&(!st||statusFor(p)===st);});state.filtered.sort((a,b)=>sort==="priceAsc"?a.price-b.price:sort==="priceDesc"?b.price-a.price:sort==="nameAsc"?a.name.localeCompare(b.name):sort==="stockDesc"?SellerCore.num(b.stock)-SellerCore.num(a.stock):String(b.createdAt).localeCompare(String(a.createdAt)));}
+    function renderStats(){const t=state.products.length,a=state.products.filter(p=>statusFor(p)==="active").length,l=state.products.filter(p=>statusFor(p)==="low").length,h=state.products.filter(p=>statusFor(p)==="hidden").length,u=state.products.reduce((s,p)=>s+Math.max(0,Math.floor(SellerCore.num(p.stock))),0),v=state.products.reduce((s,p)=>s+(SellerCore.num(p.price)*Math.max(0,Math.floor(SellerCore.num(p.stock)))),0);byId("inventoryStats").innerHTML=[["Products",t],["Active",a],["Low Stock",l],["Hidden",h],["Stock Units",u],["Inventory Value",SellerCore.fmtMoney(v)]].map(x=>'<article class="stat"><div class="k">'+x[0]+'</div><div class="v">'+x[1]+'</div></article>').join("");}
+    function stockBadge(p){const n=Math.max(0,Math.floor(SellerCore.num(p.stock)));if(n<=0)return'<span class="sel-badge declined">Sold Out</span>';if(n<=LOW)return'<span class="sel-badge pending">Low: '+n+"</span>";return'<span class="sel-badge approved">'+n+"</span>";}
+    function visBadge(p){return p.isVisible===false?'<span class="sel-badge info">Hidden</span>':'<span class="sel-badge approved">Visible</span>';}
+    function isSelected(id){return state.selected.has(String(id));}
+    function updateBulkInfo(){byId("bulkInfo").textContent=state.selected.size+" selected";}
+    function renderTable() {
+      const tbl = byId("productTable");
+      const allChecked = state.filtered.length > 0 && state.filtered.every(function (p) { return isSelected(p.id); });
+      const head =
+        '<thead><tr>' +
+        '<th><input type="checkbox" id="selectAllCheck"' + (allChecked ? " checked" : "") + "></th>" +
+        "<th>Name</th><th>Category</th><th>Price</th><th>Stock</th><th>Visibility</th><th>Key</th><th>Updated</th><th>Actions</th>" +
+        "</tr></thead>";
+
+      if (!state.filtered.length) {
+        tbl.innerHTML = head + '<tbody><tr><td colspan="9" class="sel-empty">No products found.</td></tr></tbody>';
+        updateBulkInfo();
+        return;
+      }
+
+      tbl.innerHTML = head + "<tbody>" + state.filtered.map(function (p) {
+        return (
+          "<tr>" +
+          '<td><input type="checkbox" data-select-id="' + encodeURIComponent(p.id) + '"' + (isSelected(p.id) ? " checked" : "") + "></td>" +
+          "<td><strong>" + esc(p.name) + '</strong><br><span class="sel-note">' + esc(p.description || "-") + "</span></td>" +
+          "<td>" + esc(p.category || "general") + "</td>" +
+          "<td>" + SellerCore.fmtMoney(p.price) + "</td>" +
+          "<td>" + stockBadge(p) + "</td>" +
+          "<td>" + visBadge(p) + "</td>" +
+          "<td>" + esc(p.productKey || "-") + "</td>" +
+          "<td>" + SellerCore.fmtDate(p.updatedAt || p.createdAt) + "</td>" +
+          "<td><div class=\"sel-inline-actions\">" +
+          '<button class="btn-sel" data-action="edit" data-id="' + encodeURIComponent(p.id) + '">Edit</button>' +
+          '<button class="btn-sel" data-action="duplicate" data-id="' + encodeURIComponent(p.id) + '">Duplicate</button>' +
+          '<button class="btn-sel warning" data-action="toggleVisibility" data-id="' + encodeURIComponent(p.id) + '">' + (p.isVisible === false ? "Show" : "Hide") + "</button>" +
+          '<button class="btn-sel" data-action="plus1" data-id="' + encodeURIComponent(p.id) + '">+1</button>' +
+          '<button class="btn-sel" data-action="plus5" data-id="' + encodeURIComponent(p.id) + '">+5</button>' +
+          '<button class="btn-sel danger" data-action="delete" data-id="' + encodeURIComponent(p.id) + '">Delete</button>' +
+          "</div></td>" +
+          "</tr>"
+        );
+      }).join("") + "</tbody>";
+
+      updateBulkInfo();
+    }
+    function renderSoldOutPanel(){const c=byId("soldOutCard"),l=byId("soldOutList");if(!state.soldOut.length){c.style.display="none";l.innerHTML="";return;}c.style.display="block";l.innerHTML='<table class="sel-table"><thead><tr><th>Name</th><th>Key</th><th>Sold Out Since</th><th>Actions</th></tr></thead><tbody>'+state.soldOut.map(p=>'<tr><td>'+esc(p.name)+'</td><td>'+esc(p.productKey||"-")+"</td><td>"+SellerCore.fmtDate(p.soldOutAt||p.updatedAt||p.createdAt)+'</td><td><div class="sel-inline-actions"><button class="btn-sel warning" data-soldout-action="renew" data-id="'+encodeURIComponent(p.id)+'">Renew</button><button class="btn-sel danger" data-soldout-action="delete" data-id="'+encodeURIComponent(p.id)+'">Delete</button></div></td></tr>').join("")+"</tbody></table>";}
+    function maybePromptSoldOut(){if(!state.soldOut.length||!seller||!seller.email)return;const sig=state.soldOut.map(p=>p.id).sort().join("|"),k="soldout_prompt_"+String(seller.email).toLowerCase();if(MMStorageSession.getItem(k)===sig)return;MMStorageSession.setItem(k,sig);alert("You have "+state.soldOut.length+" sold-out product(s). Renew stock or delete them below.");}
+    function updatePostPolicyUI(){const locked=!SellerCore.canSellerPost(seller),note=byId("postLockNote");if(SellerCore.isSellerSuspended(seller))note.textContent="Posting is disabled: this seller account is suspended.";else if(!SellerCore.hasActiveSubscription(seller))note.textContent="Posting is disabled: active subscription and approved status are required.";else note.textContent=state.soldOut.length?("You can create and update products. "+state.soldOut.length+" sold-out item(s) need renew or delete."): "You can create and update products.";["name","category","price","stock","productKey","location","image","imageFile","description","saveBtn","generateKeyBtn","testImageBtn","bulkShowBtn","bulkHideBtn","bulkRestockBtn","bulkDeleteBtn"].forEach(id=>{const el=byId(id);if(el)el.disabled=locked;});byId("productKey").readOnly=true;}
+    function refresh(){const old=new Set(Array.from(state.selected));seller=SellerCore.getCurrentSeller()||seller;readProducts();populateCategoryFilter();applyFilters();const valid=new Set(state.products.map(p=>String(p.id)));state.selected=new Set(Array.from(old).filter(id=>valid.has(String(id))));updatePostPolicyUI();renderStats();renderTable();renderSoldOutPanel();maybePromptSoldOut();}
+    function findProduct(id){const t=String(id||"");return state.products.find(p=>String(p.id)===t)||null;}
+    function saveProduct(){if(!SellerCore.canSellerPost(seller)){if(SellerCore.isSellerSuspended(seller))alert("Your seller account is suspended. You cannot post products.");else alert("Active subscription is required before posting products.");return;}const p=currentPayload();if(!p.name||p.price<=0){alert("Product name and valid price are required.");return;}if(!p.productKey)p.productKey=SellerCore.generateProductKey(p.name,p.category);if(!p.image)p.image=generatedImageUrl(p.name,p.category,p.productKey);if(state.editId){if(!SellerCore.updateProductForSeller(seller,state.editId,p)){alert("Could not update product.");return;}}else{const saved=SellerCore.saveProductForSeller(seller,p);if(!saved.ok){alert(saved.error||"Could not save product.");return;}}resetForm();refresh();alert("Product saved.");}
+    function editProduct(id){if(!SellerCore.canSellerPost(seller)){alert("Posting actions are disabled for this account.");return;}const p=findProduct(id);if(!p)return;state.editId=p.id;byId("name").value=p.name;byId("category").value=p.category;byId("price").value=p.price;byId("stock").value=p.stock;byId("productKey").value=p.productKey||"";byId("location").value=p.location||"";byId("image").value=p.image||"";byId("description").value=p.description||"";clearImageFileInput();setImagePreview(p.image||"");byId("saveBtn").textContent="Update Product";saveDraft();}
+    function duplicateProduct(id){const p=findProduct(id);if(!p)return;const cp={name:p.name+" Copy",category:p.category,price:p.price,stock:p.stock,productKey:SellerCore.generateProductKey(p.name,p.category),location:p.location,image:p.image,description:p.description};const s=SellerCore.saveProductForSeller(seller,cp);if(!s.ok){alert(s.error||"Could not duplicate product.");return;}refresh();alert("Product duplicated.");}
+    function deleteProduct(id){if(!SellerCore.canSellerPost(seller)){alert("Posting actions are disabled for this account.");return;}if(!confirm("Delete this product?"))return;if(!SellerCore.deleteProductForSeller(seller,id)){alert("Could not delete product.");return;}state.selected.delete(String(id));if(state.editId===id)resetForm();refresh();}
+    function toggleVisibility(id){const p=findProduct(id);if(!p)return;const show=p.isVisible===false,st=show?(SellerCore.num(p.stock)>0?"active":"soldout"):"hidden";if(!SellerCore.updateProductForSeller(seller,id,{isVisible:show,status:st})){alert("Could not update visibility.");return;}refresh();}
+    function quickRestock(id,u){const r=SellerCore.renewProductStockForSeller(seller,id,Math.max(1,Math.floor(SellerCore.num(u||0))));if(!r.ok){alert(r.error||"Could not renew stock.");return;}refresh();}
+    function renewSoldOut(id){const v=prompt("Enter restock quantity to add:"),u=Math.max(0,Math.floor(SellerCore.num(v||0)));if(u<=0)return;quickRestock(id,u);alert("Stock renewed.");}
+    function toggleSelect(id,ch){const k=String(id||"");if(!k)return;if(ch)state.selected.add(k);else state.selected.delete(k);updateBulkInfo();}
+    function selectedIds(){const valid=new Set(state.products.map(p=>String(p.id)));return Array.from(state.selected).filter(id=>valid.has(String(id)));}
+    function clearSelection(){state.selected.clear();renderTable();}
+    function bulkSetVisibility(show){const ids=selectedIds();if(!ids.length){alert("Select products first.");return;}let n=0;ids.forEach(id=>{const p=findProduct(id);if(!p)return;const st=show?(SellerCore.num(p.stock)>0?"active":"soldout"):"hidden";if(SellerCore.updateProductForSeller(seller,id,{isVisible:show,status:st}))n+=1;});refresh();alert(n+" product(s) updated.");}
+    function bulkDelete(){const ids=selectedIds();if(!ids.length){alert("Select products first.");return;}if(!confirm("Delete "+ids.length+" selected product(s)?"))return;let n=0;ids.forEach(id=>{if(SellerCore.deleteProductForSeller(seller,id))n+=1;});state.selected.clear();refresh();alert(n+" product(s) deleted.");}
+    function bulkRestock(){const ids=selectedIds();if(!ids.length){alert("Select products first.");return;}const v=prompt("Enter restock quantity to add for each selected product:"),u=Math.max(0,Math.floor(SellerCore.num(v||0)));if(u<=0)return;let n=0;ids.forEach(id=>{const r=SellerCore.renewProductStockForSeller(seller,id,u);if(r.ok)n+=1;});refresh();alert(n+" product(s) restocked.");}
+    function exportCSV(){const rows=state.filtered.map(p=>({id:p.id,name:p.name,category:p.category,price:p.price,stock:p.stock,visibility:(p.isVisible===false?"hidden":"visible"),status:statusFor(p),productKey:p.productKey,location:p.location,seller:p.seller,sellerEmail:p.sellerEmail}));if(!rows.length){alert("No products to export.");return;}const h=Object.keys(rows[0]),csv=[h.join(",")].concat(rows.map(r=>h.map(k=>'"'+String(r[k]).replace(/"/g,'""')+'"').join(","))).join("\n"),b=new Blob([csv],{type:"text/csv;charset=utf-8;"}),u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download="seller-products.csv";a.click();URL.revokeObjectURL(u);}
+    function initSellerProductsPage(){seller=SellerCore.ensureSellerSession("seller-login.html");if(!seller)return;setHeader();refresh();loadDraft();
+      byId("refreshBtn").addEventListener("click",refresh);byId("clearFormBtn").addEventListener("click",resetForm);byId("saveBtn").addEventListener("click",saveProduct);byId("generateKeyBtn").addEventListener("click",generateProductKeyAndImage);byId("testImageBtn").addEventListener("click",testImageUrl);byId("imageFile").addEventListener("change",onImageFileChange);byId("image").addEventListener("input",function(){setImagePreview(byId("image").value);saveDraft();});
+      ["name","category","price","stock","location","description"].forEach(id=>byId(id).addEventListener("input",saveDraft));
+      byId("searchInput").addEventListener("input",refresh);byId("sortFilter").addEventListener("change",refresh);byId("stockFilter").addEventListener("input",refresh);byId("categoryFilter").addEventListener("change",refresh);byId("statusFilter").addEventListener("change",refresh);byId("exportBtn").addEventListener("click",exportCSV);
+      byId("clearSelectionBtn").addEventListener("click",clearSelection);byId("bulkShowBtn").addEventListener("click",()=>bulkSetVisibility(true));byId("bulkHideBtn").addEventListener("click",()=>bulkSetVisibility(false));byId("bulkRestockBtn").addEventListener("click",bulkRestock);byId("bulkDeleteBtn").addEventListener("click",bulkDelete);
+      byId("productTable").addEventListener("click",function(e){const b=e.target.closest("button[data-action]");if(!b)return;const id=decodeURIComponent(b.dataset.id||""),a=b.dataset.action;if(a==="edit")editProduct(id);if(a==="duplicate")duplicateProduct(id);if(a==="toggleVisibility")toggleVisibility(id);if(a==="plus1")quickRestock(id,1);if(a==="plus5")quickRestock(id,5);if(a==="delete")deleteProduct(id);});
+      byId("productTable").addEventListener("change",function(e){if(e.target&&e.target.id==="selectAllCheck"){const ch=Boolean(e.target.checked);state.filtered.forEach(p=>toggleSelect(p.id,ch));renderTable();return;}if(e.target&&e.target.matches("input[data-select-id]")){toggleSelect(decodeURIComponent(e.target.getAttribute("data-select-id")||""),Boolean(e.target.checked));}});
+      byId("soldOutList").addEventListener("click",function(e){const b=e.target.closest("button[data-soldout-action]");if(!b)return;const id=decodeURIComponent(b.dataset.id||"");if(!id)return;if(b.dataset.soldoutAction==="renew")renewSoldOut(id);if(b.dataset.soldoutAction==="delete")deleteProduct(id);});
+      window.addEventListener("storage",refresh);
+    }
+
+    function startSellerProductsPage(){const ready=window.MMStorage&&window.MMStorage.ready;if(ready&&typeof ready.then==="function"){ready.finally(initSellerProductsPage);return;}initSellerProductsPage();}
+    if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",startSellerProductsPage);else startSellerProductsPage();
+  </script>
+  <script defer src="upgrade.js"></script>
+  <script defer src="sw-register.js?v=20260226a"></script>
+  <script defer src="site-performance.js?v=20260226a"></script>
+</body>
+</html>
+
+
+
+

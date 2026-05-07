@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Seller Orders - MatrixMarket</title>
+  <link rel="stylesheet" href="seller-layout.css" />
+  <link rel="stylesheet" href="upgrade.css" />
+    <script src="firebase-online-storage.js"></script>
+</head>
+<body class="seller-page">
+  <div id="sellerHeader"></div>
+  <main class="seller-shell">
+    <section class="seller-titlebar">
+      <h1>Seller Orders</h1>
+      <div class="seller-actions">
+        <button class="btn-sel" id="refreshBtn" type="button">Refresh</button>
+        <button class="btn-sel" id="exportBtn" type="button">Export CSV</button>
+        <a class="btn-sel primary" href="delivery.html">Delivery Board</a>
+      </div>
+    </section>
+
+    <section class="seller-card">
+      <div class="sel-toolbar">
+        <input class="sel" id="searchInput" type="text" placeholder="Search order, buyer, product">
+        <select class="sel" id="statusFilter">
+          <option value="">All Status</option>
+          <option value="pending">Pending</option>
+          <option value="in-transit">In Transit</option>
+          <option value="approved">Approved</option>
+          <option value="delivered">Delivered</option>
+          <option value="declined">Declined</option>
+        </select>
+        <select class="sel" id="sortFilter">
+          <option value="newest">Newest</option>
+          <option value="oldest">Oldest</option>
+          <option value="amountDesc">Highest Amount</option>
+          <option value="amountAsc">Lowest Amount</option>
+        </select>
+        <button class="btn-sel" id="resetBtn" type="button">Reset</button>
+      </div>
+    </section>
+
+    <section class="seller-card">
+      <div class="sel-table-wrap">
+        <table class="sel-table" id="orderTable"></table>
+      </div>
+    </section>
+
+    <div class="sel-foot">Order history and queue view</div>
+  </main>
+
+  <script src="seller-core.js?v=20260228a"></script>
+  <script>
+    let seller = null;
+    const state = { rows: [], filtered: [] };
+
+    function byId(id){ return document.getElementById(id); }
+
+    function setHeader(){
+      byId("sellerHeader").innerHTML = SellerCore.renderSellerHeader("seller-orders.html");
+    }
+
+    function readRows(){
+      function signature(row) {
+        const qty = Math.max(1, Math.floor(SellerCore.num(row.quantity || 1)));
+        const amount = SellerCore.num(row.amount || 0).toFixed(2);
+        return [
+          SellerCore.str(row.orderId || "").toLowerCase(),
+          SellerCore.str(row.buyerEmail || "").toLowerCase(),
+          SellerCore.str(row.product || "").toLowerCase(),
+          qty,
+          amount
+        ].join("|");
+      }
+
+      const sales = SellerCore.getPurchasesForSeller(seller).map(function (r) {
+        return {
+          source: "purchase",
+          orderId: r.orderId,
+          buyer: r.buyerName || r.buyerEmail,
+          buyerEmail: r.buyerEmail,
+          product: r.productName,
+          quantity: r.quantity,
+          amount: SellerCore.num(r.total),
+          status: SellerCore.str(r.status || "pending"),
+          date: r.date
+        };
+      });
+
+      const queue = SellerCore.getSellerQueueRows(seller).map(function (q) {
+        return {
+          source: "queue",
+          queueKey: q.queueKey,
+          queueIndex: q.index,
+          orderId: q.orderId,
+          buyer: q.buyer,
+          buyerEmail: q.email,
+          product: q.item,
+          quantity: q.quantity,
+          amount: SellerCore.num(q.amount),
+          status: SellerCore.str(q.status || "pending"),
+          date: q.date
+        };
+      });
+
+      const merged = new Map();
+      sales.forEach(function (row) {
+        merged.set(signature(row), row);
+      });
+      queue.forEach(function (row) {
+        const sig = signature(row);
+        const prev = merged.get(sig);
+        if (!prev) {
+          merged.set(sig, row);
+          return;
+        }
+        if (prev.source !== "queue") {
+          merged.set(sig, { ...prev, ...row, source: "queue" });
+          return;
+        }
+        const prevDate = String(prev.date || "");
+        const nextDate = String(row.date || "");
+        merged.set(sig, nextDate >= prevDate ? row : prev);
+      });
+      state.rows = Array.from(merged.values());
+    }
+
+    function applyFilters(){
+      const q = byId("searchInput").value.toLowerCase().trim();
+      const st = byId("statusFilter").value.toLowerCase();
+      const sort = byId("sortFilter").value;
+
+      state.filtered = state.rows.filter(function (r) {
+        const hay = [r.orderId, r.buyer, r.buyerEmail, r.product].join(" ").toLowerCase();
+        return (!q || hay.includes(q)) && (!st || r.status.toLowerCase().includes(st));
+      });
+
+      state.filtered.sort(function (a, b) {
+        if (sort === "oldest") return String(a.date).localeCompare(String(b.date));
+        if (sort === "amountDesc") return b.amount - a.amount;
+        if (sort === "amountAsc") return a.amount - b.amount;
+        return String(b.date).localeCompare(String(a.date));
+      });
+    }
+
+    function renderTable(){
+      const head = '<thead><tr><th>Order</th><th>Buyer</th><th>Product</th><th>Qty</th><th>Amount</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>';
+      const table = byId("orderTable");
+
+      if (!state.filtered.length) {
+        table.innerHTML = head + '<tbody><tr><td colspan="8" class="sel-empty">No orders found.</td></tr></tbody>';
+        return;
+      }
+
+      table.innerHTML = head + '<tbody>' + state.filtered.map(function (r, i) {
+        const canUpdate = r.source === "queue";
+        return '<tr>' +
+          '<td>' + (r.orderId || "-") + '</td>' +
+          '<td>' + (r.buyer || "-") + '<br><span class="sel-note">' + (r.buyerEmail || "-") + '</span></td>' +
+          '<td>' + r.product + '</td>' +
+          '<td>' + r.quantity + '</td>' +
+          '<td>' + SellerCore.fmtMoney(r.amount) + '</td>' +
+          '<td>' + SellerCore.badge(r.status) + '</td>' +
+          '<td>' + SellerCore.fmtDate(r.date) + '</td>' +
+          '<td><div class="sel-inline-actions">' + (canUpdate
+            ? '<button class="btn-sel" data-action="pending" data-index="' + i + '">Pending</button>' +
+              '<button class="btn-sel warning" data-action="in-transit" data-index="' + i + '">In Transit</button>' +
+              '<button class="btn-sel success" data-action="delivered" data-index="' + i + '">Delivered</button>' +
+              '<button class="btn-sel danger" data-action="declined" data-index="' + i + '">Decline</button>'
+            : '<span class="sel-note">History</span>') +
+          '</div></td>' +
+          '</tr>';
+      }).join("") + '</tbody>';
+    }
+
+    function refresh(){
+      readRows();
+      applyFilters();
+      renderTable();
+    }
+
+    function exportCSV(){
+      if (!state.filtered.length) {
+        alert("No rows to export.");
+        return;
+      }
+      const headers = ["orderId","buyer","buyerEmail","product","quantity","amount","status","date"];
+      const csv = [headers.join(",")].concat(state.filtered.map(function (r) {
+        const row = {
+          orderId: r.orderId,
+          buyer: r.buyer,
+          buyerEmail: r.buyerEmail,
+          product: r.product,
+          quantity: r.quantity,
+          amount: r.amount,
+          status: r.status,
+          date: SellerCore.fmtDate(r.date)
+        };
+        return headers.map(function (h) { return '"' + String(row[h]).replace(/"/g, '""') + '"'; }).join(",");
+      })).join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "seller-orders.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function updateQueueRow(row, status){
+      if (!row || row.source !== "queue") return;
+      SellerCore.updateQueueStatus(seller, row.queueKey, row.queueIndex, status);
+      refresh();
+    }
+
+    function initSellerOrdersPage() {
+      seller = SellerCore.ensureSellerSession("seller-login.html");
+      if (!seller) return;
+      setHeader();
+      refresh();
+
+      byId("refreshBtn").addEventListener("click", refresh);
+      byId("searchInput").addEventListener("input", refresh);
+      byId("statusFilter").addEventListener("change", refresh);
+      byId("sortFilter").addEventListener("change", refresh);
+      byId("exportBtn").addEventListener("click", exportCSV);
+      byId("resetBtn").addEventListener("click", function(){
+        byId("searchInput").value = "";
+        byId("statusFilter").value = "";
+        byId("sortFilter").value = "newest";
+        refresh();
+      });
+
+      byId("orderTable").addEventListener("click", function(e){
+        const btn = e.target.closest("button[data-action]");
+        if (!btn) return;
+        const row = state.filtered[Number(btn.dataset.index)];
+        if (!row) return;
+        updateQueueRow(row, btn.dataset.action);
+      });
+      window.addEventListener("storage", refresh);
+    }
+
+    function startSellerOrdersPage() {
+      const ready = window.MMStorage && window.MMStorage.ready;
+      if (ready && typeof ready.then === "function") {
+        ready.finally(initSellerOrdersPage);
+        return;
+      }
+      initSellerOrdersPage();
+    }
+
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", startSellerOrdersPage);
+    else startSellerOrdersPage();
+  </script>
+  <script defer src="upgrade.js"></script>
+  <script defer src="sw-register.js?v=20260226a"></script>
+  <script defer src="site-performance.js?v=20260226a"></script>
+</body>
+</html>
+
+
+

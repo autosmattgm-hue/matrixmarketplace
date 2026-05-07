@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>MatrixMarket - Seller Registration</title>
+  <link rel="stylesheet" href="style.css">
+
+  <!-- Font Awesome for icons -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+
+  <style>
+    body {
+      margin: 0;
+      font-family: "Poppins", sans-serif;
+      background: linear-gradient(-45deg, #0f172a, #1e293b, #4f46e5, #06b6d4);
+      background-size: 400% 400%;
+      animation: gradientBG 15s ease infinite;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    @keyframes gradientBG {
+      0% {
+        background-position: 0% 50%;
+      }
+
+      50% {
+        background-position: 100% 50%;
+      }
+
+      100% {
+        background-position: 0% 50%;
+      }
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 15px 40px;
+      background: rgba(0, 0, 0, 0.3);
+      backdrop-filter: blur(8px);
+    }
+
+    header .logo {
+      font-size: 1.5rem;
+      font-weight: bold;
+      color: #06b6d4;
+      text-shadow: 0 0 8px #4f46e5;
+    }
+
+    header nav a {
+      margin: 0 12px;
+      color: #fff;
+      text-decoration: none;
+      font-weight: 500;
+      transition: 0.3s;
+    }
+
+    header nav a:hover {
+      color: #06b6d4;
+    }
+
+    .register-container {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .register-card {
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(18px);
+      border-radius: 20px;
+      padding: 40px;
+      width: 100%;
+      max-width: 520px;
+      text-align: center;
+      box-shadow: 0 0 30px rgba(6, 182, 212, 0.5);
+      animation: fadeIn 1s ease-in-out;
+    }
+
+    .register-card h1 {
+      margin-bottom: 10px;
+      font-size: 2.2rem;
+      text-shadow: 0 0 12px #06b6d4, 0 0 20px #4f46e5;
+    }
+
+    .register-card p {
+      margin-bottom: 20px;
+      font-size: 1rem;
+      color: #cbd5e1;
+    }
+
+    .register-card input {
+      width: 100%;
+      padding: 14px;
+      margin: 12px 0;
+      border: none;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.12);
+      color: #fff;
+      font-size: 1rem;
+      outline: none;
+      box-shadow: 0 0 8px rgba(255, 255, 255, 0.2);
+      transition: all 0.3s ease-in-out;
+    }
+
+    .register-card input:focus {
+      box-shadow: 0 0 15px #06b6d4, 0 0 25px #4f46e5;
+    }
+
+    .error-msg {
+      color: #f87171;
+      font-size: 0.9rem;
+      margin-top: -5px;
+      margin-bottom: 10px;
+      display: none;
+    }
+
+    .plans {
+      margin: 25px 0;
+      display: flex;
+      gap: 15px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .plan {
+      flex: 1;
+      min-width: 140px;
+      background: rgba(255, 255, 255, 0.1);
+      padding: 20px;
+      border-radius: 16px;
+      cursor: pointer;
+      transition: all 0.3s ease-in-out;
+      box-shadow: 0 0 12px rgba(255, 255, 255, 0.15);
+      text-align: center;
+    }
+
+    .plan:hover {
+      transform: scale(1.07);
+      box-shadow: 0 0 25px #06b6d4;
+    }
+
+    .plan strong {
+      display: block;
+      font-size: 1.2rem;
+      margin-bottom: 5px;
+    }
+
+    .plan span {
+      display: block;
+      font-size: 0.95rem;
+      color: #06b6d4;
+    }
+
+    .plan i {
+      font-size: 2rem;
+      margin-bottom: 10px;
+      color: #4f46e5;
+    }
+
+    footer {
+      text-align: center;
+      padding: 20px;
+      background: rgba(255, 255, 255, 0.08);
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      font-size: 0.9rem;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(-20px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+  </style>
+
+  <script src="firebase-online-storage.js"></script>
+  <script>
+    async function goToPayment(plan) {
+      const ready = window.MMStorage && window.MMStorage.ready;
+      if (ready && typeof ready.then === "function") {
+        await ready.catch(function () {});
+      }
+
+      const name = document.getElementById("name").value.trim();
+      const email = document.getElementById("email").value.trim();
+      const store = document.getElementById("store").value.trim();
+      const phone = document.getElementById("phone").value.trim();
+      const password = document.getElementById("password").value.trim();
+      const errorBox = document.getElementById("errorBox");
+
+      errorBox.style.display = "none";
+
+      if (!name || !email || !store || !phone || !password) {
+        errorBox.innerText = "⚠️ Please fill in all your details!";
+        errorBox.style.display = "block";
+        return;
+      }
+
+      let sellers = JSON.parse(MMStorage.getItem("sellers")) || [];
+
+      if (sellers.some(seller => seller.email === email)) {
+        errorBox.innerText = "⚠️ Email already registered. Try login instead.";
+        errorBox.style.display = "block";
+        return;
+      }
+
+      if (sellers.some(seller => seller.store === store)) {
+        errorBox.innerText = "⚠️ Store name already taken.";
+        errorBox.style.display = "block";
+        return;
+      }
+
+      // Define amount
+      let amount = plan.includes("Weekly") ? 1000 :
+        plan.includes("Monthly") ? 3000 : 20500;
+
+      // Save seller record
+      sellers.push({
+        name,
+        email,
+        store,
+        phone,
+        password,
+        plan,
+        amount,
+        status: "Pending Approval",
+        date: new Date().toLocaleString()
+      });
+      MMStorage.setItem("sellers", JSON.stringify(sellers));
+
+      // Save pending payment request
+      let pendingRequests = JSON.parse(MMStorage.getItem("pendingRequests")) || [];
+      pendingRequests.push({
+        name,
+        email,
+        store,
+        phone,
+        plan,
+        amount,
+        status: "Pending",
+        date: new Date().toLocaleString()
+      });
+      MMStorage.setItem("pendingRequests", JSON.stringify(pendingRequests));
+
+      // ✅ Redirect to seller payment status page
+      window.location.href = "payment-status-sellers.html";
+    }
+  </script>
+    <link rel="stylesheet" href="upgrade.css">
+</head>
+
+<body>
+
+  <header>
+    <div class="logo">MatrixMarket</div>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="shop.html">Shop</a>
+      <a href="seller-login.html">Sellers</a>
+    </nav>
+  </header>
+
+  <div class="register-container">
+    <div class="register-card">
+      <h1>📝 Become a Seller</h1>
+      <p>Register your store and choose a subscription plan to start selling on MatrixMarket.</p>
+
+      <form onsubmit="return false">
+        <input type="text" id="name" placeholder="Full Name" required>
+        <input type="email" id="email" placeholder="Business Email" required>
+        <input type="text" id="store" placeholder="Store Name" required>
+        <input type="text" id="phone" placeholder="Phone Number" required>
+        <input type="password" id="password" placeholder="Create Password" required>
+        <div id="errorBox" class="error-msg"></div>
+      </form>
+
+      <h2>Select Your Plan</h2>
+      <div class="plans">
+        <div class="plan" onclick="goToPayment('Weekly - GMD1000/week')">
+          <i class="fas fa-calendar-week"></i>
+          <strong>Weekly</strong>
+          <span>GMD 1000 / week</span>
+        </div>
+        <div class="plan" onclick="goToPayment('Monthly - GMD3000/month')">
+          <i class="fas fa-calendar-alt"></i>
+          <strong>Monthly</strong>
+          <span>GMD 3000 / month</span>
+        </div>
+        <div class="plan" onclick="goToPayment('Yearly - GMD20500/year')">
+          <i class="fas fa-calendar"></i>
+          <strong>Yearly</strong>
+          <span>GMD 20500 / year</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <p>© 2025 MatrixMarket | Seller Registration</p>
+  </footer>
+
+    <script defer src="upgrade.js"></script>
+  <script defer src="sw-register.js?v=20260226a"></script>
+  <script defer src="site-performance.js?v=20260226a"></script>
+</body>
+
+</html>
+
+
+
+

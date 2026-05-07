@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Seller Withdrawal - MatrixMarket</title>
+  <link rel="stylesheet" href="seller-layout.css" />
+  <link rel="stylesheet" href="upgrade.css" />
+    <script src="firebase-online-storage.js"></script>
+</head>
+<body class="seller-page">
+  <div id="sellerHeader"></div>
+
+  <main class="seller-shell">
+    <section class="seller-titlebar">
+      <h1>Seller Withdrawal</h1>
+      <div class="seller-actions">
+        <button class="btn-sel" id="refreshBtn" type="button">Refresh</button>
+        <a class="btn-sel" href="seller-dashboard.html">Dashboard</a>
+        <a class="btn-sel primary" href="payment-status-sellers.html">Payment Status</a>
+      </div>
+    </section>
+
+    <section class="seller-grid cols-3" id="summaryGrid"></section>
+
+    <section class="seller-grid cols-2">
+      <article class="seller-card">
+        <h3 style="margin:0 0 .5rem;">Create Withdrawal Request</h3>
+        <p class="sel-note" style="margin:0 0 .55rem;">
+          Charge rule: every GMD 10 has GMD 2 charge (20%). Charge is applied only after admin approval.
+        </p>
+
+        <div class="seller-form-grid cols-2">
+          <input class="sel" id="withdrawAmount" type="number" min="0.01" step="0.01" placeholder="Withdrawal Amount (GMD)" />
+          <select class="sel" id="withdrawMethod">
+            <option value="Wave">Wave</option>
+            <option value="Comcash">Comcash</option>
+          </select>
+          <input class="sel" id="payoutNumber" type="text" placeholder="Your Wave/Comcash Number" />
+          <input class="sel" id="fullName" type="text" placeholder="Recipient Name (optional)" />
+          <textarea class="sel" id="withdrawNote" placeholder="Note for admin (optional)" style="grid-column:1 / -1;"></textarea>
+        </div>
+
+        <div class="meta-list" style="margin-top:.6rem;">
+          <div class="meta-row"><strong>Requested</strong><span id="previewAmount">0.00 GMD</span></div>
+          <div class="meta-row"><strong>Charge (20%)</strong><span id="previewCharge">0.00 GMD</span></div>
+          <div class="meta-row"><strong>Net Payout</strong><span id="previewNet">0.00 GMD</span></div>
+          <div class="meta-row"><strong>Current Balance</strong><span id="previewBalance">0.00 GMD</span></div>
+        </div>
+
+        <div class="seller-actions" style="margin-top:.6rem;">
+          <button class="btn-sel primary" id="submitBtn" type="button">Submit Withdrawal</button>
+        </div>
+      </article>
+
+      <article class="seller-card">
+        <h3 style="margin:0 0 .5rem;">Rules</h3>
+        <div class="sel-list">
+          <div class="sel-list-item">1. Seller must have active subscription before withdrawal.</div>
+          <div class="sel-list-item">2. You cannot request more than your available balance.</div>
+          <div class="sel-list-item">3. Admin approval is required before payout is processed.</div>
+          <div class="sel-list-item">4. Charge is deducted after admin approves your request.</div>
+        </div>
+      </article>
+    </section>
+
+    <section class="seller-card">
+      <div class="sel-split">
+        <h3 style="margin:0;">Withdrawal History</h3>
+        <span class="sel-note">Pending, Approved, Declined and Cancelled requests</span>
+      </div>
+      <div class="sel-table-wrap" style="margin-top:.55rem;">
+        <table class="sel-table" id="withdrawTable"></table>
+      </div>
+    </section>
+
+    <div class="sel-foot">Seller withdrawal manager</div>
+  </main>
+
+  <script src="seller-core.js?v=20260222g"></script>
+  <script>
+    const state = { seller: null, rows: [] };
+
+    function byId(id) { return document.getElementById(id); }
+
+    function requestRows() {
+      let rows = SellerCore.readJSON("pendingRequests", []);
+      if (typeof rows === "string") {
+        try { rows = JSON.parse(rows); } catch (_) { rows = []; }
+      }
+      if (Array.isArray(rows)) return rows.slice();
+      if (rows && typeof rows === "object") {
+        return Object.keys(rows).map(function (key) {
+          const row = rows[key];
+          if (row && typeof row === "object") {
+            const next = { ...row };
+            if (!next.id) next.id = key;
+            return next;
+          }
+          return { id: key, value: row };
+        });
+      }
+      return [];
+    }
+
+    function readRows() {
+      const seller = state.seller;
+      const all = requestRows();
+      const email = SellerCore.cleanEmail(seller.email || "");
+      return all.filter(function (row) {
+        return SellerCore.cleanEmail(row.email || "") === email &&
+          SellerCore.str(row.type || "").toLowerCase().includes("withdraw");
+      }).sort(function (a, b) {
+        return String(b.createdAt || b.date || "").localeCompare(String(a.createdAt || a.date || ""));
+      });
+    }
+
+    function renderHeader() {
+      byId("sellerHeader").innerHTML = SellerCore.renderSellerHeader("seller-withdrawal.html");
+    }
+
+    function renderPreview() {
+      const amount = SellerCore.num(byId("withdrawAmount").value || 0);
+      const charge = SellerCore.withdrawalCharge(amount);
+      const net = SellerCore.withdrawalNet(amount);
+      byId("previewAmount").textContent = SellerCore.fmtMoney(amount);
+      byId("previewCharge").textContent = SellerCore.fmtMoney(charge);
+      byId("previewNet").textContent = SellerCore.fmtMoney(net);
+      byId("previewBalance").textContent = SellerCore.fmtMoney(state.seller.balance || 0);
+    }
+
+    function renderSummary() {
+      const rows = state.rows;
+      const pending = rows.filter(function (r) { return SellerCore.str(r.status).toLowerCase() === "pending"; }).length;
+      const approved = rows.filter(function (r) { return SellerCore.str(r.status).toLowerCase() === "approved"; });
+      const approvedGross = approved.reduce(function (sum, row) { return sum + SellerCore.num(row.amount || 0); }, 0);
+      const approvedNet = approved.reduce(function (sum, row) {
+        const amount = SellerCore.num(row.amount || 0);
+        const net = SellerCore.num(row.netAmount || SellerCore.withdrawalNet(amount));
+        return sum + net;
+      }, 0);
+
+      byId("summaryGrid").innerHTML = [
+        ["Available Balance", SellerCore.fmtMoney(state.seller.balance || 0)],
+        ["Pending Requests", pending],
+        ["Approved Gross", SellerCore.fmtMoney(approvedGross)],
+        ["Approved Net Payout", SellerCore.fmtMoney(approvedNet)],
+        ["Charge Rule", "GMD " + SellerCore.WITHDRAWAL_CHARGE_PER_10 + " / 10"],
+        ["Subscription", SellerCore.badge(state.seller.subscription || "Inactive")]
+      ].map(function (item) {
+        return '<article class="kpi"><div class="label">' + item[0] + '</div><div class="value">' + item[1] + '</div></article>';
+      }).join("");
+    }
+
+    function renderTable() {
+      const table = byId("withdrawTable");
+      const head = "<thead><tr><th>ID</th><th>Amount</th><th>Charge</th><th>Net</th><th>Method</th><th>Number</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>";
+      if (!state.rows.length) {
+        table.innerHTML = head + '<tbody><tr><td colspan="9" class="sel-empty">No withdrawal requests yet.</td></tr></tbody>';
+        return;
+      }
+
+      table.innerHTML = head + "<tbody>" + state.rows.map(function (row) {
+        const amount = SellerCore.num(row.amount || 0);
+        const charge = SellerCore.num(row.charge || SellerCore.withdrawalCharge(amount));
+        const net = SellerCore.num(row.netAmount || SellerCore.withdrawalNet(amount));
+        const pending = SellerCore.str(row.status || "pending").toLowerCase() === "pending";
+        return "<tr>" +
+          "<td>" + (row.id || "-") + "</td>" +
+          "<td>" + SellerCore.fmtMoney(amount) + "</td>" +
+          "<td>" + SellerCore.fmtMoney(charge) + "</td>" +
+          "<td>" + SellerCore.fmtMoney(net) + "</td>" +
+          "<td>" + SellerCore.str(row.method || "-") + "</td>" +
+          "<td>" + SellerCore.str(row.payoutNumber || "-") + "</td>" +
+          "<td>" + SellerCore.badge(row.status || "Pending") + "</td>" +
+          "<td>" + SellerCore.fmtDate(row.createdAt || row.date) + "</td>" +
+          "<td>" + (pending
+            ? '<button class="btn-sel danger" data-action="cancel" data-id="' + encodeURIComponent(row.id || "") + '">Cancel</button>'
+            : '<span class="sel-note">-</span>') + "</td>" +
+          "</tr>";
+      }).join("") + "</tbody>";
+    }
+
+    function saveRequests(nextRows) {
+      const list = requestRows();
+      const email = SellerCore.cleanEmail(state.seller.email || "");
+      const others = list.filter(function (row) {
+        return !(SellerCore.cleanEmail(row.email || "") === email &&
+          SellerCore.str(row.type || "").toLowerCase().includes("withdraw"));
+      });
+      SellerCore.writeJSON("pendingRequests", others.concat(nextRows));
+    }
+
+    function submitWithdrawal() {
+      state.seller = SellerCore.ensureSellerSession("seller-login.html");
+      if (!state.seller) return;
+
+      if (!SellerCore.hasActiveSubscription(state.seller)) {
+        alert("Subscription must be active before requesting withdrawal.");
+        return;
+      }
+
+      const amount = SellerCore.num(byId("withdrawAmount").value || 0);
+      const method = SellerCore.paymentMethod(byId("withdrawMethod").value);
+      const payoutNumber = SellerCore.str(byId("payoutNumber").value);
+      const fullName = SellerCore.str(byId("fullName").value);
+      const note = SellerCore.str(byId("withdrawNote").value);
+
+      if (amount <= 0) {
+        alert("Enter a valid withdrawal amount.");
+        return;
+      }
+      if (amount > SellerCore.num(state.seller.balance || 0)) {
+        alert("Withdrawal amount cannot exceed available balance.");
+        return;
+      }
+      if (!payoutNumber) {
+        alert("Enter your Wave or Comcash number for payout.");
+        return;
+      }
+
+      const hasPending = state.rows.some(function (row) {
+        return SellerCore.str(row.status || "pending").toLowerCase() === "pending";
+      });
+      if (hasPending) {
+        alert("You already have a pending withdrawal request.");
+        return;
+      }
+
+      const charge = SellerCore.withdrawalCharge(amount);
+      const netAmount = SellerCore.withdrawalNet(amount);
+      const row = {
+        id: "WDR-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6),
+        name: state.seller.fullName || state.seller.name || state.seller.email,
+        email: state.seller.email,
+        store: state.seller.store || "",
+        type: "Withdrawal",
+        amount: amount,
+        charge: charge,
+        netAmount: netAmount,
+        method: method,
+        payoutNumber: payoutNumber,
+        recipientName: fullName,
+        proof: note,
+        status: "Pending",
+        date: new Date().toISOString(),
+        createdAt: new Date().toISOString()
+      };
+
+      const nextRows = state.rows.concat(row);
+      saveRequests(nextRows);
+      alert("Withdrawal request submitted. Admin approval required.");
+
+      byId("withdrawAmount").value = "";
+      byId("withdrawNote").value = "";
+      refresh();
+    }
+
+    function cancelWithdrawal(id) {
+      const target = decodeURIComponent(id || "");
+      if (!target) return;
+      if (!confirm("Cancel this withdrawal request?")) return;
+
+      const nextRows = state.rows.map(function (row) {
+        if (SellerCore.str(row.id) !== target) return row;
+        if (SellerCore.str(row.status).toLowerCase() !== "pending") return row;
+        return { ...row, status: "Cancelled", updatedAt: new Date().toISOString() };
+      });
+
+      saveRequests(nextRows);
+      alert("Withdrawal request cancelled.");
+      refresh();
+    }
+
+    function refresh() {
+      state.seller = SellerCore.ensureSellerSession("seller-login.html");
+      if (!state.seller) return;
+      state.seller = SellerCore.upsertSeller(state.seller);
+      state.rows = readRows();
+      renderPreview();
+      renderSummary();
+      renderTable();
+    }
+
+    function initSellerWithdrawalPage() {
+      renderHeader();
+      refresh();
+      byId("refreshBtn").addEventListener("click", refresh);
+      byId("withdrawAmount").addEventListener("input", renderPreview);
+      byId("submitBtn").addEventListener("click", submitWithdrawal);
+      byId("withdrawTable").addEventListener("click", function (e) {
+        const btn = e.target.closest("button[data-action='cancel']");
+        if (!btn) return;
+        cancelWithdrawal(btn.dataset.id || "");
+      });
+      window.addEventListener("storage", refresh);
+    }
+
+    function startSellerWithdrawalPage() {
+      const ready = window.MMStorage && window.MMStorage.ready;
+      if (ready && typeof ready.then === "function") {
+        ready.finally(initSellerWithdrawalPage);
+        return;
+      }
+      initSellerWithdrawalPage();
+    }
+
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", startSellerWithdrawalPage);
+    else startSellerWithdrawalPage();
+  </script>
+  <script defer src="upgrade.js"></script>
+  <script defer src="sw-register.js?v=20260226a"></script>
+  <script defer src="site-performance.js?v=20260226a"></script>
+</body>
+</html>
+
+
+

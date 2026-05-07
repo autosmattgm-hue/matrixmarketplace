@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Admin Products - MatrixMarket</title>
+    <link rel="stylesheet" href="admin-layout.css?v=20260227a">
+    <link rel="stylesheet" href="upgrade.css">
+    <script src="firebase-online-storage.js"></script>
+</head>
+<body class="admin-page">
+    <div id="adminHeader"></div>
+    <main class="admin-shell">
+        <section class="admin-titlebar">
+            <h1>Product Catalog Control</h1>
+            <div class="admin-actions">
+                <button class="btn-adm" id="refreshBtn" type="button">Refresh</button>
+                <button class="btn-adm" id="exportBtn" type="button">Export CSV</button>
+                <button class="btn-adm danger" id="removeNoPriceBtn" type="button">Remove Invalid Prices</button>
+            </div>
+        </section>
+
+        <section class="admin-card">
+            <div class="adm-toolbar">
+                <input class="adm" id="searchInput" type="text" placeholder="Search name, seller, category">
+                <select class="adm" id="categoryFilter">
+                    <option value="">All Categories</option>
+                </select>
+                <select class="adm" id="sortFilter">
+                    <option value="createdDesc">Newest</option>
+                    <option value="priceAsc">Price Low</option>
+                    <option value="priceDesc">Price High</option>
+                    <option value="nameAsc">Name A-Z</option>
+                </select>
+                <button class="btn-adm" id="resetBtn" type="button">Reset</button>
+            </div>
+        </section>
+
+        <section class="admin-card">
+            <div class="adm-table-wrap">
+                <table class="adm-table" id="productTable"></table>
+            </div>
+        </section>
+
+        <div class="adm-foot">Product edits update the shared products store immediately.</div>
+    </main>
+
+    <script src="admin-core.js?v=20260222c"></script>
+    <script>
+        const state = { rows: [], filtered: [] };
+
+        function setHeader() {
+            document.getElementById("adminHeader").innerHTML = AdminCore.renderAdminHeader("admin-products.html");
+        }
+
+        function readRows() {
+            state.rows = AdminCore.getProducts().map(function (p, i) {
+                return {
+                    index: i,
+                    id: p.id || ("PRD-" + i),
+                    name: AdminCore.str(p.name || p.title || "Product"),
+                    seller: AdminCore.str(p.seller || p.sellerName || p.sellerEmail || "Unknown"),
+                    category: AdminCore.str(p.category || "general"),
+                    price: AdminCore.num(p.price || 0),
+                    image: AdminCore.str(p.image || ""),
+                    createdAt: p.createdAt || p.date || String(p.id || ""),
+                    raw: p
+                };
+            });
+
+            const categories = Array.from(new Set(state.rows.map(function (r) { return r.category; }))).sort();
+            document.getElementById("categoryFilter").innerHTML = '<option value="">All Categories</option>' + categories.map(function (c) {
+                return '<option value="' + c + '">' + c + '</option>';
+            }).join("");
+        }
+
+        function applyFilters() {
+            const q = AdminCore.str(document.getElementById("searchInput").value).toLowerCase();
+            const c = AdminCore.str(document.getElementById("categoryFilter").value).toLowerCase();
+            const sort = document.getElementById("sortFilter").value;
+
+            state.filtered = state.rows.filter(function (r) {
+                const hay = [r.name, r.seller, r.category].join(" ").toLowerCase();
+                const categoryOk = !c || r.category.toLowerCase() === c;
+                return (!q || hay.includes(q)) && categoryOk;
+            });
+
+            state.filtered.sort(function (a, b) {
+                if (sort === "priceAsc") return a.price - b.price;
+                if (sort === "priceDesc") return b.price - a.price;
+                if (sort === "nameAsc") return a.name.localeCompare(b.name);
+                return String(b.createdAt).localeCompare(String(a.createdAt));
+            });
+        }
+
+        function renderTable() {
+            const table = document.getElementById("productTable");
+            const head = '<thead><tr><th>ID</th><th>Name</th><th>Seller</th><th>Category</th><th>Price</th><th>Image</th><th>Actions</th></tr></thead>';
+
+            if (!state.filtered.length) {
+                table.innerHTML = head + '<tbody><tr><td colspan="7" class="adm-empty">No products found.</td></tr></tbody>';
+                return;
+            }
+
+            table.innerHTML = head + '<tbody>' + state.filtered.map(function (r) {
+                return '<tr>' +
+                    '<td>' + r.id + '</td>' +
+                    '<td>' + r.name + '</td>' +
+                    '<td>' + r.seller + '</td>' +
+                    '<td>' + r.category + '</td>' +
+                    '<td>' + AdminCore.fmtMoney(r.price) + '</td>' +
+                    '<td>' + (r.image ? '<a href="' + r.image + '" target="_blank">Open</a>' : '-') + '</td>' +
+                    '<td><div class="adm-inline-actions">' +
+                    '<button class="btn-adm" data-action="price" data-id="' + r.index + '">Edit Price</button>' +
+                    '<button class="btn-adm" data-action="category" data-id="' + r.index + '">Edit Category</button>' +
+                    '<button class="btn-adm danger" data-action="delete" data-id="' + r.index + '">Delete</button>' +
+                    '</div></td>' +
+                    '</tr>';
+            }).join("") + '</tbody>';
+        }
+
+        function refresh() {
+            readRows();
+            applyFilters();
+            renderTable();
+        }
+
+        function updateProducts(mutator) {
+            const products = AdminCore.getProducts();
+            mutator(products);
+            AdminCore.setProducts(products);
+            refresh();
+        }
+
+        function editPrice(index) {
+            const i = Number(index);
+            const row = state.rows[i];
+            if (!row) return;
+            const next = prompt("New price for " + row.name + ":", String(row.price));
+            if (next === null) return;
+            const value = AdminCore.num(next);
+            updateProducts(function (products) {
+                if (products[i]) products[i].price = value;
+            });
+            AdminCore.log("product_price_updated", { id: row.id, name: row.name, price: value });
+        }
+
+        function editCategory(index) {
+            const i = Number(index);
+            const row = state.rows[i];
+            if (!row) return;
+            const next = prompt("New category for " + row.name + ":", row.category);
+            if (next === null) return;
+            updateProducts(function (products) {
+                if (products[i]) products[i].category = AdminCore.str(next || "general");
+            });
+            AdminCore.log("product_category_updated", { id: row.id, name: row.name, category: next });
+        }
+
+        function deleteProduct(index) {
+            const i = Number(index);
+            const row = state.rows[i];
+            if (!row) return;
+            if (!confirm("Delete product " + row.name + "?")) return;
+            updateProducts(function (products) {
+                products.splice(i, 1);
+            });
+            AdminCore.log("product_deleted", { id: row.id, name: row.name });
+        }
+
+        function initAdminProductsPage() {
+            setHeader();
+            refresh();
+            window.addEventListener("storage", refresh);
+
+            document.getElementById("searchInput").addEventListener("input", refresh);
+            document.getElementById("categoryFilter").addEventListener("change", refresh);
+            document.getElementById("sortFilter").addEventListener("change", refresh);
+            document.getElementById("refreshBtn").addEventListener("click", refresh);
+
+            document.getElementById("resetBtn").addEventListener("click", function () {
+                document.getElementById("searchInput").value = "";
+                document.getElementById("sortFilter").value = "createdDesc";
+                refresh();
+            });
+
+            document.getElementById("removeNoPriceBtn").addEventListener("click", function () {
+                updateProducts(function (products) {
+                    for (let i = products.length - 1; i >= 0; i -= 1) {
+                        if (!Number.isFinite(Number(products[i].price)) || Number(products[i].price) <= 0) {
+                            products.splice(i, 1);
+                        }
+                    }
+                });
+                AdminCore.log("invalid_price_products_removed", {});
+            });
+
+            document.getElementById("exportBtn").addEventListener("click", function () {
+                const rows = state.filtered.map(function (r) {
+                    return {
+                        id: r.id,
+                        name: r.name,
+                        seller: r.seller,
+                        category: r.category,
+                        price: r.price,
+                        image: r.image
+                    };
+                });
+                AdminCore.exportCSV(rows, "admin-products.csv");
+                AdminCore.log("products_csv_exported", { count: rows.length });
+            });
+
+            document.getElementById("productTable").addEventListener("click", function (e) {
+                const btn = e.target.closest("button[data-action]");
+                if (!btn) return;
+                if (btn.dataset.action === "price") editPrice(btn.dataset.id);
+                if (btn.dataset.action === "category") editCategory(btn.dataset.id);
+                if (btn.dataset.action === "delete") deleteProduct(btn.dataset.id);
+            });
+        }
+
+        function startAdminProductsPage() {
+            const ready = window.MMStorage && window.MMStorage.ready;
+            if (ready && typeof ready.then === "function") {
+                ready.finally(initAdminProductsPage);
+                return;
+            }
+            initAdminProductsPage();
+        }
+
+        if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", startAdminProductsPage);
+        else startAdminProductsPage();
+    </script>
+    <script defer src="upgrade.js"></script>
+  <script defer src="sw-register.js?v=20260226a"></script>
+  <script defer src="site-performance.js?v=20260226a"></script>
+</body>
+</html>
+
+
+
+

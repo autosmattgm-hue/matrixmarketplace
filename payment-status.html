@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>MatrixMarket - Payment Status</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="upgrade.css">
+    <script src="firebase-online-storage.js"></script>
+    <style>
+        :root {
+            --bg: #f6f8fc;
+            --panel: #ffffff;
+            --panel-soft: #f8fafc;
+            --text: #122033;
+            --muted: #5f6c7b;
+            --border: #dbe3ef;
+            --brand: #0f766e;
+            --brand-deep: #115e59;
+            --accent: #f97316;
+            --accent-soft: #fff7ed;
+            --good: #15803d;
+            --good-soft: #f0fdf4;
+            --warn: #b45309;
+            --warn-soft: #fffbeb;
+            --danger: #dc2626;
+            --danger-soft: #fef2f2;
+            --shadow-sm: 0 8px 20px rgba(15, 23, 42, 0.06);
+            --shadow-md: 0 18px 40px rgba(15, 23, 42, 0.10);
+            --radius-xl: 28px;
+            --radius-lg: 22px;
+            --radius-md: 16px;
+            --radius-sm: 12px;
+            --radius-pill: 999px;
+            --transition: 180ms ease;
+        }
+
+        * { box-sizing: border-box; }
+
+        html {
+            scroll-behavior: smooth;
+            -webkit-text-size-adjust: 100%;
+            text-size-adjust: 100%;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Inter", sans-serif;
+            color: var(--text);
+            background:
+                radial-gradient(circle at top left, rgba(15, 118, 110, 0.10), transparent 24%),
+                radial-gradient(circle at top right, rgba(249, 115, 22, 0.12), transparent 26%),
+                linear-gradient(180deg, #f8fbff 0%, #f5f7fb 100%);
+        }
+
+        a { color: inherit; }
+        button { font: inherit; }
+
+        .ps-header {
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            backdrop-filter: blur(16px);
+            background: rgba(248, 251, 255, 0.88);
+            border-bottom: 1px solid rgba(219, 227, 239, 0.82);
+        }
+
+        .ps-header-inner,
+        .ps-shell {
+            width: min(1260px, calc(100% - 1.4rem));
+            margin: 0 auto;
+        }
+
+        .ps-header-inner {
+            padding: 0.85rem 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .ps-brand {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.8rem;
+            text-decoration: none;
+        }
+
+        .ps-brand-mark {
+            width: 2.8rem;
+            height: 2.8rem;
+            border-radius: 16px;
+            background: linear-gradient(135deg, var(--brand), var(--brand-deep));
+            color: #fff;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.15rem;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .ps-brand-copy {
+            display: grid;
+            gap: 0.1rem;
+        }
+
+        .ps-brand-copy strong {
+            font-family: "Nunito", sans-serif;
+            font-size: 1.15rem;
+            letter-spacing: -0.03em;
+        }
+
+        .ps-brand-copy span {
+            color: var(--muted);
+            font-size: 0.74rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            font-weight: 800;
+        }
+
+        .ps-nav {
+            display: flex;
+            gap: 0.55rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .ps-nav a {
+            text-decoration: none;
+            color: var(--muted);
+            padding: 0.55rem 0.9rem;
+            border-radius: var(--radius-pill);
+            font-weight: 700;
+            transition: var(--transition);
+        }
+
+        .ps-nav a:hover,
+        .ps-nav a.active {
+            color: var(--brand-deep);
+            background: rgba(15, 118, 110, 0.08);
+        }
+
+        .ps-shell {
+            padding: 1rem 0 1.6rem;
+            display: grid;
+            gap: 1rem;
+        }
+
+        .ps-card {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-xl);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .ps-hero {
+            padding: 1.5rem;
+            background:
+                radial-gradient(circle at top right, rgba(249, 115, 22, 0.14), transparent 32%),
+                linear-gradient(135deg, #ffffff 0%, #f5fffc 100%);
+        }
+
+        .ps-kicker {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            padding: 0.5rem 0.9rem;
+            border-radius: var(--radius-pill);
+            background: rgba(15, 118, 110, 0.08);
+            color: var(--brand-deep);
+            font-size: 0.76rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .ps-hero h1 {
+            margin: 0.95rem 0 0.5rem;
+            font-family: "Nunito", sans-serif;
+            font-size: clamp(2rem, 4vw, 3rem);
+            line-height: 0.98;
+            letter-spacing: -0.05em;
+        }
+
+        .ps-hero p {
+            margin: 0;
+            max-width: 720px;
+            color: var(--muted);
+            font-size: 1rem;
+            line-height: 1.75;
+        }
+
+        .ps-pills {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.7rem;
+            margin-top: 1rem;
+        }
+
+        .ps-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            padding: 0.6rem 0.9rem;
+            border-radius: var(--radius-pill);
+            background: #fff;
+            border: 1px solid rgba(15, 118, 110, 0.12);
+            color: var(--text);
+            font-size: 0.84rem;
+            font-weight: 700;
+        }
+
+        .ps-main {
+            display: grid;
+            grid-template-columns: minmax(0, 0.95fr) minmax(340px, 0.9fr);
+            gap: 1rem;
+            align-items: start;
+        }
+
+        .ps-stack {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .ps-status-card {
+            padding: 1.4rem;
+            display: grid;
+            gap: 1rem;
+        }
+
+        .ps-status-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .ps-status-copy h2 {
+            margin: 0;
+            font-family: "Nunito", sans-serif;
+            font-size: 1.5rem;
+            letter-spacing: -0.03em;
+        }
+
+        .ps-status-copy p {
+            margin: 0.35rem 0 0;
+            color: var(--muted);
+            font-size: 0.95rem;
+            line-height: 1.65;
+        }
+
+        .ps-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.55rem;
+            padding: 0.7rem 1rem;
+            border-radius: var(--radius-pill);
+            border: 1px solid transparent;
+            font-size: 0.9rem;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        .ps-badge.pending {
+            background: var(--warn-soft);
+            color: var(--warn);
+            border-color: #fde68a;
+        }
+
+        .ps-badge.approved {
+            background: var(--good-soft);
+            color: var(--good);
+            border-color: #bbf7d0;
+        }
+
+        .ps-badge.declined {
+            background: var(--danger-soft);
+            color: var(--danger);
+            border-color: #fecaca;
+        }
+
+        .ps-banner {
+            padding: 1rem 1.05rem;
+            border-radius: var(--radius-lg);
+            font-size: 0.95rem;
+            font-weight: 700;
+            line-height: 1.7;
+        }
+
+        .ps-banner.pending {
+            background: var(--warn-soft);
+            color: #92400e;
+            border: 1px solid #fde68a;
+        }
+
+        .ps-banner.approved {
+            background: var(--good-soft);
+            color: #166534;
+            border: 1px solid #bbf7d0;
+        }
+
+        .ps-banner.declined {
+            background: var(--danger-soft);
+            color: #b91c1c;
+            border: 1px solid #fecaca;
+        }
+
+        .ps-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.9rem;
+        }
+
+        .ps-panel,
+        .ps-side-card {
+            padding: 1.25rem;
+        }
+
+        .ps-panel h3,
+        .ps-side-card h3 {
+            margin: 0 0 0.35rem;
+            font-family: "Nunito", sans-serif;
+            font-size: 1.18rem;
+            letter-spacing: -0.02em;
+        }
+
+        .ps-panel p,
+        .ps-side-card p {
+            margin: 0;
+            color: var(--muted);
+            font-size: 0.9rem;
+            line-height: 1.65;
+        }
+
+        .ps-detail-list,
+        .ps-step-list {
+            display: grid;
+            gap: 0.8rem;
+            margin-top: 0.95rem;
+        }
+
+        .ps-detail {
+            display: flex;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 0.9rem 1rem;
+            border-radius: var(--radius-lg);
+            background: var(--panel-soft);
+            border: 1px solid var(--border);
+            font-size: 0.9rem;
+        }
+
+        .ps-detail span {
+            color: var(--muted);
+        }
+
+        .ps-detail strong {
+            text-align: right;
+            color: var(--text);
+        }
+
+        .ps-step {
+            display: grid;
+            gap: 0.22rem;
+            padding: 0.95rem 1rem;
+            border-radius: var(--radius-lg);
+            background: var(--panel-soft);
+            border: 1px solid var(--border);
+        }
+
+        .ps-step strong {
+            font-size: 0.95rem;
+        }
+
+        .ps-step span {
+            color: var(--muted);
+            font-size: 0.86rem;
+            line-height: 1.6;
+        }
+
+        .ps-mini-stats {
+            display: grid;
+            gap: 0.8rem;
+        }
+
+        .ps-mini-stat {
+            padding: 0.95rem 1rem;
+            border-radius: var(--radius-lg);
+            background: linear-gradient(180deg, #f9fcff 0%, #ffffff 100%);
+            border: 1px solid var(--border);
+        }
+
+        .ps-mini-stat small {
+            display: block;
+            color: var(--muted);
+            font-size: 0.74rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            font-weight: 800;
+            margin-bottom: 0.28rem;
+        }
+
+        .ps-mini-stat strong {
+            display: block;
+            font-size: 1rem;
+            line-height: 1.45;
+        }
+
+        .ps-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+
+        .ps-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-pill);
+            background: #fff;
+            color: var(--text);
+            padding: 0.9rem 1.15rem;
+            font-size: 0.9rem;
+            font-weight: 800;
+            cursor: pointer;
+            text-decoration: none;
+            transition: transform var(--transition), box-shadow var(--transition), background var(--transition), border-color var(--transition);
+        }
+
+        .ps-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .ps-btn.primary {
+            background: linear-gradient(135deg, var(--brand), var(--brand-deep));
+            border-color: transparent;
+            color: #fff;
+            box-shadow: 0 18px 36px rgba(15, 118, 110, 0.20);
+        }
+
+        .ps-btn.secondary {
+            background: var(--accent-soft);
+            border-color: #fed7aa;
+            color: #9a3412;
+        }
+
+        .ps-empty {
+            padding: 1.1rem;
+            border-radius: var(--radius-lg);
+            background: var(--danger-soft);
+            border: 1px solid #fecaca;
+            color: #b91c1c;
+            font-weight: 700;
+            line-height: 1.7;
+        }
+
+        .ps-footer {
+            color: var(--muted);
+            text-align: center;
+            font-size: 0.85rem;
+            padding: 0.2rem 0 1rem;
+        }
+
+        @media (max-width: 1080px) {
+            .ps-main {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 760px) {
+            .ps-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .ps-header-inner,
+            .ps-shell {
+                width: min(100%, calc(100% - 1rem));
+            }
+
+            .ps-status-card,
+            .ps-panel,
+            .ps-side-card,
+            .ps-hero {
+                padding: 1.1rem;
+                border-radius: 22px;
+            }
+
+            .ps-nav {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="ps-header">
+        <div class="ps-header-inner">
+            <a class="ps-brand" href="index.html" aria-label="MatrixMarket home">
+                <span class="ps-brand-mark">MM</span>
+                <span class="ps-brand-copy">
+                    <strong>MatrixMarket</strong>
+                    <span>Payment Status</span>
+                </span>
+            </a>
+
+            <nav class="ps-nav" aria-label="Payment status navigation">
+                <a href="index.html">Home</a>
+                <a href="shop.html">Shop</a>
+                <a href="confirm-payment.html">Confirm Payment</a>
+                <a class="active" href="payment-status.html">Payment Status</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="ps-shell">
+        <section class="ps-hero ps-card">
+            <span class="ps-kicker">Live Review Tracking</span>
+            <h1>Track Your Payment Status Clearly</h1>
+            <p>This page checks your active account session together with the payment request queue so you can see a more accurate status after submitting a payment confirmation.</p>
+            <div class="ps-pills">
+                <span class="ps-pill">🔄 Auto refreshes status</span>
+                <span class="ps-pill">📋 Reads latest request details</span>
+                <span class="ps-pill">✅ Supports approval, pending, and decline states</span>
+            </div>
+        </section>
+
+        <section class="ps-main">
+            <div class="ps-stack">
+                <article class="ps-card ps-status-card">
+                    <div class="ps-status-top">
+                        <div class="ps-status-copy">
+                            <h2 id="statusTitle">Checking payment status...</h2>
+                            <p id="statusSubtitle">Reviewing your account and latest payment request.</p>
+                        </div>
+                        <div class="ps-badge pending" id="statusBadge">Pending</div>
+                    </div>
+
+                    <div class="ps-banner pending" id="statusBanner">
+                        Waiting for the latest payment request details.
+                    </div>
+
+                    <div class="ps-actions">
+                        <a class="ps-btn primary" id="primaryAction" href="index.html">Continue</a>
+                        <a class="ps-btn secondary" id="secondaryAction" href="confirm-payment.html">Submit Another Request</a>
+                        <button class="ps-btn" id="refreshBtn" type="button">Refresh Status</button>
+                    </div>
+                </article>
+
+                <div class="ps-grid">
+                    <article class="ps-card ps-panel">
+                        <h3>Current Request</h3>
+                        <p>The newest request linked to your account appears here when available.</p>
+                        <div class="ps-detail-list" id="requestDetails"></div>
+                    </article>
+
+                    <article class="ps-card ps-panel">
+                        <h3>Account Snapshot</h3>
+                        <p>These values come from the active session used during payment confirmation.</p>
+                        <div class="ps-detail-list" id="accountDetails"></div>
+                    </article>
+                </div>
+            </div>
+
+            <div class="ps-stack">
+                <article class="ps-card ps-side-card">
+                    <h3>What Happens Next</h3>
+                    <p>The next step depends on whether the request is pending, approved, or declined.</p>
+                    <div class="ps-step-list" id="stepList"></div>
+                </article>
+
+                <article class="ps-card ps-side-card">
+                    <h3>Live Summary</h3>
+                    <p>Quick markers to show what request and account state this page is seeing right now.</p>
+                    <div class="ps-mini-stats">
+                        <div class="ps-mini-stat">
+                            <small>Session User</small>
+                            <strong id="summaryUser">Checking...</strong>
+                        </div>
+                        <div class="ps-mini-stat">
+                            <small>Latest Request ID</small>
+                            <strong id="summaryRequestId">Checking...</strong>
+                        </div>
+                        <div class="ps-mini-stat">
+                            <small>Detected Review State</small>
+                            <strong id="summaryState">Checking...</strong>
+                        </div>
+                        <div class="ps-mini-stat">
+                            <small>Last Updated</small>
+                            <strong id="summaryUpdated">Checking...</strong>
+                        </div>
+                    </div>
+                </article>
+            </div>
+        </section>
+
+        <footer class="ps-footer">
+            MatrixMarket payment status reads from your current session and the existing admin payment queue.
+        </footer>
+    </main>
+
+    <script>
+        (function () {
+            const state = {
+                user: null,
+                request: null
+            };
+
+            function byId(id) { return document.getElementById(id); }
+            function str(v) { return String(v == null ? "" : v).trim(); }
+            function num(v) { const n = Number(v); return Number.isFinite(n) ? n : 0; }
+            function money(v) { return num(v).toFixed(2) + " GMD"; }
+
+            function getStorage() {
+                if (window.MMStorage && typeof window.MMStorage.getItem === "function") return window.MMStorage;
+                try {
+                    if (window.localStorage && typeof window.localStorage.getItem === "function") return window.localStorage;
+                } catch (_) {}
+                return {
+                    getItem: function () { return null; },
+                    setItem: function () {},
+                    removeItem: function () {}
+                };
+            }
+
+            function readJson(key, fallback) {
+                try {
+                    const raw = getStorage().getItem(key);
+                    if (!raw) return fallback;
+                    const parsed = JSON.parse(raw);
+                    return parsed == null ? fallback : parsed;
+                } catch (_) {
+                    return fallback;
+                }
+            }
+
+            function normalizeRequests(raw) {
+                if (Array.isArray(raw)) return raw.slice();
+                if (raw && typeof raw === "object") {
+                    return Object.keys(raw).map(function (key) {
+                        const row = raw[key];
+                        if (row && typeof row === "object") return { id: row.id || key, ...row };
+                        return { id: key, value: row };
+                    });
+                }
+                return [];
+            }
+
+            function resolveCurrentUser() {
+                return readJson("loggedInUser", null) || readJson("currentUser", null) || readJson("currentSeller", null) || null;
+            }
+
+            function requestTimestamp(row) {
+                const direct = new Date(row && (row.updatedAt || row.createdAt || row.date || "")).getTime();
+                if (Number.isFinite(direct)) return direct;
+                const fallback = num(row && row.id);
+                return fallback > 1000000000 ? fallback : 0;
+            }
+
+            function findLatestRequest(user) {
+                const rows = normalizeRequests(readJson("pendingRequests", []));
+                if (!rows.length || !user) return null;
+
+                const email = str(user.email).toLowerCase();
+                const lastId = str(user.lastPaymentRequestId);
+                const name = str(user.fullName || user.name || user.username).toLowerCase();
+
+                let matches = rows.filter(function (row) {
+                    const rowId = str(row.id);
+                    const rowEmail = str(row.email).toLowerCase();
+                    const rowName = str(row.fullName || row.name).toLowerCase();
+                    if (lastId && rowId === lastId) return true;
+                    if (email && rowEmail && rowEmail === email) return true;
+                    if (name && rowName && rowName === name) return true;
+                    return false;
+                });
+
+                if (!matches.length && lastId) {
+                    matches = rows.filter(function (row) { return str(row.id) === lastId; });
+                }
+
+                if (!matches.length) return null;
+
+                matches.sort(function (a, b) {
+                    return requestTimestamp(b) - requestTimestamp(a);
+                });
+                return matches[0];
+            }
+
+            function deriveStatus(user, request) {
+                const requestStatus = str(request && (request.status || request.paymentStatus)).toLowerCase();
+                const userStatus = str(user && (user.paymentStatus || user.status)).toLowerCase();
+                const subscription = str(user && user.subscription).toLowerCase();
+
+                if (requestStatus === "approved" || requestStatus === "paid") return "approved";
+                if (requestStatus === "declined") return "declined";
+                if (userStatus === "paid" || userStatus === "approved" || subscription === "active") return "approved";
+                if (userStatus === "declined") return "declined";
+                if (request || user) return "pending";
+                return "empty";
+            }
+
+            function fmtDate(value) {
+                if (!value) return "-";
+                const date = new Date(value);
+                return Number.isNaN(date.getTime()) ? str(value) : date.toLocaleString();
+            }
+
+            function setStatusUI(kind) {
+                const badge = byId("statusBadge");
+                const banner = byId("statusBanner");
+                const title = byId("statusTitle");
+                const subtitle = byId("statusSubtitle");
+                const primary = byId("primaryAction");
+                const secondary = byId("secondaryAction");
+                const stepList = byId("stepList");
+
+                badge.className = "ps-badge " + (kind === "approved" ? "approved" : (kind === "declined" ? "declined" : "pending"));
+                banner.className = "ps-banner " + (kind === "approved" ? "approved" : (kind === "declined" ? "declined" : "pending"));
+
+                if (kind === "approved") {
+                    badge.textContent = "Approved";
+                    title.textContent = "Payment approved";
+                    subtitle.textContent = "Your latest payment was approved or your account is already marked as paid.";
+                    banner.textContent = "Your payment has been accepted. You can continue using the related marketplace flow now.";
+                    primary.textContent = "Continue to Home";
+                    primary.href = "index.html";
+                    secondary.textContent = "Open Shop";
+                    secondary.href = "shop.html";
+                    stepList.innerHTML = [
+                        "<div class='ps-step'><strong>Access continues normally</strong><span>Your account can move forward using the approved payment state now stored in the system.</span></div>",
+                        "<div class='ps-step'><strong>Check your target page</strong><span>If this payment was for a subscription or top-up, open the related page again and confirm the change is reflected.</span></div>",
+                        "<div class='ps-step'><strong>Keep the request ID for reference</strong><span>If support is needed later, the latest request details shown on this page can help.</span></div>"
+                    ].join("");
+                    return;
+                }
+
+                if (kind === "declined") {
+                    badge.textContent = "Declined";
+                    title.textContent = "Payment declined";
+                    subtitle.textContent = "The latest request was rejected or the account was marked as declined during review.";
+                    banner.textContent = "Your payment request was declined. Review the details below, then submit a corrected request if needed.";
+                    primary.textContent = "Submit New Request";
+                    primary.href = "confirm-payment.html";
+                    secondary.textContent = "Open Support Chat";
+                    secondary.href = "chat.html?seller=" + encodeURIComponent("Support");
+                    stepList.innerHTML = [
+                        "<div class='ps-step'><strong>Review payment details carefully</strong><span>Make sure the amount, method, payer number, and transaction reference are all correct before resubmitting.</span></div>",
+                        "<div class='ps-step'><strong>Correct and resubmit if needed</strong><span>Use the confirm payment page to send an updated request with clearer details.</span></div>",
+                        "<div class='ps-step'><strong>Escalate if the decline seems wrong</strong><span>If you already paid correctly, contact support with the request ID and transaction details.</span></div>"
+                    ].join("");
+                    return;
+                }
+
+                badge.textContent = "Pending";
+                title.textContent = "Payment still pending";
+                subtitle.textContent = "Your latest request is still under review, or your session is waiting for an updated admin decision.";
+                banner.textContent = "Your request is in the review queue. This page refreshes the current state so you can check back without guessing.";
+                primary.textContent = "Refresh Status";
+                primary.href = "#";
+                secondary.textContent = "Open Confirm Payment";
+                secondary.href = "confirm-payment.html";
+                stepList.innerHTML = [
+                    "<div class='ps-step'><strong>Wait for admin review</strong><span>Pending requests remain in the queue until an admin approves or declines them.</span></div>",
+                    "<div class='ps-step'><strong>Avoid duplicate submissions too quickly</strong><span>If you already submitted one request, check that request below before sending another one.</span></div>",
+                    "<div class='ps-step'><strong>Use support if timing becomes a problem</strong><span>If the request stays pending longer than expected, contact support with your latest request details.</span></div>"
+                ].join("");
+            }
+
+            function renderDetails(user, request, statusKind) {
+                const requestDetails = byId("requestDetails");
+                const accountDetails = byId("accountDetails");
+                const summaryUser = byId("summaryUser");
+                const summaryRequestId = byId("summaryRequestId");
+                const summaryState = byId("summaryState");
+                const summaryUpdated = byId("summaryUpdated");
+
+                if (!user) {
+                    requestDetails.innerHTML = "<div class='ps-empty'>No active user session was found. Log in first, then return to this page.</div>";
+                    accountDetails.innerHTML = "<div class='ps-empty'>Account details are unavailable until a user session is loaded.</div>";
+                    summaryUser.textContent = "No user found";
+                    summaryRequestId.textContent = "-";
+                    summaryState.textContent = "Unavailable";
+                    summaryUpdated.textContent = "-";
+                    return;
+                }
+
+                const displayName = str(user.fullName || user.name || user.username || user.email || "Unknown User");
+                const email = str(user.email || "No email saved");
+                const role = user.isSeller ? "Seller account" : "Buyer account";
+                const plan = str(user.plan || user.subscription || "Standard");
+                const subscription = str(user.subscription || "Inactive");
+                const accountPayment = str(user.paymentStatus || user.status || "Pending");
+
+                if (request) {
+                    requestDetails.innerHTML = [
+                        ["Request ID", str(request.id || "-")],
+                        ["Request Type", str(request.type || "Payment Review")],
+                        ["Method", str(request.method || request.paymentMethod || "-")],
+                        ["Amount", money(request.amount || 0)],
+                        ["Status", str(request.status || request.paymentStatus || "Pending")],
+                        ["Payer Number", str(request.payerNumber || "-")],
+                        ["Transaction ID", str(request.transactionId || "-")],
+                        ["Submitted", fmtDate(request.createdAt || request.date)],
+                        ["Updated", fmtDate(request.updatedAt || request.createdAt || request.date)]
+                    ].map(function (row) {
+                        return "<div class='ps-detail'><span>" + row[0] + "</span><strong>" + row[1] + "</strong></div>";
+                    }).join("");
+                } else {
+                    requestDetails.innerHTML = "<div class='ps-empty'>No matching payment request was found in the current queue for this account yet.</div>";
+                }
+
+                accountDetails.innerHTML = [
+                    ["Name", displayName],
+                    ["Email", email],
+                    ["Role", role],
+                    ["Plan", plan],
+                    ["Subscription", subscription],
+                    ["Account Payment State", accountPayment],
+                    ["Last Submitted Amount", money(user.amount || 0)],
+                    ["Last Request ID", str(user.lastPaymentRequestId || "-")]
+                ].map(function (row) {
+                    return "<div class='ps-detail'><span>" + row[0] + "</span><strong>" + row[1] + "</strong></div>";
+                }).join("");
+
+                summaryUser.textContent = displayName;
+                summaryRequestId.textContent = str(request && request.id || user.lastPaymentRequestId || "-");
+                summaryState.textContent = statusKind.charAt(0).toUpperCase() + statusKind.slice(1);
+                summaryUpdated.textContent = fmtDate((request && (request.updatedAt || request.createdAt || request.date)) || user.lastPaymentSubmittedAt || "");
+            }
+
+            function refreshStatus() {
+                state.user = resolveCurrentUser();
+                state.request = findLatestRequest(state.user);
+                const statusKind = deriveStatus(state.user, state.request);
+                setStatusUI(statusKind);
+                renderDetails(state.user, state.request, statusKind);
+            }
+
+            function bind() {
+                byId("refreshBtn").addEventListener("click", refreshStatus);
+                byId("primaryAction").addEventListener("click", function (event) {
+                    if (byId("primaryAction").getAttribute("href") === "#") {
+                        event.preventDefault();
+                        refreshStatus();
+                    }
+                });
+                window.addEventListener("storage", refreshStatus);
+            }
+
+            function start() {
+                refreshStatus();
+                bind();
+                window.setInterval(refreshStatus, 5000);
+            }
+
+            const ready = window.MMStorage && window.MMStorage.ready;
+            if (ready && typeof ready.then === "function") {
+                ready.finally(start);
+            } else if (document.readyState === "loading") {
+                document.addEventListener("DOMContentLoaded", start);
+            } else {
+                start();
+            }
+        }());
+    </script>
+    <script defer src="upgrade.js"></script>
+    <script defer src="sw-register.js?v=20260226a"></script>
+    <script defer src="site-performance.js?v=20260226a"></script>
+</body>
+</html>

@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>MatrixMarket Auto Parts AI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script defer src="firebase-online-storage.js"></script>
+    <script defer src="seller-core.js?v=20260222g"></script>
+    <style>
+        :root {
+            --bg: #fff8f2;
+            --panel: #ffffff;
+            --panel-soft: #fff1e6;
+            --text: #1f2937;
+            --muted: #6b7280;
+            --border: #fed7aa;
+            --accent: #ea580c;
+            --accent-deep: #c2410c;
+            --good: #15803d;
+            --warn: #b45309;
+            --shadow-sm: 0 10px 24px rgba(15, 23, 42, 0.08);
+            --shadow-md: 0 20px 40px rgba(15, 23, 42, 0.12);
+            --radius-lg: 22px;
+            --radius-md: 16px;
+            --radius-sm: 12px;
+        }
+
+        * { box-sizing: border-box; }
+        html, body { height: 100%; }
+        body {
+            margin: 0;
+            font-family: "Inter", sans-serif;
+            color: var(--text);
+            background:
+                radial-gradient(circle at top right, rgba(234, 88, 12, 0.14), transparent 25%),
+                linear-gradient(180deg, #fff8f2 0%, #fffdfb 100%);
+        }
+
+        .ap-agent {
+            height: 100%;
+            display: grid;
+            grid-template-rows: auto auto 1fr auto;
+            gap: 12px;
+            padding: 14px;
+        }
+
+        .ap-head,
+        .ap-prompts,
+        .ap-compose {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .ap-head {
+            padding: 14px;
+            display: grid;
+            gap: 10px;
+        }
+
+        .ap-kicker {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            width: fit-content;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(234, 88, 12, 0.10);
+            color: var(--accent-deep);
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+
+        .ap-title-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .ap-title-row h1 {
+            margin: 0;
+            font-size: 22px;
+            line-height: 1.1;
+            letter-spacing: -0.03em;
+        }
+
+        .ap-title-row p {
+            margin: 6px 0 0;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .ap-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: #fff7ed;
+            border: 1px solid var(--border);
+            color: var(--warn);
+            font-size: 12px;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        .ap-status.good {
+            background: #f0fdf4;
+            border-color: #bbf7d0;
+            color: var(--good);
+        }
+
+        .ap-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .ap-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: var(--panel-soft);
+            border: 1px solid var(--border);
+            color: var(--accent-deep);
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .ap-prompts {
+            padding: 12px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .ap-prompt {
+            border: 1px solid var(--border);
+            background: #fff;
+            color: var(--text);
+            border-radius: 999px;
+            padding: 9px 12px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: 180ms ease;
+        }
+
+        .ap-prompt:hover {
+            background: #fff7ed;
+            border-color: #fdba74;
+            color: var(--accent-deep);
+        }
+
+        .ap-feed {
+            min-height: 0;
+            overflow: auto;
+            padding: 6px 2px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .ap-message {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .ap-message.user { align-items: flex-end; }
+
+        .ap-label {
+            font-size: 11px;
+            font-weight: 800;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 0 4px;
+        }
+
+        .ap-bubble {
+            max-width: min(520px, 92%);
+            border-radius: 18px;
+            padding: 12px 14px;
+            font-size: 13px;
+            line-height: 1.65;
+            box-shadow: var(--shadow-sm);
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .ap-message.assistant .ap-bubble {
+            background: var(--panel);
+            border: 1px solid var(--border);
+        }
+
+        .ap-message.user .ap-bubble {
+            background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+            color: #fff;
+        }
+
+        .ap-message.system .ap-bubble {
+            background: #fff7ed;
+            border: 1px dashed #fdba74;
+            color: #9a3412;
+        }
+
+        .ap-compose {
+            padding: 12px;
+            display: grid;
+            gap: 10px;
+        }
+
+        .ap-compose textarea {
+            width: 100%;
+            min-height: 96px;
+            resize: vertical;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border);
+            background: #fff;
+            padding: 12px 14px;
+            font: inherit;
+            color: var(--text);
+            outline: none;
+        }
+
+        .ap-compose textarea:focus {
+            border-color: #fb923c;
+            box-shadow: 0 0 0 4px rgba(251, 146, 60, 0.14);
+        }
+
+        .ap-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .ap-note {
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .ap-btn-row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .ap-btn {
+            border: 1px solid var(--border);
+            background: #fff;
+            color: var(--text);
+            border-radius: 999px;
+            padding: 10px 14px;
+            font-size: 12px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: 180ms ease;
+        }
+
+        .ap-btn:hover {
+            background: #fff7ed;
+        }
+
+        .ap-btn.primary {
+            background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+            border-color: transparent;
+            color: #fff;
+        }
+
+        .ap-btn.primary:hover {
+            filter: brightness(1.02);
+        }
+
+        @media (max-width: 680px) {
+            .ap-agent {
+                padding: 10px;
+            }
+
+            .ap-title-row {
+                flex-direction: column;
+            }
+
+            .ap-bubble {
+                max-width: 100%;
+            }
+
+            .ap-actions {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .ap-btn-row {
+                width: 100%;
+            }
+
+            .ap-btn {
+                flex: 1 1 auto;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="ap-agent">
+        <section class="ap-head">
+            <span class="ap-kicker">Auto Parts Specialist</span>
+            <div class="ap-title-row">
+                <div>
+                    <h1>MatrixMarket Auto Parts AI</h1>
+                    <p>This assistant is limited to the auto parts page, current automotive listings, common car types, engines, vehicle systems, and car part buying guidance.</p>
+                </div>
+                <span class="ap-status" id="serverStatus">Checking server...</span>
+            </div>
+            <div class="ap-meta">
+                <span class="ap-chip" id="catalogChip">Catalog loading...</span>
+                <span class="ap-chip">Answers fitment, engine, brake, suspension, radiator, tyre, and vehicle questions</span>
+            </div>
+        </section>
+
+        <section class="ap-prompts">
+            <button class="ap-prompt" type="button" data-prompt="What engine parts are showing on this page right now?">Live engine parts</button>
+            <button class="ap-prompt" type="button" data-prompt="Explain the difference between a radiator and an intercooler.">Radiator vs intercooler</button>
+            <button class="ap-prompt" type="button" data-prompt="What details do I need before buying an engine or gearbox?">Engine buying checklist</button>
+            <button class="ap-prompt" type="button" data-prompt="What signs show brake pads need replacement?">Brake symptoms</button>
+            <button class="ap-prompt" type="button" data-prompt="Explain different types of cars like sedan, SUV, pickup, hatchback, and coupe.">Car body types</button>
+        </section>
+
+        <section class="ap-feed" id="chatFeed" aria-live="polite"></section>
+
+        <form class="ap-compose" id="chatForm">
+            <textarea id="chatInput" placeholder="Ask about engines, cars, fitment, or the auto parts listed on this page..."></textarea>
+            <div class="ap-actions">
+                <div class="ap-note" id="composerNote">This AI stays focused on auto-parts questions and the auto-parts page catalog.</div>
+                <div class="ap-btn-row">
+                    <button class="ap-btn" id="clearBtn" type="button">Clear Chat</button>
+                    <button class="ap-btn primary" id="sendBtn" type="submit">Ask Auto AI</button>
+                </div>
+            </div>
+        </form>
+    </main>
+
+    <script>
+        (function () {
+            const STORAGE_KEY = "matrixmarket_auto_parts_ai_chat_v1";
+            const SERVER_URL_KEY = "MM_AI_SERVER_URL";
+            const DEFAULT_SERVER = "http://127.0.0.1:4050";
+            const AUTO_PARTS_REGEX = /\b(cr|car(\s|-)?parts?|auto(\s|-)?parts?|autoparts|carparts|automotive|vehicle(\s|-)?parts?|spare(\s|-)?parts?|engine(s)?|brake(s|pad|pads|disc|discs)?|bumper|radiator|clutch|gearbox|transmission|suspension|headlight|tail(\s|-)?light|mirror|windshield|tyre|tire|wheel|axle|alternator|spark(\s|-)?plug|oil(\s|-)?filter|air(\s|-)?filter)\b/i;
+            const state = {
+                messages: [],
+                sending: false,
+                server: DEFAULT_SERVER,
+                user: null,
+                catalog: []
+            };
+
+            function byId(id) { return document.getElementById(id); }
+            function str(v) { return String(v == null ? "" : v).trim(); }
+            function num(v) { const n = Number(v); return Number.isFinite(n) ? n : 0; }
+            function money(v) { return num(v).toFixed(2) + " GMD"; }
+            function esc(v) {
+                return String(v == null ? "" : v)
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/\"/g, "&quot;")
+                    .replace(/'/g, "&#39;");
+            }
+
+            function getStorage() {
+                if (window.MMStorage && typeof window.MMStorage.getItem === "function") return window.MMStorage;
+                try {
+                    if (window.localStorage && typeof window.localStorage.getItem === "function") return window.localStorage;
+                } catch (_) {}
+                return {
+                    getItem: function () { return null; },
+                    setItem: function () {},
+                    removeItem: function () {}
+                };
+            }
+
+            function readJson(key, fallback) {
+                try {
+                    const raw = getStorage().getItem(key);
+                    if (!raw) return fallback;
+                    const parsed = JSON.parse(raw);
+                    return parsed == null ? fallback : parsed;
+                } catch (_) {
+                    return fallback;
+                }
+            }
+
+            function writeJson(key, value) {
+                try {
+                    getStorage().setItem(key, JSON.stringify(value));
+                } catch (_) {}
+            }
+
+            function setStatus(text, good) {
+                const el = byId("serverStatus");
+                el.textContent = text;
+                el.className = "ap-status" + (good ? " good" : "");
+            }
+
+            function defaultMessages() {
+                return [{
+                    role: "assistant",
+                    content: "I’m MatrixMarket Auto Parts AI. I only answer auto-parts page questions, live automotive listing questions, and general car or car-part guidance. Ask me about engines, brakes, suspension, tyres, fitment details, or the products visible on this page."
+                }];
+            }
+
+            function restoreConversation() {
+                state.messages = readJson(STORAGE_KEY, defaultMessages());
+                if (!Array.isArray(state.messages) || !state.messages.length) state.messages = defaultMessages();
+                renderMessages();
+            }
+
+            function saveConversation() {
+                writeJson(STORAGE_KEY, state.messages.slice(-30));
+            }
+
+            function pushMessage(role, content) {
+                state.messages.push({ role: role, content: str(content) });
+                saveConversation();
+                renderMessages();
+            }
+
+            function renderMessages() {
+                const box = byId("chatFeed");
+                box.innerHTML = state.messages.map(function (message) {
+                    const role = str(message.role || "assistant").toLowerCase();
+                    const label = role === "user" ? "You" : (role === "assistant" ? "Auto AI" : "System");
+                    return '<article class="ap-message ' + esc(role) + '">' +
+                        '<div class="ap-label">' + esc(label) + '</div>' +
+                        '<div class="ap-bubble">' + esc(message.content || "") + '</div>' +
+                        '</article>';
+                }).join("");
+                box.scrollTop = box.scrollHeight;
+            }
+
+            function loadUser() {
+                state.user = readJson("currentUser", null) || readJson("loggedInUser", null) || null;
+            }
+
+            function isAutoPartProduct(product) {
+                return AUTO_PARTS_REGEX.test([
+                    product && product.name,
+                    product && product.category,
+                    product && product.description
+                ].join(" "));
+            }
+
+            function loadCatalogSummary() {
+                try {
+                    const all = window.SellerCore && typeof window.SellerCore.getMarketplaceProducts === "function"
+                        ? window.SellerCore.getMarketplaceProducts({ includeOutOfStock: true, includeHidden: true })
+                        : [];
+                    state.catalog = (Array.isArray(all) ? all : [])
+                        .filter(function (product) { return product && product.stock > 0 && product.isVisible !== false; })
+                        .filter(isAutoPartProduct)
+                        .slice(0, 25)
+                        .map(function (product) {
+                            return {
+                                name: str(product.name),
+                                category: str(product.category || "general"),
+                                seller: str(product.seller || product.sellerName || "Unknown Seller"),
+                                price: money(product.price),
+                                stock: String(Math.max(0, Math.floor(num(product.stock))))
+                            };
+                        });
+                } catch (_) {
+                    state.catalog = [];
+                }
+
+                byId("catalogChip").textContent = state.catalog.length
+                    ? state.catalog.length + " live auto listings loaded into AI context"
+                    : "No live auto listings loaded yet";
+            }
+
+            async function refreshServerStatus() {
+                const url = state.server.replace(/\/+$/, "");
+                try {
+                    const response = await fetch(url + "/health", { headers: { "Accept": "application/json" } });
+                    if (!response.ok) throw new Error("HTTP " + response.status);
+                    const data = await response.json();
+                    setStatus(data && data.keyConfigured ? "Server online" : "Server online, API key missing", !!(data && data.keyConfigured));
+                } catch (_) {
+                    setStatus("Server offline", false);
+                }
+            }
+
+            function conversationPayload() {
+                return state.messages
+                    .filter(function (message) {
+                        const role = str(message.role).toLowerCase();
+                        return role === "user" || role === "assistant";
+                    })
+                    .slice(-12)
+                    .map(function (message) {
+                        return {
+                            role: str(message.role || "assistant").toLowerCase(),
+                            content: str(message.content)
+                        };
+                    });
+            }
+
+            async function sendMessage(text) {
+                const content = str(text);
+                if (!content || state.sending) return;
+
+                const server = state.server.replace(/\/+$/, "");
+                state.sending = true;
+                byId("chatInput").disabled = true;
+                byId("sendBtn").disabled = true;
+                pushMessage("user", content);
+                pushMessage("system", "Auto AI is thinking...");
+
+                try {
+                    const response = await fetch(server + "/api/ai/chat", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "Accept": "application/json"
+                        },
+                        body: JSON.stringify({
+                            messages: conversationPayload(),
+                            userContext: {
+                                name: str(state.user && (state.user.fullName || state.user.name || state.user.username)),
+                                email: str(state.user && state.user.email),
+                                role: state.user && state.user.isSeller ? "seller" : "buyer"
+                            },
+                            pageContext: {
+                                page: "auto-parts-agent.html",
+                                referrer: document.referrer || "",
+                                scope: "auto-parts",
+                                categoryFocus: "cars, vehicles, engines, automotive parts, fitment, and the auto-parts page only",
+                                visibleCount: state.catalog.length,
+                                catalogSummary: state.catalog
+                            }
+                        })
+                    });
+
+                    const data = await response.json().catch(function () { return {}; });
+                    state.messages = state.messages.filter(function (message) {
+                        return !(message.role === "system" && message.content === "Auto AI is thinking...");
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(str(data && (data.error || data.message)) || ("HTTP " + response.status));
+                    }
+
+                    pushMessage("assistant", str(data.reply || "I could not generate a reply right now."));
+                    setStatus("Server online", true);
+                } catch (error) {
+                    state.messages = state.messages.filter(function (message) {
+                        return !(message.role === "system" && message.content === "Auto AI is thinking...");
+                    });
+                    renderMessages();
+                    pushMessage("system", "The auto-parts AI could not answer right now. " + str(error && error.message ? error.message : "Unknown error") + ". Start the local AI server and check the NVIDIA API key.");
+                    setStatus("Server offline", false);
+                } finally {
+                    state.sending = false;
+                    byId("chatInput").disabled = false;
+                    byId("sendBtn").disabled = false;
+                    byId("chatInput").focus();
+                }
+            }
+
+            function bind() {
+                byId("chatForm").addEventListener("submit", function (event) {
+                    event.preventDefault();
+                    const input = byId("chatInput");
+                    const text = input.value;
+                    input.value = "";
+                    sendMessage(text);
+                });
+
+                byId("clearBtn").addEventListener("click", function () {
+                    state.messages = defaultMessages();
+                    saveConversation();
+                    renderMessages();
+                });
+
+                document.querySelectorAll("[data-prompt]").forEach(function (button) {
+                    button.addEventListener("click", function () {
+                        byId("chatInput").value = str(button.getAttribute("data-prompt"));
+                        byId("chatInput").focus();
+                    });
+                });
+            }
+
+            function start() {
+                state.server = str(readJson(SERVER_URL_KEY, DEFAULT_SERVER)) || DEFAULT_SERVER;
+                loadUser();
+                loadCatalogSummary();
+                restoreConversation();
+                bind();
+                refreshServerStatus();
+            }
+
+            window.addEventListener("load", function () {
+                const ready = window.MMStorage && window.MMStorage.ready;
+                if (ready && typeof ready.then === "function") {
+                    ready.finally(start);
+                    return;
+                }
+                start();
+            });
+        }());
+    </script>
+</body>
+</html>

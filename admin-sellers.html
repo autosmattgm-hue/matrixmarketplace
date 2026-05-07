@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Admin Sellers - MatrixMarket</title>
+    <link rel="stylesheet" href="admin-layout.css?v=20260227a">
+    <link rel="stylesheet" href="upgrade.css">
+    <script src="firebase-online-storage.js"></script>
+</head>
+<body class="admin-page">
+    <div id="adminHeader"></div>
+    <main class="admin-shell">
+        <section class="admin-titlebar">
+            <h1>Manage Sellers</h1>
+            <div class="admin-actions">
+                <button class="btn-adm" id="refreshBtn" type="button">Refresh</button>
+                <button class="btn-adm" id="exportBtn" type="button">Export CSV</button>
+                <a class="btn-adm primary" href="admin-code.html">Manage Codes</a>
+            </div>
+        </section>
+
+        <section class="admin-card">
+            <div class="adm-toolbar">
+                <input class="adm" id="searchInput" type="text" placeholder="Search seller name, email, store">
+                <select class="adm" id="statusFilter">
+                    <option value="">All Status</option>
+                    <option value="approved">Approved</option>
+                    <option value="pending">Pending</option>
+                    <option value="declined">Declined</option>
+                    <option value="suspended">Suspended</option>
+                </select>
+                <select class="adm" id="planFilter">
+                    <option value="">All Plans</option>
+                    <option value="basic">Basic</option>
+                    <option value="premium">Premium</option>
+                    <option value="enterprise">Enterprise</option>
+                </select>
+                <button class="btn-adm" id="bulkActivateBtn" type="button">Activate Filtered</button>
+            </div>
+        </section>
+
+        <section class="admin-card">
+            <div class="adm-table-wrap">
+                <table class="adm-table" id="sellerTable"></table>
+            </div>
+        </section>
+
+        <div class="adm-foot">Seller administration controls</div>
+    </main>
+
+    <script src="admin-core.js?v=20260222c"></script>
+    <script>
+        const state = { sellers: [], filtered: [], productCount: {} };
+
+        function setHeader() {
+            document.getElementById("adminHeader").innerHTML = AdminCore.renderAdminHeader("admin-sellers.html");
+        }
+
+        function readSellers() {
+            state.sellers = AdminCore.getSellers();
+            const counts = {};
+            AdminCore.getProducts().forEach(function (p) {
+                const k = AdminCore.str(p.seller || p.sellerName || p.sellerEmail || "").toLowerCase();
+                counts[k] = (counts[k] || 0) + 1;
+            });
+            state.productCount = counts;
+        }
+
+        function applyFilters() {
+            const q = AdminCore.str(document.getElementById("searchInput").value).toLowerCase();
+            const statusFilter = AdminCore.str(document.getElementById("statusFilter").value).toLowerCase();
+            const planFilter = AdminCore.str(document.getElementById("planFilter").value).toLowerCase();
+
+            state.filtered = state.sellers.filter(function (s) {
+                const hay = [s.fullName, s.email, s.store].join(" ").toLowerCase();
+                const status = AdminCore.str(s.status || "pending").toLowerCase();
+                const plan = AdminCore.str(s.plan || "basic").toLowerCase();
+                return (!q || hay.includes(q)) && (!statusFilter || status.includes(statusFilter)) && (!planFilter || plan === planFilter);
+            }).sort(function (a, b) {
+                return String(b.createdAt).localeCompare(String(a.createdAt));
+            });
+        }
+
+        function rowActions(email) {
+            const safe = encodeURIComponent(email);
+            return [
+                '<button class="btn-adm success" data-action="approve" data-email="' + safe + '">Approve</button>',
+                '<button class="btn-adm warning" data-action="suspend" data-email="' + safe + '">Suspend</button>',
+                '<button class="btn-adm" data-action="code" data-email="' + safe + '">Assign Code</button>',
+                '<button class="btn-adm danger" data-action="delete" data-email="' + safe + '">Delete</button>'
+            ].join("");
+        }
+
+        function renderTable() {
+            const table = document.getElementById("sellerTable");
+            const head = '<thead><tr><th>Name</th><th>Email</th><th>Store</th><th>Plan</th><th>Products</th><th>Balance</th><th>Status</th><th>Subscription</th><th>Actions</th></tr></thead>';
+
+            if (!state.filtered.length) {
+                table.innerHTML = head + '<tbody><tr><td colspan="9" class="adm-empty">No sellers match this filter.</td></tr></tbody>';
+                return;
+            }
+
+            table.innerHTML = head + '<tbody>' + state.filtered.map(function (s) {
+                const keyName = AdminCore.str(s.fullName || s.name || s.email).toLowerCase();
+                const keyEmail = AdminCore.str(s.email).toLowerCase();
+                const count = state.productCount[keyName] || state.productCount[keyEmail] || 0;
+                return '<tr>' +
+                    '<td>' + s.fullName + '</td>' +
+                    '<td>' + s.email + '</td>' +
+                    '<td>' + (s.store || "-") + '</td>' +
+                    '<td>' + (s.plan || "basic") + '</td>' +
+                    '<td>' + count + '</td>' +
+                    '<td>' + AdminCore.fmtMoney(s.balance) + '</td>' +
+                    '<td>' + AdminCore.badge(s.status || "pending") + '</td>' +
+                    '<td>' + AdminCore.badge(s.subscription || "Inactive") + '</td>' +
+                    '<td><div class="adm-inline-actions">' + rowActions(s.email) + '</div></td>' +
+                    '</tr>';
+            }).join("") + '</tbody>';
+        }
+
+        function refresh() {
+            readSellers();
+            applyFilters();
+            renderTable();
+        }
+
+        function assignCode(email) {
+            const code = AdminCore.createCode(8);
+            const expiry = new Date(Date.now() + 30 * 86400000).toISOString();
+            AdminCore.upsertCode(email, { value: code, expiry: expiry, status: "active" });
+            AdminCore.log("seller_code_assigned", { email: email, code: code });
+            alert("Code assigned: " + code);
+        }
+
+        function mutate(encodedEmail, mode) {
+            const email = decodeURIComponent(encodedEmail);
+            if (mode === "approve") {
+                AdminCore.updateAccountByEmail(email, {
+                    status: "Approved",
+                    paymentStatus: "Paid",
+                    subscription: "Active"
+                });
+                AdminCore.log("seller_approved", { email: email });
+            }
+            if (mode === "suspend") {
+                AdminCore.updateAccountByEmail(email, {
+                    status: "Suspended",
+                    subscription: "Inactive"
+                });
+                AdminCore.log("seller_suspended", { email: email });
+            }
+            if (mode === "code") {
+                assignCode(email);
+            }
+            if (mode === "delete") {
+                if (!confirm("Delete this seller account?")) return;
+                AdminCore.deleteAccount(email);
+                AdminCore.log("seller_deleted", { email: email });
+            }
+            refresh();
+        }
+
+        function initAdminSellersPage() {
+            setHeader();
+            refresh();
+            window.addEventListener("storage", refresh);
+
+            document.getElementById("searchInput").addEventListener("input", refresh);
+            document.getElementById("statusFilter").addEventListener("change", refresh);
+            document.getElementById("planFilter").addEventListener("change", refresh);
+            document.getElementById("refreshBtn").addEventListener("click", refresh);
+
+            document.getElementById("bulkActivateBtn").addEventListener("click", function () {
+                if (!state.filtered.length) return;
+                state.filtered.forEach(function (s) {
+                    AdminCore.updateAccountByEmail(s.email, {
+                        status: "Approved",
+                        paymentStatus: "Paid",
+                        subscription: "Active"
+                    });
+                });
+                AdminCore.log("bulk_seller_activated", { count: state.filtered.length });
+                refresh();
+            });
+
+            document.getElementById("exportBtn").addEventListener("click", function () {
+                const rows = state.filtered.map(function (s) {
+                    return {
+                        name: s.fullName,
+                        email: s.email,
+                        store: s.store,
+                        plan: s.plan,
+                        balance: AdminCore.num(s.balance),
+                        status: s.status,
+                        paymentStatus: s.paymentStatus,
+                        subscription: s.subscription
+                    };
+                });
+                AdminCore.exportCSV(rows, "admin-sellers.csv");
+                AdminCore.log("sellers_csv_exported", { count: rows.length });
+            });
+
+            document.getElementById("sellerTable").addEventListener("click", function (e) {
+                const btn = e.target.closest("button[data-action]");
+                if (!btn) return;
+                mutate(btn.dataset.email, btn.dataset.action);
+            });
+        }
+
+        function startAdminSellersPage() {
+            const ready = window.MMStorage && window.MMStorage.ready;
+            if (ready && typeof ready.then === "function") {
+                ready.finally(initAdminSellersPage);
+                return;
+            }
+            initAdminSellersPage();
+        }
+
+        if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", startAdminSellersPage);
+        else startAdminSellersPage();
+    </script>
+    <script defer src="upgrade.js"></script>
+  <script defer src="sw-register.js?v=20260226a"></script>
+  <script defer src="site-performance.js?v=20260226a"></script>
+</body>
+</html>
+
+
+
+

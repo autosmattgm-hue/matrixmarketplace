@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>MatrixMarket Admin Dashboard</title>
+    <link rel="stylesheet" href="admin-layout.css?v=20260227a">
+    <link rel="stylesheet" href="upgrade.css">
+    <script src="firebase-online-storage.js"></script>
+</head>
+<body class="admin-page">
+    <div id="adminHeader"></div>
+    <main class="admin-shell">
+        <section class="admin-titlebar">
+            <h1>Admin Command Dashboard</h1>
+            <div class="admin-actions">
+                <button class="btn-adm" id="refreshBtn" type="button">Refresh</button>
+                <button class="btn-adm" id="seedLogsBtn" type="button">Create Test Log</button>
+                <button class="btn-adm primary" id="exportSnapshotBtn" type="button">Export Snapshot</button>
+            </div>
+        </section>
+
+        <section class="admin-grid cols-3" id="kpiGrid"></section>
+
+        <section class="admin-grid cols-2">
+            <article class="admin-card">
+                <div class="adm-split">
+                    <h3 style="margin:0;">Recent Payment Requests</h3>
+                    <a href="admin-accept-payment.html" class="btn-adm">Open Payments</a>
+                </div>
+                <div class="adm-table-wrap" style="margin-top:0.6rem;">
+                    <table class="adm-table" id="paymentTable"></table>
+                </div>
+            </article>
+
+            <article class="admin-card">
+                <div class="adm-split">
+                    <h3 style="margin:0;">Recent Orders</h3>
+                    <a href="admin-orders.html" class="btn-adm">Open Orders</a>
+                </div>
+                <div class="adm-table-wrap" style="margin-top:0.6rem;">
+                    <table class="adm-table" id="orderTable"></table>
+                </div>
+            </article>
+        </section>
+
+        <section class="admin-grid cols-2">
+            <article class="admin-card">
+                <div class="adm-split">
+                    <h3 style="margin:0;">Top Sellers By Products</h3>
+                    <a href="admin-products.html" class="btn-adm">Open Products</a>
+                </div>
+                <div class="adm-list" id="topSellerList" style="margin-top:0.6rem;"></div>
+            </article>
+
+            <article class="admin-card">
+                <div class="adm-split">
+                    <h3 style="margin:0;">Recent Admin Activity</h3>
+                    <a href="admin-logs.html" class="btn-adm">Open Logs</a>
+                </div>
+                <div class="adm-list" id="logList" style="margin-top:0.6rem;"></div>
+            </article>
+        </section>
+
+        <section class="admin-card">
+            <h3 style="margin:0 0 .5rem;">Quick Links</h3>
+            <div class="admin-actions">
+                <a class="btn-adm" href="admin-users.html">Manage Users</a>
+                <a class="btn-adm" href="admin-sellers.html">Manage Sellers</a>
+                <a class="btn-adm" href="admin-edit-user-seller.html">Edit Accounts</a>
+                <a class="btn-adm" href="admin-code.html">Subscription Codes</a>
+                <a class="btn-adm" href="admin-products.html">All Products</a>
+                <a class="btn-adm" href="admin-orders.html">All Orders</a>
+            </div>
+        </section>
+
+        <div class="adm-foot">MatrixMarket Admin Dashboard</div>
+    </main>
+
+    <script src="admin-core.js?v=20260222c"></script>
+    <script>
+        function setHeader() {
+            document.getElementById("adminHeader").innerHTML = AdminCore.renderAdminHeader("dashboard-admin.html");
+        }
+
+        function renderKpis() {
+            const m = AdminCore.computeDashboard();
+            const items = [
+                ["Users", m.users],
+                ["Sellers", m.sellers],
+                ["Products", m.products],
+                ["Payments", m.payments],
+                ["Pending Payments", m.pendingPayments],
+                ["Approved Payments", m.approvedPayments],
+                ["Orders", m.orders],
+                ["Pending Orders", m.orderPending],
+                ["Completed Orders", m.orderCompleted],
+                ["Total Wallet", AdminCore.fmtMoney(m.totalBalance)],
+                ["Top Seller", m.topSeller],
+                ["Audit Logs", m.auditLogs]
+            ];
+
+            document.getElementById("kpiGrid").innerHTML = items.map(function (item) {
+                return '<article class="kpi"><div class="label">' + item[0] + '</div><div class="value">' + item[1] + '</div></article>';
+            }).join("");
+        }
+
+        function renderPayments() {
+            const rows = AdminCore.getPayments().slice().sort(function (a, b) {
+                return String(b.createdAt || b.date || "").localeCompare(String(a.createdAt || a.date || ""));
+            }).slice(0, 8);
+
+            const head = '<thead><tr><th>Name</th><th>Email</th><th>Type</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead>';
+            if (!rows.length) {
+                document.getElementById("paymentTable").innerHTML = head + '<tbody><tr><td colspan="6" class="adm-empty">No payment requests found.</td></tr></tbody>';
+                return;
+            }
+
+            document.getElementById("paymentTable").innerHTML = head + '<tbody>' + rows.map(function (r) {
+                return '<tr>' +
+                    '<td>' + AdminCore.str(r.name || "-") + '</td>' +
+                    '<td>' + AdminCore.str(r.email || "-") + '</td>' +
+                    '<td>' + AdminCore.str(r.type || "-") + '</td>' +
+                    '<td>' + AdminCore.fmtMoney(r.amount || 0) + '</td>' +
+                    '<td>' + AdminCore.badge(r.status || "Pending") + '</td>' +
+                    '<td>' + AdminCore.fmtDate(r.createdAt || r.date) + '</td>' +
+                    '</tr>';
+            }).join("") + '</tbody>';
+        }
+
+        function renderOrders() {
+            const rows = AdminCore.getOrders().slice().sort(function (a, b) {
+                return String(b.placedAt || b.createdAt || "").localeCompare(String(a.placedAt || a.createdAt || ""));
+            }).slice(0, 8);
+
+            const head = '<thead><tr><th>Order ID</th><th>Buyer</th><th>Total</th><th>Status</th><th>Method</th><th>Date</th></tr></thead>';
+            if (!rows.length) {
+                document.getElementById("orderTable").innerHTML = head + '<tbody><tr><td colspan="6" class="adm-empty">No orders found.</td></tr></tbody>';
+                return;
+            }
+
+            document.getElementById("orderTable").innerHTML = head + '<tbody>' + rows.map(function (r) {
+                return '<tr>' +
+                    '<td>' + AdminCore.str(r.id || "-") + '</td>' +
+                    '<td>' + AdminCore.str(r.fullName || r.email || "-") + '</td>' +
+                    '<td>' + AdminCore.fmtMoney(r.total || 0) + '</td>' +
+                    '<td>' + AdminCore.badge(r.status || "pending") + '</td>' +
+                    '<td>' + AdminCore.str(r.paymentMethod || "-") + '</td>' +
+                    '<td>' + AdminCore.fmtDate(r.placedAt || r.createdAt) + '</td>' +
+                    '</tr>';
+            }).join("") + '</tbody>';
+        }
+
+        function renderTopSellers() {
+            const products = AdminCore.getProducts();
+            const counts = {};
+            products.forEach(function (p) {
+                const seller = AdminCore.str(p.seller || p.sellerName || p.sellerEmail || "Unknown Seller");
+                counts[seller] = (counts[seller] || 0) + 1;
+            });
+
+            const rows = Object.keys(counts).map(function (name) {
+                return { name: name, count: counts[name] };
+            }).sort(function (a, b) { return b.count - a.count; }).slice(0, 8);
+
+            if (!rows.length) {
+                document.getElementById("topSellerList").innerHTML = '<div class="adm-empty">No product activity yet.</div>';
+                return;
+            }
+
+            document.getElementById("topSellerList").innerHTML = rows.map(function (row, idx) {
+                return '<div class="adm-list-item">' +
+                    '<strong>#' + (idx + 1) + ' ' + row.name + '</strong><br>' +
+                    '<span class="adm-note">Products: ' + row.count + '</span>' +
+                    '</div>';
+            }).join("");
+        }
+
+        function renderLogs() {
+            const rows = AdminCore.getAuditLogs().slice(0, 8);
+            if (!rows.length) {
+                document.getElementById("logList").innerHTML = '<div class="adm-empty">No admin activity logs yet.</div>';
+                return;
+            }
+
+            document.getElementById("logList").innerHTML = rows.map(function (row) {
+                return '<div class="adm-list-item">' +
+                    '<strong>' + AdminCore.str(row.action || "-") + '</strong><br>' +
+                    '<span class="adm-note">' + AdminCore.fmtDate(row.at) + '</span>' +
+                    '</div>';
+            }).join("");
+        }
+
+        function refresh() {
+            renderKpis();
+            renderPayments();
+            renderOrders();
+            renderTopSellers();
+            renderLogs();
+        }
+
+        function initDashboardAdminPage() {
+            setHeader();
+            refresh();
+            window.addEventListener("storage", refresh);
+
+            document.getElementById("refreshBtn").addEventListener("click", refresh);
+            document.getElementById("seedLogsBtn").addEventListener("click", function () {
+                AdminCore.log("manual_test_log", { from: "dashboard" });
+                refresh();
+            });
+            document.getElementById("exportSnapshotBtn").addEventListener("click", function () {
+                AdminCore.exportJSON({
+                    metrics: AdminCore.computeDashboard(),
+                    users: AdminCore.getUsers(),
+                    sellers: AdminCore.getSellers(),
+                    payments: AdminCore.getPayments(),
+                    orders: AdminCore.getOrders(),
+                    products: AdminCore.getProducts(),
+                    logs: AdminCore.getAuditLogs().slice(0, 100)
+                }, "admin-snapshot.json");
+                AdminCore.log("dashboard_snapshot_exported", {});
+            });
+        }
+
+        function startDashboardAdminPage() {
+            const ready = window.MMStorage && window.MMStorage.ready;
+            if (ready && typeof ready.then === "function") {
+                ready.finally(initDashboardAdminPage);
+                return;
+            }
+            initDashboardAdminPage();
+        }
+
+        if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", startDashboardAdminPage);
+        else startDashboardAdminPage();
+    </script>
+    <script defer src="upgrade.js"></script>
+  <script defer src="sw-register.js?v=20260226a"></script>
+  <script defer src="site-performance.js?v=20260226a"></script>
+</body>
+</html>
+
+
+
+

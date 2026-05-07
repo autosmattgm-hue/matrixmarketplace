@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Seller Payment Status - MatrixMarket</title>
+    <link rel="stylesheet" href="seller-layout.css" />
+    <link rel="stylesheet" href="upgrade.css" />
+    <style>
+        .status-shell {
+            width: min(980px, 100% - 1.2rem);
+            margin: 1rem auto 1.4rem;
+            display: grid;
+            gap: 0.8rem;
+        }
+
+        .status-banner {
+            border-radius: 12px;
+            border: 1px solid var(--sel-border);
+            background: rgba(2, 6, 23, 0.58);
+            padding: 0.8rem;
+        }
+
+        .status-banner h2 {
+            margin: 0;
+            font-size: 1.18rem;
+        }
+
+        .status-banner p {
+            margin: 0.35rem 0 0;
+            color: var(--sel-muted);
+        }
+
+        .pay-box {
+            border: 1px solid rgba(6, 182, 212, 0.36);
+            border-radius: 12px;
+            background: rgba(6, 182, 212, 0.08);
+            padding: 0.75rem;
+        }
+
+        .pay-box h3 {
+            margin: 0 0 0.35rem;
+        }
+
+        .pay-box p {
+            margin: 0.18rem 0;
+            color: #cbd5e1;
+        }
+    </style>
+    <script src="firebase-online-storage.js"></script>
+</head>
+<body class="seller-page">
+    <div id="sellerHeader"></div>
+
+    <main class="status-shell">
+        <section class="seller-titlebar">
+            <h1>Seller Payment Status</h1>
+            <div class="seller-actions">
+                <button class="btn-sel" id="refreshBtn" type="button">Refresh</button>
+                <a class="btn-sel" href="seller-register.html">Register</a>
+                <a class="btn-sel primary" href="subscription-code.html">Subscription Code</a>
+            </div>
+        </section>
+
+        <section id="statusBanner" class="status-banner"></section>
+
+        <section class="seller-grid cols-2">
+            <article class="seller-card">
+                <h3 style="margin:0 0 .55rem;">Request Details</h3>
+                <div id="requestMeta" class="meta-list"></div>
+            </article>
+
+            <article class="seller-card">
+                <h3 style="margin:0 0 .55rem;">Account Details</h3>
+                <div id="accountMeta" class="meta-list"></div>
+            </article>
+        </section>
+
+        <section class="seller-card">
+            <h3 style="margin:0 0 .55rem;">Next Steps</h3>
+            <div id="nextSteps" class="sel-list"></div>
+        </section>
+
+        <section class="seller-card">
+            <div class="pay-box">
+                <h3>Subscription Payment Channel</h3>
+                <p>1. Send your subscription fee via <strong>Wave</strong> or <strong>Comcash</strong>.</p>
+                <p>2. Receiver account number: <strong id="receiverAccount">6785316</strong>.</p>
+                <p>3. Submit your sender number and transaction reference below for admin approval.</p>
+            </div>
+
+            <div class="seller-form-grid cols-2" style="margin-top:.65rem;">
+                <select class="sel" id="paymentMethod">
+                    <option value="Wave">Wave</option>
+                    <option value="Comcash">Comcash</option>
+                </select>
+                <input class="sel" id="payerNumber" type="text" placeholder="Your Wave/Comcash Number" />
+                <input class="sel" id="transactionId" type="text" placeholder="Transaction ID / Reference" />
+                <input class="sel" id="amountField" type="number" min="0" step="0.01" placeholder="Amount Sent (GMD)" />
+                <textarea class="sel" id="proofNote" placeholder="Proof note (optional)" style="grid-column:1 / -1;"></textarea>
+            </div>
+
+            <div class="seller-actions" style="margin-top:.55rem;">
+                <button class="btn-sel primary" id="submitPaymentBtn" type="button">Submit Payment Proof</button>
+            </div>
+            <p class="sel-note" id="submitHint" style="margin-top:.45rem;">Use this after sending money to account 6785316.</p>
+        </section>
+
+        <div class="sel-foot">Payment approval and subscription activation tracker</div>
+    </main>
+
+    <script src="seller-core.js?v=20260222g"></script>
+    <script>
+        let seller = null;
+        let latestRequest = null;
+
+        function byId(id) { return document.getElementById(id); }
+
+        function requestRows() {
+            let rows = SellerCore.readJSON("pendingRequests", []);
+            if (typeof rows === "string") {
+                try { rows = JSON.parse(rows); } catch (_) { rows = []; }
+            }
+            if (Array.isArray(rows)) return rows.slice();
+            if (rows && typeof rows === "object") {
+                return Object.keys(rows).map(function (key) {
+                    const row = rows[key];
+                    if (row && typeof row === "object") {
+                        const next = { ...row };
+                        if (!next.id) next.id = key;
+                        return next;
+                    }
+                    return { id: key, value: row };
+                });
+            }
+            return [];
+        }
+
+        function renderHeader() {
+            byId("sellerHeader").innerHTML = SellerCore.renderSellerHeader("payment-status-sellers.html");
+        }
+
+        function latestRequestFor(email) {
+            const rows = requestRows();
+            const target = SellerCore.cleanEmail(email || "");
+            const filtered = rows.filter(function (row) {
+                return SellerCore.cleanEmail(row.email || "") === target;
+            });
+            if (!filtered.length) return null;
+            filtered.sort(function (a, b) {
+                return String(b.createdAt || b.date || "").localeCompare(String(a.createdAt || a.date || ""));
+            });
+            return filtered[0];
+        }
+
+        function normalizeRequestStatus(value) {
+            const status = SellerCore.str(value || "pending").toLowerCase();
+            if (["approved", "paid", "success"].includes(status)) return "approved";
+            if (["declined", "rejected", "failed"].includes(status)) return "declined";
+            return "pending";
+        }
+
+        function maybeSyncSellerByRequest(request) {
+            if (!request) return;
+            const status = normalizeRequestStatus(request.status);
+            if (status !== "approved") return;
+            seller.status = "Approved";
+            seller.paymentStatus = "Paid";
+            seller.subscription = "Active";
+            seller = SellerCore.upsertSeller(seller);
+            SellerCore.setCurrentSeller(seller);
+        }
+
+        function renderMetaList(containerId, rows) {
+            byId(containerId).innerHTML = rows.map(function (item) {
+                return '<div class="meta-row"><strong>' + item[0] + '</strong><span>' + item[1] + '</span></div>';
+            }).join("");
+        }
+
+        function render() {
+            seller = SellerCore.ensureSellerSession("seller-login.html");
+            if (!seller) return;
+
+            const request = latestRequestFor(seller.email);
+            latestRequest = request;
+            maybeSyncSellerByRequest(request);
+
+            const requestStatus = normalizeRequestStatus(request && request.status);
+            const bannerTitle = request
+                ? (requestStatus === "approved" ? "Payment Approved" : requestStatus === "declined" ? "Payment Declined" : "Payment Pending")
+                : "No Payment Request Found";
+
+            const bannerText = request
+                ? "Latest request is currently " + SellerCore.str(request.status || "Pending") + "."
+                : "Submit or retry your payment request to start subscription activation.";
+
+            byId("statusBanner").innerHTML =
+                '<h2>' + bannerTitle + '</h2>' +
+                '<p>' + bannerText + '</p>' +
+                '<div style="margin-top:.45rem;">' +
+                SellerCore.badge(request ? request.status || "Pending" : "Not Submitted") +
+                ' ' + SellerCore.badge(seller.subscription || "Inactive") +
+                '</div>';
+
+            renderMetaList("requestMeta", [
+                ["Request ID", request && request.id ? request.id : "-"],
+                ["Type", request && request.type ? request.type : "Subscription"],
+                ["Amount", request ? SellerCore.fmtMoney(request.amount || 0) : "-"],
+                ["Method", request && request.method ? request.method : "-"],
+                ["Date", request && (request.createdAt || request.date) ? SellerCore.fmtDate(request.createdAt || request.date) : "-"],
+                ["Status", request ? SellerCore.badge(request.status || "Pending") : SellerCore.badge("Pending")]
+            ]);
+
+            renderMetaList("accountMeta", [
+                ["Seller", seller.fullName || seller.name || "-"],
+                ["Store", seller.store || "-"],
+                ["Email", seller.email || "-"],
+                ["Plan", seller.plan || "basic"],
+                ["Account Status", SellerCore.badge(seller.status || "Pending")],
+                ["Subscription", SellerCore.badge(seller.subscription || "Inactive")]
+            ]);
+
+            const steps = [];
+            if (!request) {
+                steps.push("No payment request found yet for this seller email.");
+                steps.push("Send payment to Wave/Comcash account 6785316 and submit proof below.");
+            } else if (requestStatus === "pending") {
+                steps.push("Wait for admin to review your payment request.");
+                steps.push("Use Refresh to check updates after submission.");
+            } else if (requestStatus === "declined") {
+                steps.push("Your request was declined. Verify proof and payment details.");
+                steps.push("Resend payment to account 6785316 and submit proof again.");
+            } else {
+                steps.push("Payment approved. Your subscription is active.");
+                steps.push("Open Subscription Code to generate or renew your access code.");
+            }
+
+            byId("nextSteps").innerHTML = steps.map(function (text, idx) {
+                return '<div class="sel-list-item">' + (idx + 1) + '. ' + text + '</div>';
+            }).join("");
+
+            byId("receiverAccount").textContent = SellerCore.SELLER_PAYMENT_ACCOUNT;
+            byId("amountField").value = request && Number.isFinite(Number(request.amount))
+                ? Number(request.amount)
+                : SellerCore.planAmount(seller.plan || "basic");
+            if (request) {
+                byId("paymentMethod").value = SellerCore.paymentMethod(request.method || "Wave");
+                byId("payerNumber").value = request.payerNumber || "";
+                byId("transactionId").value = request.transactionId || "";
+                byId("proofNote").value = request.proof || "";
+            }
+
+            const approved = requestStatus === "approved";
+            ["paymentMethod", "payerNumber", "transactionId", "amountField", "proofNote", "submitPaymentBtn"].forEach(function (id) {
+                byId(id).disabled = approved;
+            });
+            byId("submitHint").textContent = approved
+                ? "Payment already approved by admin."
+                : "Submit after sending to account " + SellerCore.SELLER_PAYMENT_ACCOUNT + ".";
+        }
+
+        function submitPaymentProof() {
+            seller = SellerCore.ensureSellerSession("seller-login.html");
+            if (!seller) return;
+
+            const method = SellerCore.paymentMethod(byId("paymentMethod").value);
+            const payerNumber = SellerCore.str(byId("payerNumber").value);
+            const transactionId = SellerCore.str(byId("transactionId").value);
+            const amount = SellerCore.num(byId("amountField").value || SellerCore.planAmount(seller.plan || "basic"));
+            const note = SellerCore.str(byId("proofNote").value);
+
+            if (!payerNumber || !transactionId || amount <= 0) {
+                alert("Enter sender number, transaction reference, and valid amount.");
+                return;
+            }
+
+            SellerCore.ensurePendingRequest(seller, {
+                type: "Subscription",
+                amount: amount,
+                plan: seller.plan || "basic",
+                method: method,
+                payerNumber: payerNumber,
+                transactionId: transactionId,
+                proof: note || ("Paid via " + method + " from " + payerNumber + " to " + SellerCore.SELLER_PAYMENT_ACCOUNT + ". Ref: " + transactionId)
+            });
+
+            seller.paymentStatus = "Pending";
+            if (SellerCore.str(seller.status).toLowerCase() !== "approved") {
+                seller.status = "Pending";
+                seller.subscription = "Inactive";
+            }
+            seller = SellerCore.upsertSeller(seller);
+            SellerCore.setCurrentSeller(seller);
+
+            alert("Payment proof submitted. Wait for admin approval.");
+            render();
+        }
+
+        function initPaymentStatusSellersPage() {
+            renderHeader();
+            render();
+            byId("refreshBtn").addEventListener("click", render);
+            byId("submitPaymentBtn").addEventListener("click", submitPaymentProof);
+            window.addEventListener("storage", render);
+        }
+
+        function startPaymentStatusSellersPage() {
+            const ready = window.MMStorage && window.MMStorage.ready;
+            if (ready && typeof ready.then === "function") {
+                ready.finally(initPaymentStatusSellersPage);
+                return;
+            }
+            initPaymentStatusSellersPage();
+        }
+
+        if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", startPaymentStatusSellersPage);
+        else startPaymentStatusSellersPage();
+    </script>
+    <script defer src="upgrade.js"></script>
+  <script defer src="sw-register.js?v=20260226a"></script>
+  <script defer src="site-performance.js?v=20260226a"></script>
+</body>
+</html>
+
+
+

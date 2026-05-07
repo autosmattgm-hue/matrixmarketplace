@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Seller Chat - MatrixMarket</title>
+  <link rel="stylesheet" href="seller-layout.css" />
+  <link rel="stylesheet" href="upgrade.css" />
+  <script src="firebase-online-storage.js"></script>
+  <style>
+    .chat-shell { width: min(1220px, 100% - 1.2rem); margin: 1rem auto 1.4rem; display: grid; grid-template-columns: 320px 1fr; gap: .8rem; }
+    .panel, .thread { border: 1px solid var(--sel-border); border-radius: 14px; background: var(--sel-surface); overflow: hidden; }
+    .panel-head, .thread-head { padding: .7rem .75rem; border-bottom: 1px solid var(--sel-border); background: rgba(2, 6, 23, .58); }
+    .panel-head h3, .thread-head h3 { margin: 0; color: #67e8f9; font-size: 1rem; }
+    .panel-body { padding: .7rem; display: grid; gap: .55rem; }
+    .contacts { display: grid; gap: .4rem; max-height: 52vh; overflow: auto; }
+    .contact-btn { border: 1px solid var(--sel-border); border-radius: 10px; background: rgba(2, 6, 23, .48); color: var(--sel-text); text-align: left; padding: .55rem .6rem; cursor: pointer; }
+    .contact-btn.active { border-color: rgba(103, 232, 249, .55); background: rgba(6, 182, 212, .13); color: #67e8f9; }
+    .thread { display: grid; grid-template-rows: auto 1fr auto; min-height: 72vh; }
+    .meta { margin-top: .22rem; font-size: .8rem; color: var(--sel-muted); }
+    .messages { padding: .7rem; display: flex; flex-direction: column; gap: .45rem; overflow-y: auto; background: rgba(2, 6, 23, .62); }
+    .msg { max-width: 80%; border-radius: 12px; padding: .52rem .62rem; line-height: 1.35; word-break: break-word; }
+    .msg.me { align-self: flex-end; background: rgba(6, 182, 212, .22); border: 1px solid rgba(6, 182, 212, .35); }
+    .msg.other { align-self: flex-start; background: rgba(51, 65, 85, .72); border: 1px solid rgba(148, 163, 184, .3); }
+    .msg small { display: block; margin-top: .2rem; color: var(--sel-muted); font-size: .72rem; }
+    .composer { border-top: 1px solid var(--sel-border); padding: .7rem; display: grid; gap: .5rem; }
+    .quick { display: flex; gap: .35rem; flex-wrap: wrap; }
+    .quick button { border: 1px solid var(--sel-border); background: rgba(30, 41, 59, .7); color: var(--sel-text); border-radius: 8px; padding: .35rem .52rem; cursor: pointer; }
+    .row { display: grid; grid-template-columns: 1fr auto; gap: .45rem; }
+    .empty { text-align: center; color: var(--sel-muted); border: 1px dashed var(--sel-border); border-radius: 10px; padding: .8rem; }
+    @media (max-width: 980px) { .chat-shell { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body class="seller-page">
+  <div id="sellerHeader"></div>
+
+  <main class="chat-shell">
+    <aside class="panel">
+      <div class="panel-head"><h3>Buyer Conversations</h3></div>
+      <div class="panel-body">
+        <input class="sel" id="contactSearch" type="search" placeholder="Search buyer contact" />
+        <div id="contactList" class="contacts"></div>
+        <div class="seller-actions">
+          <button class="btn-sel" id="refreshBtn" type="button">Refresh</button>
+          <button class="btn-sel" id="exportBtn" type="button">Export Chat</button>
+          <button class="btn-sel danger" id="clearBtn" type="button">Clear Thread</button>
+        </div>
+      </div>
+    </aside>
+
+    <section class="thread">
+      <div class="thread-head">
+        <h3 id="chatTitle">Seller Chat</h3>
+        <div class="meta" id="chatMeta">Connect with buyers directly from one inbox.</div>
+      </div>
+      <div id="messages" class="messages"></div>
+      <div class="composer">
+        <div class="quick">
+          <button type="button" data-quick="Thanks for your order. We are preparing shipment.">Order update</button>
+          <button type="button" data-quick="Your item is ready for delivery.">Ready for delivery</button>
+          <button type="button" data-quick="Please confirm your address and phone number.">Confirm address</button>
+        </div>
+        <input class="sel" id="messageSearch" type="text" placeholder="Filter thread messages" />
+        <div class="row">
+          <textarea class="sel" id="messageInput" rows="2" placeholder="Type message and press Enter"></textarea>
+          <button class="btn-sel primary" id="sendBtn" type="button">Send</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="seller-core.js?v=20260222g"></script>
+  <script>
+    const state = {
+      seller: null,
+      aliases: [],
+      contacts: [],
+      contactAlias: {},
+      target: "",
+      currentAlias: "",
+      messages: []
+    };
+
+    function byId(id) { return document.getElementById(id); }
+    function read(key, fallback) { return SellerCore.readJSON(key, fallback); }
+    function write(key, value) { return SellerCore.writeJSON(key, value); }
+    function text(v) { return SellerCore.str(v); }
+    function nowIso() { return new Date().toISOString(); }
+    function fmtTime(iso) { return SellerCore.fmtDate(iso); }
+
+    function sortedPair(a, b) {
+      return [text(a), text(b)].sort(function (x, y) { return x.localeCompare(y); });
+    }
+    function threadId(a, b) {
+      const p = sortedPair(a, b);
+      return p[0] + "::" + p[1];
+    }
+    function legacyKey(a, b) {
+      const p = sortedPair(a, b);
+      return "chat_" + p[0] + "_" + p[1];
+    }
+
+    function sellerAliases(seller) {
+      const list = [seller.store, seller.fullName, seller.name, seller.email].map(text).filter(Boolean);
+      return Array.from(new Set(list));
+    }
+
+    function aliasSet() {
+      return new Set(state.aliases.map(function (v) { return v.toLowerCase(); }));
+    }
+
+    function preferredAlias() {
+      return text(state.seller.store || state.seller.fullName || state.seller.name || state.seller.email);
+    }
+
+    function getThreadMessages(myName, target) {
+      const id = threadId(myName, target);
+      const threads = read("chatThreads", {});
+      const modern = Array.isArray(threads[id]) ? threads[id] : [];
+      const legacy = read(legacyKey(myName, target), []);
+
+      const normalizedLegacy = Array.isArray(legacy) ? legacy.map(function (m, idx) {
+        const when = m.timeIso || m.createdAt || nowIso();
+        return {
+          id: m.id || ("legacy-" + idx + "-" + Math.random().toString(36).slice(2, 8)),
+          sender: text(m.sender || "Unknown"),
+          text: text(m.text || ""),
+          timeIso: when
+        };
+      }) : [];
+
+      const seen = new Set();
+      const merged = modern.concat(normalizedLegacy).filter(function (m) {
+        const sig = [m.sender, m.text, m.timeIso].join("|");
+        if (seen.has(sig)) return false;
+        seen.add(sig);
+        return true;
+      }).sort(function (a, b) { return String(a.timeIso).localeCompare(String(b.timeIso)); });
+
+      threads[id] = merged;
+      write("chatThreads", threads);
+      MMStorage.setItem(legacyKey(myName, target), JSON.stringify(merged));
+      return merged;
+    }
+
+    function setThreadMessages(myName, target, messages) {
+      const id = threadId(myName, target);
+      const threads = read("chatThreads", {});
+      threads[id] = messages;
+      write("chatThreads", threads);
+      MMStorage.setItem(legacyKey(myName, target), JSON.stringify(messages));
+    }
+
+    function mergeContact(name, alias, timeIso) {
+      const n = text(name);
+      if (!n) return;
+      const current = state.contactAlias[n];
+      if (!current || String(timeIso || "") >= String(current.lastTime || "")) {
+        state.contactAlias[n] = { alias: text(alias) || preferredAlias(), lastTime: timeIso || "" };
+      }
+    }
+
+    function buildContacts() {
+      state.contactAlias = {};
+      const threads = read("chatThreads", {});
+      const aliasLookup = aliasSet();
+
+      Object.keys(threads).forEach(function (id) {
+        const parts = id.split("::");
+        if (parts.length !== 2) return;
+        const left = text(parts[0]);
+        const right = text(parts[1]);
+        const leftIsMe = aliasLookup.has(left.toLowerCase());
+        const rightIsMe = aliasLookup.has(right.toLowerCase());
+        if (!leftIsMe && !rightIsMe) return;
+        const alias = leftIsMe ? left : right;
+        const contact = leftIsMe ? right : left;
+        const rows = Array.isArray(threads[id]) ? threads[id] : [];
+        const last = rows.length ? rows[rows.length - 1].timeIso : "";
+        mergeContact(contact, alias, last);
+      });
+
+      const purchases = SellerCore.getPurchasesForSeller(state.seller);
+      purchases.forEach(function (row) {
+        mergeContact(text(row.buyerName || row.buyerEmail), preferredAlias(), row.date);
+      });
+
+      const queueRows = SellerCore.getSellerQueueRows(state.seller);
+      queueRows.forEach(function (row) {
+        mergeContact(text(row.buyer || row.email), preferredAlias(), row.date);
+      });
+
+      const urlBuyer = text(new URLSearchParams(window.location.search).get("buyer") || "");
+      if (urlBuyer) mergeContact(urlBuyer, preferredAlias(), nowIso());
+
+      state.contacts = Object.keys(state.contactAlias).sort(function (a, b) {
+        return String(state.contactAlias[b].lastTime || "").localeCompare(String(state.contactAlias[a].lastTime || "")) || a.localeCompare(b);
+      });
+
+      const stored = text(MMStorage.getItem("chatWithSeller") || "");
+      const preferred = urlBuyer || stored || state.contacts[0] || "";
+      state.target = state.contacts.includes(preferred) ? preferred : (state.contacts[0] || "");
+    }
+
+    function renderContacts() {
+      const q = byId("contactSearch").value.toLowerCase().trim();
+      const list = byId("contactList");
+      const filtered = state.contacts.filter(function (c) { return !q || c.toLowerCase().includes(q); });
+      if (!filtered.length) {
+        list.innerHTML = '<div class="empty">No buyer conversations yet.</div>';
+        return;
+      }
+
+      list.innerHTML = filtered.map(function (name) {
+        const active = state.target === name ? "active" : "";
+        return '<button class="contact-btn ' + active + '" type="button" data-contact="' + encodeURIComponent(name) + '">' + name + '</button>';
+      }).join("");
+    }
+
+    function renderMessages() {
+      const container = byId("messages");
+      const q = byId("messageSearch").value.toLowerCase().trim();
+      const filtered = state.messages.filter(function (m) {
+        return !q || text(m.text).toLowerCase().includes(q);
+      });
+      if (!filtered.length) {
+        container.innerHTML = '<div class="empty">No messages in this thread.</div>';
+        return;
+      }
+
+      const aliasLookup = aliasSet();
+      container.innerHTML = filtered.map(function (m) {
+        const mine = aliasLookup.has(text(m.sender).toLowerCase());
+        return '<article class="msg ' + (mine ? "me" : "other") + '">' +
+          text(m.text) + '<small>' + text(m.sender) + " | " + fmtTime(m.timeIso) + "</small></article>";
+      }).join("");
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function openContact(name) {
+      const target = text(name);
+      if (!target) {
+        state.target = "";
+        state.messages = [];
+        renderContacts();
+        renderMessages();
+        return;
+      }
+
+      state.target = target;
+      const binding = state.contactAlias[target] || { alias: preferredAlias() };
+      state.currentAlias = text(binding.alias || preferredAlias());
+      MMStorage.setItem("chatWithSeller", state.target);
+
+      byId("chatTitle").textContent = "Chat with " + state.target;
+      byId("chatMeta").textContent = "Sender identity: " + state.currentAlias;
+      state.messages = getThreadMessages(state.currentAlias, state.target);
+      renderContacts();
+      renderMessages();
+    }
+
+    function sendMessage() {
+      if (!state.target) return;
+      const input = byId("messageInput");
+      const msg = text(input.value);
+      if (!msg) return;
+
+      const row = {
+        id: "m-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6),
+        sender: state.currentAlias || preferredAlias(),
+        text: msg,
+        timeIso: nowIso()
+      };
+
+      state.messages.push(row);
+      setThreadMessages(state.currentAlias, state.target, state.messages);
+      input.value = "";
+      renderMessages();
+      buildContacts();
+      renderContacts();
+    }
+
+    function clearThread() {
+      if (!state.target) return;
+      if (!confirm("Clear this conversation?")) return;
+      state.messages = [];
+      setThreadMessages(state.currentAlias, state.target, []);
+      renderMessages();
+      buildContacts();
+      renderContacts();
+    }
+
+    function exportThread() {
+      if (!state.messages.length) {
+        alert("No messages to export.");
+        return;
+      }
+      const payload = {
+        seller: state.seller.email,
+        alias: state.currentAlias,
+        contact: state.target,
+        exportedAt: nowIso(),
+        messages: state.messages
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "seller-chat-" + state.target.replace(/\s+/g, "-").toLowerCase() + ".json";
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function refresh() {
+      state.seller = SellerCore.ensureSellerSession("seller-login.html");
+      if (!state.seller) return;
+      state.aliases = sellerAliases(state.seller);
+      buildContacts();
+      if (!state.target && state.contacts.length) state.target = state.contacts[0];
+      openContact(state.target);
+    }
+
+    function initSellerChatPage() {
+      byId("sellerHeader").innerHTML = SellerCore.renderSellerHeader("seller-chat.html");
+      refresh();
+
+      byId("refreshBtn").addEventListener("click", refresh);
+      byId("contactSearch").addEventListener("input", renderContacts);
+      byId("messageSearch").addEventListener("input", renderMessages);
+      byId("sendBtn").addEventListener("click", sendMessage);
+      byId("exportBtn").addEventListener("click", exportThread);
+      byId("clearBtn").addEventListener("click", clearThread);
+
+      byId("contactList").addEventListener("click", function (event) {
+        const btn = event.target.closest("button[data-contact]");
+        if (!btn) return;
+        openContact(decodeURIComponent(btn.dataset.contact || ""));
+      });
+
+      byId("messageInput").addEventListener("keydown", function (e) {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          sendMessage();
+        }
+      });
+
+      document.querySelectorAll("button[data-quick]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          byId("messageInput").value = text(btn.dataset.quick || "");
+          byId("messageInput").focus();
+        });
+      });
+
+      window.addEventListener("storage", refresh);
+    }
+
+    function startSellerChatPage() {
+      const ready = window.MMStorage && window.MMStorage.ready;
+      if (ready && typeof ready.then === "function") {
+        ready.finally(initSellerChatPage);
+        return;
+      }
+      initSellerChatPage();
+    }
+
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", startSellerChatPage);
+    else startSellerChatPage();
+  </script>
+  <script defer src="upgrade.js"></script>
+  <script defer src="sw-register.js?v=20260226a"></script>
+  <script defer src="site-performance.js?v=20260226a"></script>
+</body>
+</html>
+
+
+
+

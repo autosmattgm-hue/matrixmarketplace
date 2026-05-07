@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>MatrixMarket - Settings</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body{margin:0;font-family:"Poppins",sans-serif;background:#f5f7fb;color:#1f2937}
+        header{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;background:#ffffff;border-bottom:1px solid #e5e7eb;box-shadow:0 2px 10px rgba(15,23,42,.06);position:sticky;top:0;z-index:1000}
+        .logo{font-size:1.4rem;font-weight:800;color:#111827}nav{display:flex;gap:12px;flex-wrap:wrap}nav a{color:#374151;text-decoration:none;font-weight:600}
+        .page{width:min(1160px,100% - 16px);margin:16px auto 26px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+        .card{background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;padding:12px;box-shadow:0 8px 20px rgba(15,23,42,.05)}
+        h1,h2,h3,p{margin:0}.title{color:#111827;margin-bottom:10px}
+        .grid{display:grid;gap:8px}input,select,textarea{width:100%;border:1px solid #d1d5db;background:#ffffff;color:#111827;border-radius:10px;padding:10px;font:inherit}
+        textarea{min-height:82px;resize:vertical}
+        .row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+        .btn{border:1px solid #1d4ed8;border-radius:10px;padding:10px 12px;font-weight:700;cursor:pointer;background:#2563eb;color:#fff}
+        .btn.alt{background:#ffffff;border:1px solid #d1d5db;color:#1f2937}
+        .btn.danger{background:linear-gradient(135deg,#ef4444,#dc2626)}
+        .wallet{background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:10px;font-weight:700;color:#1d4ed8}
+        .hint{font-size:.82rem;color:#6b7280}
+        .chips{display:flex;gap:6px;flex-wrap:wrap}
+        .chip{font-size:.78rem;border:1px solid #d1d5db;border-radius:999px;padding:4px 8px;background:#f8fafc;color:#374151}
+        .req-list{display:grid;gap:8px;max-height:260px;overflow:auto}
+        .req{background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:8px;display:grid;gap:4px}
+        .req .meta{font-size:.82rem;color:#6b7280}
+        .status{font-size:.78rem;border-radius:999px;padding:2px 8px;display:inline-flex;width:max-content}
+        .status.pending{background:#fff7ed;color:#c2410c}.status.approved{background:#ecfdf3;color:#166534}.status.declined{background:#fef2f2;color:#b91c1c}
+        .status.cancelled{background:#f3f4f6;color:#4b5563}
+        .msg{display:none;border-radius:10px;padding:10px;margin-top:8px;font-size:.9rem}
+        .msg.ok{background:#ecfdf3;border:1px solid #86efac;color:#166534}
+        .msg.err{background:#fef2f2;border:1px solid #fecaca;color:#b91c1c}
+        .tools{display:flex;gap:8px;flex-wrap:wrap}
+        .empty{text-align:center;color:#6b7280;border:1px dashed #d1d5db;border-radius:10px;padding:12px}
+        @media (max-width:980px){.page{grid-template-columns:1fr}.row{grid-template-columns:1fr}}
+    </style>
+    <link rel="stylesheet" href="upgrade.css">
+    <script src="firebase-online-storage.js"></script>
+</head>
+<body>
+    <header>
+        <div class="logo">MatrixMarket</div>
+        <nav>
+            <a href="index.html">Home</a>
+            <a href="shop.html">Shop</a>
+            <a href="cart.html">Cart</a>
+            <a href="settings.html">Settings</a>
+        </nav>
+    </header>
+
+    <main class="page">
+        <section class="card">
+            <h2 class="title">Account Profile</h2>
+            <div class="grid">
+                <input id="fullName" type="text" placeholder="Full Name">
+                <input id="email" type="email" placeholder="Email Address">
+                <input id="phone" type="text" placeholder="Phone Number">
+                <textarea id="address" placeholder="Address"></textarea>
+            </div>
+            <div class="row" style="margin-top:8px;">
+                <button id="saveProfileBtn" class="btn" type="button">Save Profile</button>
+                <button id="logoutBtn" class="btn alt" type="button">Logout</button>
+            </div>
+
+            <h3 class="title" style="margin-top:12px;">Security</h3>
+            <div class="grid">
+                <input id="newPassword" type="password" placeholder="New Password">
+                <input id="confirmPassword" type="password" placeholder="Confirm Password">
+                <label class="hint"><input id="showPass" type="checkbox" style="width:auto; margin-right:6px;">Show password fields</label>
+                <button id="savePasswordBtn" class="btn alt" type="button">Update Password</button>
+            </div>
+
+            <h3 class="title" style="margin-top:12px;">Preferences</h3>
+            <div class="grid">
+                <select id="themeSelect">
+                    <option value="dark">Dark Theme</option>
+                    <option value="light">Light Theme</option>
+                </select>
+                <label class="hint"><input id="notifyEmail" type="checkbox" style="width:auto; margin-right:6px;">Email notifications</label>
+                <label class="hint"><input id="notifyDeals" type="checkbox" style="width:auto; margin-right:6px;">Deals and promotions</label>
+                <button id="savePrefsBtn" class="btn alt" type="button">Save Preferences</button>
+            </div>
+        </section>
+
+        <section class="card">
+            <h2 class="title">Wallet & Payment Requests</h2>
+            <div class="wallet" id="walletBox">Balance: 0.00 GMD</div>
+            <div class="grid" style="margin-top:8px;">
+                <select id="method">
+                    <option value="Wave (6785316)">Wave (6785316)</option>
+                    <option value="Comcash (6785316)">Comcash (6785316)</option>
+                    <option value="Bank Transfer">Bank Transfer</option>
+                </select>
+                <input id="amount" type="number" min="1" step="0.01" placeholder="Amount">
+                <div class="chips">
+                    <button class="btn alt preset-btn" type="button" data-amt="100">+100</button>
+                    <button class="btn alt preset-btn" type="button" data-amt="250">+250</button>
+                    <button class="btn alt preset-btn" type="button" data-amt="500">+500</button>
+                    <button class="btn alt preset-btn" type="button" data-amt="1000">+1000</button>
+                </div>
+                <div class="row">
+                    <button id="topupBtn" class="btn" type="button">Request Top-Up</button>
+                    <button id="withdrawBtn" class="btn alt" type="button">Request Withdrawal</button>
+                </div>
+                <p class="hint">Requests are stored in <code>pendingRequests</code> and visible to admin.</p>
+            </div>
+
+            <h3 class="title" style="margin-top:10px;">My Requests</h3>
+            <div class="row" style="margin-top:6px;">
+                <select id="reqFilter">
+                    <option value="all">All Statuses</option>
+                    <option value="pending">Pending</option>
+                    <option value="approved">Approved</option>
+                    <option value="declined">Declined</option>
+                    <option value="cancelled">Cancelled</option>
+                </select>
+                <input id="reqSearch" type="text" placeholder="Search request">
+            </div>
+            <div class="chips" id="walletStats" style="margin-top:8px;"></div>
+            <div id="requestList" class="req-list"></div>
+
+            <h3 class="title" style="margin-top:10px;">Data Tools</h3>
+            <div class="tools">
+                <button id="exportReqBtn" class="btn alt" type="button">Export Requests CSV</button>
+                <button id="exportBtn" class="btn alt" type="button">Export My Data</button>
+                <button id="deleteBtn" class="btn danger" type="button">Delete Account</button>
+            </div>
+            <p class="hint" style="margin-top:6px;">Deleting account removes your entry from <code>users</code> and clears <code>currentUser</code>.</p>
+        </section>
+    </main>
+
+    <div style="width:min(1160px,100% - 16px); margin:0 auto 20px;">
+        <div id="okMsg" class="msg ok"></div>
+        <div id="errMsg" class="msg err"></div>
+    </div>
+
+    <script>
+        const state = { user: null, oldEmail: null, prefs: { notifyEmail: true, notifyDeals: true } };
+
+        function byId(id){ return document.getElementById(id); }
+        function num(v){ const n = Number(v); return Number.isFinite(n) ? n : 0; }
+        function money(v){ return num(v).toFixed(2) + " GMD"; }
+        function read(key, fallback){ try { const d = JSON.parse(MMStorage.getItem(key)||"null"); return d ?? fallback; } catch(_){ return fallback; } }
+        function write(key, value){ MMStorage.setItem(key, JSON.stringify(value)); }
+        function normalizeStatus(v){ return String(v || "Pending").trim().toLowerCase(); }
+        function isSellerUser(user){ return !!(user && (user.isSeller || String(user.accountType || user.role || "").toLowerCase() === "seller")); }
+        function isGuestUser(user){
+            if (!user || typeof user !== "object") return true;
+            if (user.isGuest) return true;
+            return String(user.email || "").trim().toLowerCase() === "guest@matrixmarket.local";
+        }
+
+        function resolveSessionUser(){
+            const ordered = ["loggedInUser", "currentUser", "currentSeller"];
+            let fallback = null;
+            for (let i = 0; i < ordered.length; i++) {
+                const user = read(ordered[i], null);
+                if (!user || typeof user !== "object") continue;
+                if (!fallback) fallback = user;
+                if (!isGuestUser(user)) return user;
+            }
+            return fallback;
+        }
+
+        function persistSessionUser(nextUser){
+            if (!nextUser || typeof nextUser !== "object") return;
+            const email = String(nextUser.email || "").trim().toLowerCase();
+            ["loggedInUser", "currentUser", "currentSeller"].forEach(function(key){
+                const existing = read(key, null);
+                if (key === "currentSeller" && !isSellerUser(nextUser)) {
+                    if (existing && typeof existing === "object" && String(existing.email || "").trim().toLowerCase() === email) {
+                        MMStorage.removeItem(key);
+                    }
+                    return;
+                }
+                if (!existing || typeof existing !== "object") {
+                    if (key !== "currentSeller" || isSellerUser(nextUser)) write(key, nextUser);
+                    return;
+                }
+                const existingEmail = String(existing.email || "").trim().toLowerCase();
+                if (!email || existingEmail === email || key !== "currentSeller") {
+                    write(key, { ...existing, ...nextUser });
+                }
+            });
+        }
+
+        function clearSessionUser(){
+            ["currentUser", "loggedInUser", "currentSeller"].forEach(function(key){
+                MMStorage.removeItem(key);
+            });
+            MMStorage.removeItem("userBalance");
+            MMStorage.removeItem("balance");
+        }
+
+        function syncWalletMirrors(){
+            const amount = num(state.user && state.user.balance);
+            MMStorage.setItem("userBalance", String(amount));
+            MMStorage.setItem("balance", String(amount));
+        }
+
+        function getMyRequests(){
+            const requests = read("pendingRequests", []);
+            return Array.isArray(requests)
+                ? requests.filter(function(r){ return r && r.email === state.user.email; }).sort(function(a,b){ return String(b.createdAt||"").localeCompare(String(a.createdAt||"")); })
+                : [];
+        }
+
+        function showError(text){ byId("okMsg").style.display = "none"; byId("errMsg").textContent = text; byId("errMsg").style.display = "block"; }
+        function showSuccess(text){ byId("errMsg").style.display = "none"; byId("okMsg").textContent = text; byId("okMsg").style.display = "block"; }
+
+        function ensureUser(){
+            const user = resolveSessionUser();
+            if (!user || isGuestUser(user)) {
+                showError("No user logged in. Redirecting to login...");
+                setTimeout(function(){ window.location.href = "login.html"; }, 1200);
+                return false;
+            }
+            state.user = user;
+            state.oldEmail = user.email || "";
+            return true;
+        }
+
+        function fillForm(){
+            if (!state.user) return;
+            byId("fullName").value = state.user.fullName || state.user.name || "";
+            byId("email").value = state.user.email || "";
+            byId("phone").value = state.user.phone || "";
+            byId("address").value = state.user.address || "";
+            byId("walletBox").textContent = "Balance: " + money(state.user.balance || 0);
+            syncWalletMirrors();
+
+            const prefs = read("userPrefs", {});
+            const key = state.user.email || "default";
+            state.prefs = prefs[key] || { notifyEmail: true, notifyDeals: true };
+            byId("notifyEmail").checked = !!state.prefs.notifyEmail;
+            byId("notifyDeals").checked = !!state.prefs.notifyDeals;
+
+            const theme = MMStorage.getItem("mm-theme") || "dark";
+            byId("themeSelect").value = theme;
+        }
+
+        function upsertUserInList(nextUser){
+            const users = read("users", []);
+            const out = Array.isArray(users) ? users.slice() : [];
+            const oldEmail = state.oldEmail;
+            let found = false;
+
+            for (let i = 0; i < out.length; i++) {
+                const u = out[i] || {};
+                if ((oldEmail && u.email === oldEmail) || (nextUser.email && u.email === nextUser.email)) {
+                    out[i] = { ...u, ...nextUser };
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found) out.push(nextUser);
+            write("users", out);
+        }
+
+        function upsertSellerInList(nextUser){
+            if (!isSellerUser(nextUser)) return;
+            const sellers = read("sellers", []);
+            const out = Array.isArray(sellers) ? sellers.slice() : [];
+            const oldEmail = state.oldEmail;
+            let found = false;
+
+            for (let i = 0; i < out.length; i++) {
+                const seller = out[i] || {};
+                if ((oldEmail && seller.email === oldEmail) || (nextUser.email && seller.email === nextUser.email)) {
+                    out[i] = { ...seller, ...nextUser };
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found) out.push(nextUser);
+            write("sellers", out);
+        }
+
+        function updateEmailReferences(newEmail){
+            const oldEmail = state.oldEmail;
+            if (!oldEmail || oldEmail === newEmail) return;
+            const requests = read("pendingRequests", []);
+            const mapped = Array.isArray(requests) ? requests.map(function(r){
+                if (r && r.email === oldEmail) return { ...r, email: newEmail };
+                return r;
+            }) : [];
+            write("pendingRequests", mapped);
+        }
+
+        function saveProfile(){
+            if (!state.user) return;
+            const fullName = byId("fullName").value.trim();
+            const email = byId("email").value.trim().toLowerCase();
+            const phone = byId("phone").value.trim();
+            const address = byId("address").value.trim();
+
+            if (!fullName || !email) {
+                showError("Full name and email are required.");
+                return;
+            }
+
+            const nextUser = {
+                ...state.user,
+                fullName: fullName,
+                name: fullName,
+                email: email,
+                phone: phone,
+                address: address
+            };
+
+            upsertUserInList(nextUser);
+            upsertSellerInList(nextUser);
+            updateEmailReferences(email);
+            persistSessionUser(nextUser);
+            state.user = nextUser;
+            state.oldEmail = email;
+            fillForm();
+            showSuccess("Profile updated successfully.");
+        }
+
+        function savePassword(){
+            if (!state.user) return;
+            const pass = byId("newPassword").value;
+            const confirm = byId("confirmPassword").value;
+            if (!pass && !confirm) {
+                showError("Enter a new password first.");
+                return;
+            }
+            if (pass.length < 4) {
+                showError("Password must be at least 4 characters.");
+                return;
+            }
+            if (pass !== confirm) {
+                showError("Passwords do not match.");
+                return;
+            }
+
+            state.user.password = pass;
+            persistSessionUser(state.user);
+            upsertUserInList(state.user);
+            upsertSellerInList(state.user);
+            byId("newPassword").value = "";
+            byId("confirmPassword").value = "";
+            showSuccess("Password updated.");
+        }
+
+        function savePrefs(){
+            const theme = byId("themeSelect").value;
+            MMStorage.setItem("mm-theme", theme);
+            document.documentElement.setAttribute("data-theme", theme);
+
+            const prefs = read("userPrefs", {});
+            prefs[state.user.email || "default"] = {
+                notifyEmail: byId("notifyEmail").checked,
+                notifyDeals: byId("notifyDeals").checked
+            };
+            write("userPrefs", prefs);
+            showSuccess("Preferences saved.");
+        }
+
+        function applyPresetAmount(amount){
+            const current = num(byId("amount").value);
+            byId("amount").value = String(Math.max(0, current + num(amount)));
+        }
+
+        function makeRequest(type){
+            if (!state.user) return;
+            const amount = num(byId("amount").value);
+            const method = byId("method").value;
+
+            if (amount <= 0) {
+                showError("Enter a valid amount.");
+                return;
+            }
+
+            if (type === "Withdrawal" && amount > num(state.user.balance)) {
+                showError("Withdrawal amount cannot exceed wallet balance.");
+                return;
+            }
+
+            const requests = read("pendingRequests", []);
+            requests.push({
+                id: "REQ-" + Date.now() + "-" + Math.random().toString(36).slice(2,6),
+                email: state.user.email,
+                name: state.user.fullName || state.user.name || state.user.email,
+                type: type,
+                amount: amount,
+                method: type === "Withdrawal" ? "Balance" : method,
+                status: "Pending",
+                createdAt: new Date().toISOString()
+            });
+            write("pendingRequests", requests);
+            byId("amount").value = "";
+            renderRequests();
+            showSuccess(type + " request submitted.");
+        }
+
+        function cancelRequest(id){
+            const requests = read("pendingRequests", []);
+            const updated = requests.map(function(r){
+                if (r && r.id === id && r.email === state.user.email && String(r.status).toLowerCase() === "pending") {
+                    return { ...r, status: "Cancelled" };
+                }
+                return r;
+            });
+            write("pendingRequests", updated);
+            renderRequests();
+            showSuccess("Request cancelled.");
+        }
+
+        function renderWalletStats(mine){
+            const rows = Array.isArray(mine) ? mine : [];
+            const pending = rows.filter(function(r){ return normalizeStatus(r.status) === "pending"; }).length;
+            const approved = rows.filter(function(r){ return normalizeStatus(r.status) === "approved"; }).length;
+            const totalTopup = rows
+                .filter(function(r){ return String(r.type).toLowerCase() === "top-up" && normalizeStatus(r.status) === "approved"; })
+                .reduce(function(sum, r){ return sum + num(r.amount); }, 0);
+            const totalWithdrawal = rows
+                .filter(function(r){ return String(r.type).toLowerCase() === "withdrawal" && normalizeStatus(r.status) === "approved"; })
+                .reduce(function(sum, r){ return sum + num(r.amount); }, 0);
+
+            byId("walletStats").innerHTML = [
+                '<span class="chip">Pending: ' + pending + '</span>',
+                '<span class="chip">Approved: ' + approved + '</span>',
+                '<span class="chip">Top-Ups: ' + money(totalTopup) + '</span>',
+                '<span class="chip">Withdrawals: ' + money(totalWithdrawal) + '</span>'
+            ].join("");
+        }
+
+        function renderRequests(){
+            const list = byId("requestList");
+            const raw = getMyRequests();
+            renderWalletStats(raw);
+            const filter = byId("reqFilter").value || "all";
+            const q = byId("reqSearch").value.trim().toLowerCase();
+            const mine = raw.filter(function(r){
+                const st = normalizeStatus(r.status);
+                if (filter !== "all" && st !== filter) return false;
+                if (!q) return true;
+                const hay = [r.type, r.method, r.id, r.status, r.amount].join(" ").toLowerCase();
+                return hay.includes(q);
+            });
+
+            if (!mine.length) {
+                list.innerHTML = '<div class="empty">No requests yet.</div>';
+                return;
+            }
+
+            list.innerHTML = mine.map(function(r){
+                const st = String(r.status || "Pending");
+                const statusKey = normalizeStatus(st);
+                const cls = statusKey === "approved"
+                    ? "approved"
+                    : (statusKey === "declined" ? "declined" : (statusKey === "cancelled" ? "cancelled" : "pending"));
+                const canCancel = statusKey === "pending";
+                return `
+                    <article class="req">
+                        <strong>${r.type} - ${money(r.amount)}</strong>
+                        <div class="meta">Method: ${r.method || "N/A"}</div>
+                        <div class="meta">Date: ${new Date(r.createdAt || Date.now()).toLocaleString()}</div>
+                        <span class="status ${cls}">${st}</span>
+                        ${canCancel ? `<button class="btn alt" type="button" onclick="cancelRequest('${r.id}')">Cancel</button>` : ""}
+                    </article>
+                `;
+            }).join("");
+        }
+
+        function exportData(){
+            if (!state.user) return;
+            const payload = {
+                profile: state.user,
+                requests: read("pendingRequests", []).filter(function(r){ return r && r.email === state.user.email; }),
+                orders: read("buyerOrders", []).filter(function(o){ return o && o.email === state.user.email; }),
+                exportedAt: new Date().toISOString()
+            };
+            const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "matrixmarket-user-data.json";
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function exportRequestsCsv(){
+            if (!state.user) return;
+            const rows = getMyRequests();
+            if (!rows.length) {
+                showError("No requests available to export.");
+                return;
+            }
+            const csvRows = [["id", "type", "amount", "method", "status", "createdAt"]];
+            rows.forEach(function(r){
+                csvRows.push([
+                    String(r.id || ""),
+                    String(r.type || ""),
+                    String(num(r.amount).toFixed(2)),
+                    String(r.method || ""),
+                    String(r.status || ""),
+                    String(r.createdAt || "")
+                ]);
+            });
+            const csv = csvRows.map(function(row){
+                return row.map(function(cell){ return '"' + String(cell).replace(/"/g, '""') + '"'; }).join(",");
+            }).join("\n");
+            const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "matrixmarket-requests.csv";
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function logout(){
+            clearSessionUser();
+            showSuccess("Logged out. Redirecting...");
+            setTimeout(function(){ window.location.href = "login.html"; }, 900);
+        }
+
+        function deleteAccount(){
+            if (!state.user) return;
+            const check = prompt("Type DELETE to confirm account removal:");
+            if (check !== "DELETE") return;
+
+            const users = read("users", []);
+            const nextUsers = Array.isArray(users) ? users.filter(function(u){ return !(u && u.email === state.user.email); }) : [];
+            write("users", nextUsers);
+
+            const sellers = read("sellers", []);
+            const nextSellers = Array.isArray(sellers) ? sellers.filter(function(s){ return !(s && s.email === state.user.email); }) : [];
+            write("sellers", nextSellers);
+
+            const requests = read("pendingRequests", []);
+            const nextRequests = Array.isArray(requests) ? requests.filter(function(r){ return !(r && r.email === state.user.email); }) : [];
+            write("pendingRequests", nextRequests);
+
+            clearSessionUser();
+            MMStorage.removeItem("buyerInfo");
+            MMStorage.removeItem("buyerInfoDraft");
+            showSuccess("Account deleted. Redirecting...");
+            setTimeout(function(){ window.location.href = "register.html"; }, 1200);
+        }
+
+        function bind(){
+            byId("saveProfileBtn").addEventListener("click", saveProfile);
+            byId("savePasswordBtn").addEventListener("click", savePassword);
+            byId("savePrefsBtn").addEventListener("click", savePrefs);
+            byId("topupBtn").addEventListener("click", function(){ makeRequest("Top-Up"); });
+            byId("withdrawBtn").addEventListener("click", function(){ makeRequest("Withdrawal"); });
+            byId("reqFilter").addEventListener("change", renderRequests);
+            byId("reqSearch").addEventListener("input", renderRequests);
+            byId("exportReqBtn").addEventListener("click", exportRequestsCsv);
+            document.querySelectorAll(".preset-btn").forEach(function(btn){
+                btn.addEventListener("click", function(){ applyPresetAmount(num(btn.dataset.amt)); });
+            });
+            byId("exportBtn").addEventListener("click", exportData);
+            byId("logoutBtn").addEventListener("click", logout);
+            byId("deleteBtn").addEventListener("click", deleteAccount);
+            byId("showPass").addEventListener("change", function(){
+                const type = this.checked ? "text" : "password";
+                byId("newPassword").type = type;
+                byId("confirmPassword").type = type;
+            });
+        }
+
+        function init(){
+            if (!ensureUser()) return;
+            fillForm();
+            renderRequests();
+            bind();
+        }
+
+        window.cancelRequest = cancelRequest;
+        window.addEventListener("load", function () {
+            const ready = window.MMStorage && window.MMStorage.ready;
+            if (ready && typeof ready.then === "function") {
+                ready.finally(init);
+                return;
+            }
+            init();
+        });
+    </script>
+    <script defer src="upgrade.js"></script>
+  <script defer src="sw-register.js?v=20260226a"></script>
+  <script defer src="site-performance.js?v=20260226a"></script>
+</body>
+</html>
+
+
+
+

@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Register - Matrix Marketplace</title>
+    <link rel="icon" type="image/x-icon" href="matrixx.png">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        :root {
+            --bg1: #ffffff;
+            --bg2: #f6f8fc;
+            --accent: #f59e0b;
+            --accent2: #10b981;
+            --text: #122033;
+            --muted: #5f6c7b;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            padding: 1rem;
+            font-family: "Poppins", sans-serif;
+            color: var(--text);
+            position: relative;
+            overflow: auto;
+            background:
+                radial-gradient(880px 440px at -10% -5%, rgba(245, 158, 11, 0.12), transparent 58%),
+                radial-gradient(720px 360px at 112% 8%, rgba(16, 185, 129, 0.10), transparent 60%),
+                linear-gradient(180deg, var(--bg1), var(--bg2) 52%, #eef4f7 100%);
+        }
+
+        body::before,
+        body::after {
+            content: "";
+            position: fixed;
+            pointer-events: none;
+            filter: blur(42px);
+            opacity: 0.45;
+            z-index: 0;
+        }
+
+        body::before {
+            width: 300px;
+            height: 300px;
+            border-radius: 50%;
+            left: -95px;
+            top: -90px;
+            background: rgba(245, 158, 11, 0.10);
+        }
+
+        body::after {
+            width: 260px;
+            height: 260px;
+            border-radius: 50%;
+            right: -75px;
+            bottom: -80px;
+            background: rgba(16, 185, 129, 0.10);
+        }
+
+        .bg-grid {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+            opacity: 0.38;
+            background:
+                linear-gradient(rgba(148, 163, 184, 0.16) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(148, 163, 184, 0.16) 1px, transparent 1px);
+            background-size: 28px 28px;
+            mask-image: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.75) 0%, transparent 82%);
+        }
+
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .panel {
+            width: min(520px, 100%);
+            border: 1px solid rgba(219, 227, 239, 0.95);
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(12px);
+            box-shadow: 0 18px 40px rgba(15, 23, 42, 0.10);
+            padding: 1.2rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        h1 {
+            margin: 0 0 0.2rem;
+            font-size: 1.9rem;
+            color: #0f172a;
+            text-shadow: none;
+        }
+
+        .sub {
+            margin: 0 0 0.8rem;
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+
+        .label {
+            display: block;
+            margin-top: 0.52rem;
+            margin-bottom: 0.26rem;
+            color: #1e293b;
+            font-size: 0.84rem;
+            font-weight: 600;
+        }
+
+        .field-hint {
+            margin-top: 0.3rem;
+            font-size: 0.75rem;
+            color: var(--muted);
+            opacity: 0.88;
+        }
+
+        .field-hint.ok {
+            color: #bbf7d0;
+        }
+
+        .field-hint.warn {
+            color: #fde68a;
+        }
+
+        .field-hint.error {
+            color: #fecaca;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.55rem;
+        }
+
+        input,
+        select {
+            width: 100%;
+            border: 1px solid #dbe3ef;
+            border-radius: 11px;
+            padding: 0.72rem;
+            background: #f8fafc;
+            color: #000000;
+            outline: none;
+            font: inherit;
+        }
+
+        input::placeholder {
+            color: #111111;
+            opacity: 1;
+        }
+
+        select option {
+            color: #0f172a;
+        }
+
+        input:focus,
+        select:focus {
+            border-color: #22c55e;
+            box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.12);
+        }
+
+        .password-row {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 0.45rem;
+            align-items: center;
+        }
+
+        .password-tools {
+            margin-top: 0.42rem;
+            display: flex;
+            gap: 0.42rem;
+            flex-wrap: wrap;
+        }
+
+        .tool-btn {
+            border: 1px solid rgba(203, 213, 225, 0.5);
+            border-radius: 10px;
+            background: #ffffff;
+            color: #0f172a;
+            font-size: 0.76rem;
+            font-weight: 700;
+            padding: 0.42rem 0.62rem;
+            cursor: pointer;
+        }
+
+        .mini-btn {
+            border: 1px solid rgba(203, 213, 225, 0.5);
+            border-radius: 10px;
+            background: #ffffff;
+            color: #0f172a;
+            height: 40px;
+            padding: 0 0.7rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .strength {
+            margin-top: 0.42rem;
+            display: grid;
+            gap: 0.26rem;
+        }
+
+        .strength-track {
+            width: 100%;
+            height: 7px;
+            border-radius: 999px;
+            background: rgba(148, 163, 184, 0.35);
+            overflow: hidden;
+        }
+
+        .strength-bar {
+            width: 0%;
+            height: 100%;
+            transition: width 0.2s ease;
+            background: #ef4444;
+        }
+
+        .strength-text {
+            font-size: 0.8rem;
+            color: var(--muted);
+        }
+
+        .rule-list {
+            margin: 0;
+            padding-left: 1rem;
+            display: grid;
+            gap: 0.16rem;
+            font-size: 0.76rem;
+            color: var(--muted);
+        }
+
+        .rule-list li.ok {
+            color: #bbf7d0;
+        }
+
+        .seller-fields {
+            margin-top: 0.45rem;
+            padding: 0.7rem;
+            border-radius: 12px;
+            border: 1px dashed rgba(245, 158, 11, 0.55);
+            background: rgba(16, 185, 129, 0.08);
+            display: none;
+        }
+
+        .seller-fields.open {
+            display: block;
+        }
+
+        .checkline {
+            margin-top: 0.52rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.38rem;
+            color: var(--muted);
+            font-size: 0.83rem;
+            cursor: pointer;
+        }
+
+        .checkline input {
+            width: 15px;
+            height: 15px;
+            margin: 0;
+            accent-color: var(--accent);
+        }
+
+        .submit {
+            width: 100%;
+            margin-top: 0.9rem;
+            border: none;
+            border-radius: 11px;
+            padding: 0.76rem;
+            font-weight: 700;
+            color: #fff;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            cursor: pointer;
+        }
+
+        .submit[disabled] {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+
+        .progress-wrap {
+            margin-top: 0.7rem;
+            display: grid;
+            gap: 0.24rem;
+        }
+
+        .progress-track {
+            width: 100%;
+            height: 7px;
+            border-radius: 999px;
+            background: rgba(203, 213, 225, 0.55);
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), var(--accent2));
+            transition: width 0.2s ease;
+        }
+
+        .progress-text {
+            font-size: 0.76rem;
+            color: var(--muted);
+        }
+
+        .msg {
+            display: none;
+            margin-top: 0.62rem;
+            padding: 0.55rem 0.62rem;
+            border-radius: 10px;
+            font-size: 0.84rem;
+            border: 1px solid transparent;
+        }
+
+        .msg.success { color: #166534; background: rgba(34, 197, 94, 0.10); border-color: rgba(74, 222, 128, 0.35); }
+        .msg.error { color: #b91c1c; background: rgba(239, 68, 68, 0.10); border-color: rgba(248, 113, 113, 0.35); }
+
+        .foot {
+            margin: 0.88rem 0 0;
+            font-size: 0.9rem;
+            color: var(--muted);
+        }
+
+        .foot a {
+            color: #2563eb;
+            text-decoration: none;
+            font-weight: 700;
+        }
+
+        @media (max-width: 580px) {
+            .grid-2 {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+    <link rel="stylesheet" href="upgrade.css">
+    <script src="firebase-online-storage.js"></script>
+</head>
+<body>
+    <div class="bg-grid" aria-hidden="true"></div>
+    <div class="panel">
+        <h1>Create Account</h1>
+        <p class="sub">Set up a buyer or seller account with improved security checks.</p>
+
+        <form onsubmit="return registerUser(event)">
+            <label class="label" for="fullName">Full Name</label>
+            <input type="text" id="fullName" placeholder="First and last name" autocomplete="name" required>
+
+            <div class="grid-2">
+                <div>
+                    <label class="label" for="email">Email Address</label>
+                    <input type="email" id="email" placeholder="you@example.com" autocomplete="email" required>
+                    <div id="emailHint" class="field-hint">Checking availability...</div>
+                    <label class="label" for="confirmEmail">Confirm Email</label>
+                    <input type="email" id="confirmEmail" placeholder="Re-enter email" autocomplete="email" required>
+                    <div id="confirmEmailHint" class="field-hint">Re-enter the same email.</div>
+                </div>
+                <div>
+                    <label class="label" for="phone">Phone (optional)</label>
+                    <input type="text" id="phone" placeholder="+220..." autocomplete="tel">
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <div>
+                    <label class="label" for="location">Location</label>
+                    <input type="text" id="location" placeholder="Banjul" autocomplete="address-level2" required>
+                </div>
+                <div>
+                    <label class="label" for="accountType">Account Type</label>
+                    <select id="accountType" required>
+                        <option value="">Select Account Type</option>
+                        <option value="buyer">Buyer</option>
+                        <option value="seller">Seller</option>
+                    </select>
+                    <div id="typeHint" class="field-hint">Choose account type to continue.</div>
+                </div>
+            </div>
+
+            <div id="sellerFields" class="seller-fields">
+                <div class="grid-2">
+                    <div>
+                        <label class="label" for="storeName">Store Name</label>
+                        <input type="text" id="storeName" placeholder="Your shop/store">
+                    </div>
+                    <div>
+                        <label class="label" for="storeCategory">Store Category</label>
+                        <input type="text" id="storeCategory" placeholder="general">
+                    </div>
+                </div>
+            </div>
+
+            <label class="label" for="password">Password</label>
+            <div class="password-row">
+                <input type="password" id="password" placeholder="At least 8 chars, letters + numbers" autocomplete="new-password" required>
+                <button id="togglePassword" class="mini-btn" type="button">Show</button>
+            </div>
+            <div class="strength">
+                <div class="strength-track"><div id="strengthBar" class="strength-bar"></div></div>
+                <div id="strengthText" class="strength-text">Password strength: -</div>
+            </div>
+            <div class="password-tools">
+                <button id="generatePasswordBtn" class="tool-btn" type="button">Generate Strong Password</button>
+                <button id="copyPasswordBtn" class="tool-btn" type="button">Copy Password</button>
+            </div>
+            <ul class="rule-list" id="passwordRules">
+                <li id="ruleLength">At least 8 characters</li>
+                <li id="ruleLetters">Contains letters</li>
+                <li id="ruleNumbers">Contains numbers</li>
+                <li id="ruleUpper">Contains upper + lower case</li>
+            </ul>
+
+            <label class="label" for="confirmPassword">Confirm Password</label>
+            <div class="password-row">
+                <input type="password" id="confirmPassword" placeholder="Re-enter password" autocomplete="new-password" required>
+                <button id="toggleConfirmPassword" class="mini-btn" type="button">Show</button>
+            </div>
+            <div id="confirmPasswordHint" class="field-hint">Password confirmation required.</div>
+
+            <label class="label" for="referralCode">Referral Code (optional)</label>
+            <input type="text" id="referralCode" placeholder="Enter code if you have one">
+
+            <label class="checkline" for="marketingOptIn">
+                <input type="checkbox" id="marketingOptIn">
+                <span>Send me product updates and offers.</span>
+            </label>
+
+            <label class="checkline" for="agreeTerms">
+                <input type="checkbox" id="agreeTerms" required>
+                <span>I agree to the terms and account policy.</span>
+            </label>
+
+            <div class="progress-wrap">
+                <div class="progress-track"><div id="formProgressBar" class="progress-bar"></div></div>
+                <div id="formProgressText" class="progress-text">Form completion: 0%</div>
+            </div>
+            <button id="registerBtn" class="submit" type="submit">Create Account</button>
+        </form>
+
+        <div id="successMsg" class="msg success">Registration successful. Redirecting to login...</div>
+        <div id="errorMsg" class="msg error"></div>
+        <p class="foot">Already have an account? <a href="login.html">Login here</a></p>
+    </div>
+
+    <script>
+        (function () {
+            let registerBusy = false;
+
+            function byId(id) { return document.getElementById(id); }
+
+            function storage() {
+                if (window.MMStorage && typeof window.MMStorage.getItem === "function") return window.MMStorage;
+                return window.localStorage;
+            }
+
+            function normalizeEmail(value) {
+                return String(value || "").trim().toLowerCase();
+            }
+
+            function safeParse(raw, fallback) {
+                if (raw == null || raw === "") return fallback;
+                try {
+                    const parsed = JSON.parse(raw);
+                    return parsed == null ? fallback : parsed;
+                } catch (_) {
+                    return fallback;
+                }
+            }
+
+            function readList(key) {
+                const parsed = safeParse(storage().getItem(key), []);
+                if (Array.isArray(parsed)) return parsed;
+                if (parsed && typeof parsed === "object") {
+                    return Object.keys(parsed).map(function (entryKey) {
+                        const entry = parsed[entryKey];
+                        if (entry && typeof entry === "object") {
+                            if (!entry.email && !entry.mail) return Object.assign({ email: entryKey }, entry);
+                            return entry;
+                        }
+                        return { email: entryKey, value: entry };
+                    });
+                }
+                return [];
+            }
+
+            function setBusy(isBusy) {
+                registerBusy = Boolean(isBusy);
+                byId("registerBtn").disabled = registerBusy;
+                byId("registerBtn").textContent = registerBusy ? "Creating account..." : "Create Account";
+            }
+
+            function setError(text) {
+                const node = byId("errorMsg");
+                const ok = byId("successMsg");
+                ok.style.display = "none";
+                node.textContent = text || "";
+                node.style.display = text ? "block" : "none";
+            }
+
+            function setSuccess(text) {
+                const node = byId("successMsg");
+                const err = byId("errorMsg");
+                err.style.display = "none";
+                node.textContent = text || "";
+                node.style.display = text ? "block" : "none";
+            }
+
+            function setHint(id, type, text) {
+                const node = byId(id);
+                if (!node) return;
+                node.className = type ? ("field-hint " + type) : "field-hint";
+                node.textContent = text || "";
+            }
+
+            function setRuleState(id, passed) {
+                const node = byId(id);
+                if (!node) return;
+                node.classList.toggle("ok", Boolean(passed));
+            }
+
+            function emailExists(email) {
+                const users = readList("users");
+                const sellers = readList("sellers");
+                return users.some(function (row) {
+                    return normalizeEmail(row && (row.email || row.mail)) === email;
+                }) || sellers.some(function (row) {
+                    return normalizeEmail(row && (row.email || row.mail)) === email;
+                });
+            }
+
+            function updateEmailHints() {
+                const email = normalizeEmail(byId("email").value);
+                const confirmEmail = normalizeEmail(byId("confirmEmail").value);
+                if (!email) {
+                    setHint("emailHint", "", "Enter an email address.");
+                } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                    setHint("emailHint", "warn", "Email format looks invalid.");
+                } else if (emailExists(email)) {
+                    setHint("emailHint", "error", "Email is already registered.");
+                } else {
+                    setHint("emailHint", "ok", "Email is available.");
+                }
+
+                if (!confirmEmail) {
+                    setHint("confirmEmailHint", "", "Re-enter the same email.");
+                } else if (email !== confirmEmail) {
+                    setHint("confirmEmailHint", "error", "Email addresses do not match.");
+                } else {
+                    setHint("confirmEmailHint", "ok", "Email confirmed.");
+                }
+            }
+
+            function passwordScore(password) {
+                const value = String(password || "");
+                let score = 0;
+                if (value.length >= 8) score += 1;
+                if (value.length >= 12) score += 1;
+                if (/[a-z]/.test(value) && /[A-Z]/.test(value)) score += 1;
+                if (/\d/.test(value)) score += 1;
+                if (/[^A-Za-z0-9]/.test(value)) score += 1;
+                return score;
+            }
+
+            function refreshStrength() {
+                const value = byId("password").value;
+                const score = passwordScore(value);
+                const bar = byId("strengthBar");
+                const text = byId("strengthText");
+                const pct = Math.min(100, score * 20);
+                bar.style.width = pct + "%";
+                setRuleState("ruleLength", value.length >= 8);
+                setRuleState("ruleLetters", /[A-Za-z]/.test(value));
+                setRuleState("ruleNumbers", /\d/.test(value));
+                setRuleState("ruleUpper", /[a-z]/.test(value) && /[A-Z]/.test(value));
+                if (score <= 1) {
+                    bar.style.background = "#ef4444";
+                    text.textContent = "Password strength: weak";
+                    return;
+                }
+                if (score <= 3) {
+                    bar.style.background = "#f59e0b";
+                    text.textContent = "Password strength: medium";
+                    return;
+                }
+                bar.style.background = "#22c55e";
+                text.textContent = "Password strength: strong";
+            }
+
+            function updateConfirmPasswordHint() {
+                const password = byId("password").value;
+                const confirm = byId("confirmPassword").value;
+                if (!confirm) {
+                    setHint("confirmPasswordHint", "", "Password confirmation required.");
+                } else if (password !== confirm) {
+                    setHint("confirmPasswordHint", "error", "Passwords do not match.");
+                } else {
+                    setHint("confirmPasswordHint", "ok", "Passwords match.");
+                }
+            }
+
+            function updateTypeHint() {
+                const accountType = byId("accountType").value;
+                if (accountType === "seller") {
+                    setHint("typeHint", "ok", "Seller account requires store setup and approval.");
+                    return;
+                }
+                if (accountType === "buyer") {
+                    setHint("typeHint", "ok", "Buyer account gives direct shopping access.");
+                    return;
+                }
+                setHint("typeHint", "", "Choose account type to continue.");
+            }
+
+            function updateFormProgress() {
+                const accountType = byId("accountType").value;
+                const required = [
+                    { id: "fullName" },
+                    { id: "email" },
+                    { id: "confirmEmail" },
+                    { id: "location" },
+                    { id: "accountType" },
+                    { id: "password" },
+                    { id: "confirmPassword" },
+                    { id: "agreeTerms", type: "checkbox" }
+                ];
+                if (accountType === "seller") required.push({ id: "storeName" });
+
+                let done = 0;
+                required.forEach(function (rule) {
+                    const node = byId(rule.id);
+                    if (!node) return;
+                    if (rule.type === "checkbox") {
+                        if (node.checked) done += 1;
+                    } else if (String(node.value || "").trim()) {
+                        done += 1;
+                    }
+                });
+
+                const percent = required.length ? Math.round((done / required.length) * 100) : 0;
+                byId("formProgressBar").style.width = percent + "%";
+                byId("formProgressText").textContent = "Form completion: " + percent + "%";
+            }
+
+            function generateStrongPassword() {
+                const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*";
+                let pass = "";
+                while (pass.length < 12) {
+                    pass += chars[Math.floor(Math.random() * chars.length)];
+                }
+                if (!/[A-Z]/.test(pass)) pass += "A";
+                if (!/[a-z]/.test(pass)) pass += "a";
+                if (!/\d/.test(pass)) pass += "3";
+                if (!/[^A-Za-z0-9]/.test(pass)) pass += "!";
+                byId("password").value = pass;
+                byId("confirmPassword").value = pass;
+                refreshStrength();
+                updateConfirmPasswordHint();
+                updateFormProgress();
+                setError("");
+                setSuccess("Strong password generated and applied.");
+            }
+
+            async function copyPasswordToClipboard() {
+                const value = byId("password").value;
+                if (!value) {
+                    setError("Enter or generate a password first.");
+                    return;
+                }
+                try {
+                    await navigator.clipboard.writeText(value);
+                    setSuccess("Password copied to clipboard.");
+                } catch (_) {
+                    setError("Clipboard not available. Copy manually.");
+                }
+            }
+
+            function togglePassword(inputId, btnId) {
+                const input = byId(inputId);
+                const btn = byId(btnId);
+                const hidden = input.type === "password";
+                input.type = hidden ? "text" : "password";
+                btn.textContent = hidden ? "Hide" : "Show";
+            }
+
+            function updateSellerFields() {
+                const isSeller = byId("accountType").value === "seller";
+                byId("sellerFields").classList.toggle("open", isSeller);
+                byId("storeName").required = isSeller;
+                updateTypeHint();
+                updateFormProgress();
+            }
+
+            function validateValues(values) {
+                if (!values.fullName || values.fullName.length < 3) {
+                    return "Full name must be at least 3 characters.";
+                }
+                if (!values.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email)) {
+                    return "Enter a valid email address.";
+                }
+                if (values.confirmEmail !== values.email) {
+                    return "Email confirmation does not match.";
+                }
+                if (values.phone && !/^[+\d][\d\s-]{5,19}$/.test(values.phone)) {
+                    return "Phone format looks invalid.";
+                }
+                if (!values.location) {
+                    return "Enter your location.";
+                }
+                if (!values.accountType) {
+                    return "Choose an account type.";
+                }
+                if (values.accountType === "seller" && !values.storeName) {
+                    return "Store name is required for seller accounts.";
+                }
+                if (values.password.length < 8 || !/[A-Za-z]/.test(values.password) || !/\d/.test(values.password)) {
+                    return "Password must be 8+ characters and include letters and numbers.";
+                }
+                if (values.password !== values.confirmPassword) {
+                    return "Password confirmation does not match.";
+                }
+                if (!values.agreeTerms) {
+                    return "You must agree to the terms.";
+                }
+                return "";
+            }
+
+            async function syncOnlineStorage(timeoutMs) {
+                const sync = window.MMStorage && window.MMStorage.syncNow;
+                if (!sync || typeof sync !== "function") return;
+                const waitMs = Number(timeoutMs) > 0 ? Number(timeoutMs) : 3500;
+                try {
+                    await Promise.race([
+                        sync(),
+                        new Promise(function (resolve) { setTimeout(resolve, waitMs); })
+                    ]);
+                } catch (_) {}
+            }
+
+            window.registerUser = async function registerUser(event) {
+                event.preventDefault();
+                if (registerBusy) return false;
+                setError("");
+                setSuccess("");
+
+                const ready = window.MMStorage && window.MMStorage.ready;
+                if (ready && typeof ready.then === "function") {
+                    await ready.catch(function () {});
+                }
+
+                const values = {
+                    fullName: String(byId("fullName").value || "").trim(),
+                    email: normalizeEmail(byId("email").value),
+                    confirmEmail: normalizeEmail(byId("confirmEmail").value),
+                    phone: String(byId("phone").value || "").trim(),
+                    location: String(byId("location").value || "").trim(),
+                    accountType: byId("accountType").value,
+                    storeName: String(byId("storeName").value || "").trim(),
+                    storeCategory: String(byId("storeCategory").value || "").trim(),
+                    password: byId("password").value,
+                    confirmPassword: byId("confirmPassword").value,
+                    referralCode: String(byId("referralCode").value || "").trim(),
+                    marketingOptIn: Boolean(byId("marketingOptIn").checked),
+                    agreeTerms: Boolean(byId("agreeTerms").checked)
+                };
+
+                const validationError = validateValues(values);
+                if (validationError) {
+                    setError(validationError);
+                    return false;
+                }
+
+                const users = readList("users");
+                const sellers = readList("sellers");
+                const existsInUsers = users.some(function (row) {
+                    return normalizeEmail(row && (row.email || row.mail)) === values.email;
+                });
+                const existsInSellers = sellers.some(function (row) {
+                    return normalizeEmail(row && (row.email || row.mail)) === values.email;
+                });
+                if (existsInUsers || existsInSellers) {
+                    setError("Email already registered. Please login.");
+                    return false;
+                }
+
+                setBusy(true);
+                try {
+                    const createdAt = new Date().toISOString();
+                    const isSeller = values.accountType === "seller";
+                    const userRecord = {
+                        fullName: values.fullName,
+                        name: values.fullName,
+                        email: values.email,
+                        password: values.password,
+                        location: values.location,
+                        country: values.location,
+                        phone: values.phone,
+                        accountType: values.accountType,
+                        role: values.accountType,
+                        referralCode: values.referralCode,
+                        marketingOptIn: values.marketingOptIn,
+                        balance: 0,
+                        subscription: isSeller ? "Inactive" : "Active",
+                        paymentStatus: isSeller ? "Pending" : "Paid",
+                        status: isSeller ? "Pending Approval" : "Active",
+                        isSeller: isSeller,
+                        createdAt: createdAt
+                    };
+
+                    users.push(userRecord);
+                    storage().setItem("users", JSON.stringify(users));
+
+                    if (isSeller) {
+                        sellers.push({
+                            fullName: values.fullName,
+                            name: values.fullName,
+                            email: values.email,
+                            password: values.password,
+                            phone: values.phone,
+                            country: values.location,
+                            address: values.location,
+                            store: values.storeName,
+                            category: values.storeCategory || "general",
+                            plan: "Basic",
+                            amount: 0,
+                            balance: 0,
+                            subscription: "Inactive",
+                            paymentStatus: "Pending",
+                            status: "Pending Approval",
+                            isSeller: true,
+                            referralCode: values.referralCode,
+                            marketingOptIn: values.marketingOptIn,
+                            createdAt: createdAt
+                        });
+                        storage().setItem("sellers", JSON.stringify(sellers));
+                    }
+
+                    storage().setItem("lastRegisteredEmail", values.email);
+                    storage().setItem("lastRegisteredAccountType", values.accountType);
+                    await syncOnlineStorage(4000);
+                    setSuccess("Registration successful. Redirecting to login...");
+                    window.location.href = "login.html?registered=1&email=" + encodeURIComponent(values.email);
+                    return false;
+                } finally {
+                    setBusy(false);
+                }
+            };
+
+            function hydrateFromQuery() {
+                const query = new URLSearchParams(window.location.search);
+                const qType = String(query.get("type") || "").toLowerCase();
+                if (qType === "buyer" || qType === "seller") {
+                    byId("accountType").value = qType;
+                }
+                const qEmail = normalizeEmail(query.get("email"));
+                if (qEmail) {
+                    byId("email").value = qEmail;
+                    byId("confirmEmail").value = qEmail;
+                }
+                const qRef = String(query.get("ref") || "").trim();
+                if (qRef) byId("referralCode").value = qRef;
+                updateSellerFields();
+                updateEmailHints();
+                updateFormProgress();
+            }
+
+            function bindUi() {
+                byId("password").addEventListener("input", function () {
+                    refreshStrength();
+                    updateConfirmPasswordHint();
+                    updateFormProgress();
+                });
+                byId("confirmPassword").addEventListener("input", function () {
+                    updateConfirmPasswordHint();
+                    updateFormProgress();
+                });
+                byId("email").addEventListener("input", function () {
+                    updateEmailHints();
+                    updateFormProgress();
+                });
+                byId("confirmEmail").addEventListener("input", function () {
+                    updateEmailHints();
+                    updateFormProgress();
+                });
+                byId("fullName").addEventListener("input", updateFormProgress);
+                byId("location").addEventListener("input", updateFormProgress);
+                byId("phone").addEventListener("input", updateFormProgress);
+                byId("agreeTerms").addEventListener("change", updateFormProgress);
+                byId("togglePassword").addEventListener("click", function () {
+                    togglePassword("password", "togglePassword");
+                });
+                byId("toggleConfirmPassword").addEventListener("click", function () {
+                    togglePassword("confirmPassword", "toggleConfirmPassword");
+                });
+                byId("accountType").addEventListener("change", updateSellerFields);
+                byId("storeName").addEventListener("input", updateFormProgress);
+                byId("generatePasswordBtn").addEventListener("click", generateStrongPassword);
+                byId("copyPasswordBtn").addEventListener("click", copyPasswordToClipboard);
+                refreshStrength();
+                updateConfirmPasswordHint();
+                updateEmailHints();
+                updateTypeHint();
+                updateFormProgress();
+            }
+
+            function start() {
+                bindUi();
+                hydrateFromQuery();
+            }
+
+            const ready = window.MMStorage && window.MMStorage.ready;
+            if (ready && typeof ready.then === "function") ready.finally(start);
+            else start();
+        })();
+    </script>
+
+    <script defer src="upgrade.js"></script>
+    <script defer src="sw-register.js?v=20260226a"></script>
+    <script defer src="site-performance.js?v=20260226a"></script>
+</body>
+</html>

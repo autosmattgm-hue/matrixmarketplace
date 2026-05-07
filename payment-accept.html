@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>MatrixMarket - Seller Payment Status</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body {
+            margin: 0;
+            font-family: "Poppins", sans-serif;
+            background: linear-gradient(-45deg, #1e293b, #0f172a, #4f46e5, #06b6d4);
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        @keyframes gradientBG {
+            0% {
+                background-position: 0% 50%;
+            }
+
+            50% {
+                background-position: 100% 50%;
+            }
+
+            100% {
+                background-position: 0% 50%;
+            }
+        }
+
+        header {
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.4);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        header .logo {
+            font-size: 1.3rem;
+            font-weight: bold;
+            color: #06b6d4;
+        }
+
+        header nav a {
+            margin: 0 10px;
+            color: #06b6d4;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        header nav a:hover {
+            text-decoration: underline;
+        }
+
+        .status-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .status-card {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(15px);
+            border-radius: 20px;
+            padding: 40px;
+            width: 100%;
+            max-width: 600px;
+            text-align: center;
+            box-shadow: 0 0 25px rgba(6, 182, 212, 0.6);
+            animation: fadeIn 1s ease-in-out;
+        }
+
+        .status-card h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+
+        .status-message {
+            font-size: 1.2rem;
+            margin: 15px 0 25px;
+        }
+
+        .success {
+            color: #22c55e;
+            text-shadow: 0 0 8px #22c55e;
+        }
+
+        .declined {
+            color: #ef4444;
+            text-shadow: 0 0 8px #ef4444;
+        }
+
+        .pending {
+            color: #facc15;
+            text-shadow: 0 0 8px #facc15;
+        }
+
+        .details-box {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 18px;
+            border-radius: 12px;
+            margin-top: 20px;
+            text-align: left;
+            display: none;
+        }
+
+        .details-box p {
+            margin: 6px 0;
+            font-size: 1rem;
+        }
+
+        .btn {
+            margin-top: 25px;
+            padding: 14px 24px;
+            border: none;
+            border-radius: 12px;
+            background: linear-gradient(45deg, #06b6d4, #4f46e5);
+            color: white;
+            font-size: 1rem;
+            cursor: pointer;
+            box-shadow: 0 0 12px rgba(6, 182, 212, 0.5);
+            transition: all 0.3s ease-in-out;
+            display: none;
+        }
+
+        .btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 25px #06b6d4;
+        }
+
+        footer {
+            text-align: center;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.08);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 0.9rem;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+
+    <script src="firebase-online-storage.js"></script>
+    <script>
+        function updateSellerStatus() {
+            const seller = JSON.parse(MMStorage.getItem("currentSeller"));
+            if (!seller) {
+                document.getElementById("statusTitle").innerText = "❌ No Seller Found";
+                document.getElementById("statusMessage").innerText = "Please register first.";
+                return;
+            }
+
+            const sellers = JSON.parse(MMStorage.getItem("sellers")) || [];
+            const storedSeller = sellers.find(s => s.email === seller.email);
+
+            let status = storedSeller ? storedSeller.status.toLowerCase() : "pending";
+
+            const statusTitle = document.getElementById("statusTitle");
+            const statusMsg = document.getElementById("statusMessage");
+            const continueBtn = document.getElementById("continueBtn");
+            const detailsBox = document.querySelector(".details-box");
+
+            // Default
+            detailsBox.style.display = "block";
+            document.getElementById("detailsName").innerText = seller.name;
+            document.getElementById("detailsPlan").innerText = seller.plan;
+            document.getElementById("detailsEmail").innerText = seller.email;
+
+            if (status === "approved" || status === "active") {
+                statusTitle.innerText = "✅ Payment Approved";
+                statusMsg.innerText = "Your seller account is now active. Welcome to MatrixMarket!";
+                statusMsg.className = "status-message success";
+                continueBtn.style.display = "inline-block";
+
+                setTimeout(() => {
+                    window.location.href = "seller-dashboard.html";
+                }, 3000);
+            }
+            else if (status === "declined") {
+                statusTitle.innerText = "❌ Payment Declined";
+                statusMsg.innerText = "Your payment was rejected by the admin.";
+                statusMsg.className = "status-message declined";
+                continueBtn.style.display = "none";
+            }
+            else {
+                statusTitle.innerText = "⌛ Pending Approval";
+                statusMsg.innerText = "Your payment is under review. Please check back later.";
+                statusMsg.className = "status-message pending";
+                continueBtn.style.display = "none";
+            }
+        }
+
+        function initPaymentAcceptPage() {
+            updateSellerStatus();
+            setInterval(updateSellerStatus, 4000);
+
+            document.getElementById("continueBtn").addEventListener("click", function () {
+                window.location.href = "seller-dashboard.html";
+            });
+        }
+
+        window.onload = function () {
+            const ready = window.MMStorage && window.MMStorage.ready;
+            if (ready && typeof ready.then === "function") {
+                ready.finally(initPaymentAcceptPage);
+                return;
+            }
+            initPaymentAcceptPage();
+        };
+    </script>
+    <link rel="stylesheet" href="upgrade.css">
+</head>
+
+<body>
+    <header>
+        <div class="logo">MatrixMarket</div>
+        <nav>
+            <a href="index.html">Home</a>
+            <a href="shop.html">Shop</a>
+            <a href="seller-login.html">Sellers</a>
+        </nav>
+    </header>
+
+    <div class="status-container">
+        <div class="status-card">
+            <h1 id="statusTitle">Checking Status...</h1>
+            <p id="statusMessage" class="status-message pending"></p>
+
+            <div class="details-box">
+                <p><strong>Name:</strong> <span id="detailsName"></span></p>
+                <p><strong>Email:</strong> <span id="detailsEmail"></span></p>
+                <p><strong>Plan:</strong> <span id="detailsPlan"></span></p>
+            </div>
+
+            <button id="continueBtn" class="btn">Go to Seller Dashboard</button>
+        </div>
+    </div>
+
+<footer>
+        <p>© 2025 MatrixMarket | Seller Payment Status</p>
+    </footer>
+    <script defer src="upgrade.js"></script>
+  <script defer src="sw-register.js?v=20260226a"></script>
+  <script defer src="site-performance.js?v=20260226a"></script>
+</body>
+</html>
+
+
+
+
+

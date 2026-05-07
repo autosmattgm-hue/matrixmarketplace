@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>MatrixMarket - Cart</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body { margin: 0; font-family: "Poppins", sans-serif; background: #f5f7fb; color: #1f2937; }
+        header { background: #ffffff; border-bottom: 1px solid #e5e7eb; box-shadow: 0 2px 10px rgba(15, 23, 42, .06); display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; position: sticky; top: 0; z-index: 1000; }
+        .logo { font-size: 1.4rem; font-weight: 800; color: #111827; }
+        nav { display: flex; gap: 12px; flex-wrap: wrap; }
+        nav a { color: #374151; text-decoration: none; font-weight: 600; }
+        .page { width: min(1100px, 100% - 20px); margin: 18px auto 30px; display: grid; grid-template-columns: 1.45fr .9fr; gap: 14px; }
+        .card { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 14px; padding: 12px; box-shadow: 0 8px 20px rgba(15, 23, 42, .05); }
+        h1, h2, h3, p { margin: 0; }
+        .title { margin-bottom: 10px; color: #111827; }
+        .cart-list { display: grid; gap: 9px; }
+        .cart-item { display: grid; grid-template-columns: 70px 1fr auto; gap: 10px; align-items: center; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 10px; padding: 8px; }
+        .cart-item img { width: 70px; height: 70px; object-fit: cover; border-radius: 8px; background: #f3f4f6; }
+        .name { font-weight: 700; color: #111827; }
+        .meta { color: #6b7280; font-size: .85rem; margin-top: 2px; }
+        .price { margin-top: 4px; font-weight: 700; color: #111827; }
+        .qty { display: flex; align-items: center; gap: 6px; }
+        .qty button, .remove, .btn, .mini-btn { border: 1px solid #d1d5db; background: #ffffff; color: #1f2937; border-radius: 8px; cursor: pointer; }
+        .qty button { width: 30px; height: 30px; }
+        .remove { padding: 7px 10px; }
+        .remove:hover, .qty button:hover, .mini-btn:hover { border-color: #9ca3af; background: #f9fafb; }
+        .form-grid { display: grid; gap: 8px; }
+        input, textarea, select { width: 100%; border: 1px solid #d1d5db; background: #ffffff; color: #111827; border-radius: 10px; padding: 10px; font: inherit; }
+        textarea { resize: vertical; min-height: 82px; }
+        .coupon-row { display: grid; grid-template-columns: 1fr auto; gap: 7px; }
+        .btn { padding: 10px 12px; font-weight: 700; background: #2563eb; border: 1px solid #1d4ed8; color: #ffffff; }
+        .btn:hover { filter: brightness(1.08); }
+        .mini-btn { padding: 8px 10px; }
+        .summary { display: grid; gap: 6px; font-size: .94rem; }
+        .line { display: flex; justify-content: space-between; gap: 8px; color: #374151; }
+        .total { border-top: 1px solid #e5e7eb; margin-top: 6px; padding-top: 8px; font-size: 1.05rem; font-weight: 800; color: #111827; }
+        .foot-actions { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 10px; }
+        .item-actions { display: grid; gap: 7px; margin-top: 7px; }
+        .empty { text-align: center; border: 1px dashed #d1d5db; border-radius: 10px; color: #6b7280; padding: 16px; }
+        .hint { margin-top: 8px; font-size: .82rem; color: #6b7280; }
+        .status { margin-top: 8px; font-size: .83rem; color: #1d4ed8; }
+        .tool-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+        .tool-row label { font-size: .8rem; color: #6b7280; display: grid; gap: 4px; }
+        @media (max-width: 900px) { .page { grid-template-columns: 1fr; } }
+        @media (max-width: 680px) {
+            header { align-items: flex-start; padding: 12px 10px; }
+            nav { width: 100%; overflow-x: auto; padding-bottom: 2px; }
+            nav a { white-space: nowrap; }
+            .tool-row { grid-template-columns: 1fr; }
+            .cart-item { grid-template-columns: 1fr; }
+            .cart-item img { width: 100%; height: 170px; }
+            .item-actions { grid-template-columns: 1fr 1fr; }
+            .foot-actions { display: grid; grid-template-columns: 1fr 1fr; }
+            .foot-actions .mini-btn,
+            .foot-actions a { width: 100%; justify-content: center; text-align: center; }
+        }
+        @media (max-width: 460px) {
+            .foot-actions { grid-template-columns: 1fr; }
+            .item-actions { grid-template-columns: 1fr; }
+        }
+    </style>
+    <link rel="stylesheet" href="upgrade.css">
+    <script src="firebase-online-storage.js"></script>
+</head>
+<body>
+    <header>
+        <div class="logo">MatrixMarket</div>
+        <nav>
+            <a href="index.html">Home</a>
+            <a href="shop.html">Shop</a>
+            <a href="cart.html">Cart</a>
+            <a href="chat.html">Chat</a>
+        </nav>
+    </header>
+
+    <main class="page">
+        <section class="card">
+            <h2 class="title">Shopping Cart</h2>
+            <div class="tool-row">
+                <label>Sort Items
+                    <select id="sortCart">
+                        <option value="recent">Recently Added</option>
+                        <option value="priceDesc">Price High-Low</option>
+                        <option value="priceAsc">Price Low-High</option>
+                        <option value="nameAsc">Name A-Z</option>
+                    </select>
+                </label>
+                <label>Delivery Mode
+                    <select id="deliveryMode">
+                        <option value="standard">Standard (0.00 GMD)</option>
+                        <option value="express">Express (+35.00 GMD)</option>
+                    </select>
+                </label>
+            </div>
+            <div id="cartList" class="cart-list"></div>
+            <div class="foot-actions">
+                <button class="mini-btn" id="clearCartBtn" type="button">Clear Cart</button>
+                <button class="mini-btn" id="recheckStockBtn" type="button">Recheck Stock</button>
+                <button class="mini-btn" id="saveSnapshotBtn" type="button">Save Snapshot</button>
+                <button class="mini-btn" id="restoreSnapshotBtn" type="button">Restore Snapshot</button>
+                <a class="mini-btn" href="shop.html" style="text-decoration:none; display:inline-flex; align-items:center;">Continue Shopping</a>
+            </div>
+        </section>
+
+        <aside class="card">
+            <h3 class="title">Order Details</h3>
+            <div class="form-grid">
+                <input id="buyerName" type="text" placeholder="Full Name">
+                <input id="buyerPhone" type="text" placeholder="Phone Number">
+                <input id="buyerEmail" type="email" placeholder="Email Address">
+                <textarea id="buyerAddress" placeholder="Delivery Address"></textarea>
+            </div>
+
+            <div style="margin-top:10px;">
+                <div class="coupon-row">
+                    <input id="couponInput" type="text" placeholder="Coupon code (SAVE10 or FREEDEL)">
+                    <button class="mini-btn" id="applyCouponBtn" type="button">Apply</button>
+                </div>
+            <div id="couponStatus" class="status"></div>
+            <div id="stockStatus" class="status"></div>
+            </div>
+
+            <div class="summary" id="summaryBox" style="margin-top:10px;">
+                <div class="line"><span>Items</span><span id="sumItems">0</span></div>
+                <div class="line"><span>Subtotal</span><span id="sumSubtotal">0.00 GMD</span></div>
+                <div class="line"><span>Discount</span><span id="sumDiscount">0.00 GMD</span></div>
+                <div class="line"><span>Delivery Fee</span><span id="sumDelivery">0.00 GMD</span></div>
+                <div class="line"><span>Shipping</span><span id="sumShipping">0.00 GMD</span></div>
+                <div class="line total"><span>Total</span><span id="sumTotal">0.00 GMD</span></div>
+            </div>
+
+            <button class="btn" id="checkoutBtn" type="button" style="margin-top:10px; width:100%;">Proceed to Checkout</button>
+            <div id="deliveryStatus" class="status"></div>
+            <p class="hint">Free shipping from 500 GMD. Coupon support: <b>SAVE10</b> and <b>FREEDEL</b>. Move products to wishlist from cart items.</p>
+        </aside>
+    </main>
+
+    <script src="seller-core.js?v=20260222g"></script>
+    <script>
+        const state = {
+            cart: [],
+            coupon: null,
+            deliveryMode: "standard",
+            totals: { items: 0, subtotal: 0, discount: 0, deliveryFee: 0, shipping: 0, total: 0 },
+            liveProducts: [],
+            checkingOut: false
+        };
+
+        const couponMap = {
+            SAVE10: function (subtotal) { return Math.min(subtotal * 0.10, 500); },
+            FREEDEL: function () { return 0; }
+        };
+        const BUYER_SCOPE_PREFIX = "__mm_buyer__";
+        const SCOPED_KEYS = new Set([
+            "cart",
+            "cartItems",
+            "buyerInfo",
+            "buyerInfoDraft",
+            "checkoutCart",
+            "checkoutMeta",
+            "cartCoupon",
+            "cartDeliveryMode",
+            "lastCartSnapshot",
+            "marketplaceWishlist"
+        ]);
+        const LEGACY_READ_THROUGH_KEYS = new Set([
+            "cart",
+            "cartItems",
+            "checkoutCart",
+            "checkoutMeta",
+            "cartCoupon",
+            "cartDeliveryMode",
+            "lastCartSnapshot"
+        ]);
+        let cachedUserScope = null;
+
+        function byId(id) { return document.getElementById(id); }
+        const storage = (function () {
+            if (window.MMStorage && typeof window.MMStorage.getItem === "function") return window.MMStorage;
+            try {
+                if (window.localStorage && typeof window.localStorage.getItem === "function") return window.localStorage;
+            } catch (_) {}
+            return {
+                getItem: function () { return null; },
+                setItem: function () {},
+                removeItem: function () {}
+            };
+        })();
+        function num(v) { const n = Number(v); return Number.isFinite(n) ? n : 0; }
+        function money(v) { return num(v).toFixed(2) + " GMD"; }
+        function cleanEmail(v) { return String(v || "").trim().toLowerCase(); }
+        function cleanPhone(v) { return String(v || "").replace(/\D+/g, ""); }
+        function isValidEmail(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || "").trim()); }
+        function esc(v) { return String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;"); }
+        function parseStoredJson(raw, fallback) {
+            if (raw == null || raw === "") return fallback;
+            try {
+                const parsed = JSON.parse(raw);
+                return parsed == null ? fallback : parsed;
+            } catch (_) {
+                return fallback;
+            }
+        }
+        function normalizeScopeToken(value) {
+            const token = String(value == null ? "" : value).trim().toLowerCase();
+            if (!token) return "";
+            return token.replace(/[^a-z0-9._:@-]+/g, "_");
+        }
+        function resolveUserScopeToken() {
+            const user = parseStoredJson(storage.getItem("currentUser"), null) || parseStoredJson(storage.getItem("loggedInUser"), null) || {};
+            const email = normalizeScopeToken(user && user.email);
+            if (email) return email;
+            const uid = normalizeScopeToken(user && (user.id || user.uid || user.userId));
+            if (uid) return "id_" + uid;
+            const phone = normalizeScopeToken(user && user.phone);
+            if (phone) return "phone_" + phone;
+            const name = normalizeScopeToken(user && (user.username || user.name || user.fullName));
+            if (name) return "name_" + name;
+            return "guest";
+        }
+        function userScopeToken() {
+            if (cachedUserScope) return cachedUserScope;
+            cachedUserScope = resolveUserScopeToken();
+            return cachedUserScope;
+        }
+        function shouldScopeKey(key) {
+            return SCOPED_KEYS.has(String(key || ""));
+        }
+        function scopedStorageKey(key) {
+            return BUYER_SCOPE_PREFIX + userScopeToken() + "__" + String(key || "");
+        }
+        function guestScopedStorageKey(key) {
+            return BUYER_SCOPE_PREFIX + "guest__" + String(key || "");
+        }
+        function rawGet(key) {
+            const target = String(key || "");
+            try {
+                if (shouldScopeKey(target)) {
+                    const scoped = storage.getItem(scopedStorageKey(target));
+                    if (scoped != null && scoped !== "") return scoped;
+                    if (LEGACY_READ_THROUGH_KEYS.has(target)) {
+                        const guestScoped = storage.getItem(guestScopedStorageKey(target));
+                        if (guestScoped != null && guestScoped !== "") return guestScoped;
+                        const legacy = storage.getItem(target);
+                        if (legacy != null && legacy !== "") return legacy;
+                    }
+                    if (userScopeToken() !== "guest") return null;
+                }
+                return storage.getItem(target);
+            } catch (_) {
+                return null;
+            }
+        }
+        function rawSet(key, value) {
+            const target = String(key || "");
+            try {
+                storage.setItem(shouldScopeKey(target) ? scopedStorageKey(target) : target, value);
+                return true;
+            } catch (_) {
+                return false;
+            }
+        }
+        function rawRemove(key) {
+            const target = String(key || "");
+            try {
+                storage.removeItem(shouldScopeKey(target) ? scopedStorageKey(target) : target);
+                return true;
+            } catch (_) {
+                return false;
+            }
+        }
+        function read(key, fallback) {
+            try {
+                const data = JSON.parse(rawGet(key) || "null");
+                return data ?? fallback;
+            } catch (_) {
+                return fallback;
+            }
+        }
+        function write(key, value) {
+            return rawSet(key, JSON.stringify(value));
+        }
+        function directReadJson(storageKey, fallback) {
+            try {
+                const raw = storage.getItem(storageKey);
+                if (raw == null || raw === "") return fallback;
+                const parsed = JSON.parse(raw);
+                return parsed ?? fallback;
+            } catch (_) {
+                return fallback;
+            }
+        }
+        function readBridgeCart() {
+            try {
+                const raw = String(window.name || "").trim();
+                if (!raw) return [];
+                const parsed = JSON.parse(raw);
+                if (!parsed || typeof parsed !== "object") return [];
+                const bridge = parsed.mmCartBridge;
+                if (!bridge || !Array.isArray(bridge.cart)) return [];
+                return normalizeCart(bridge.cart);
+            } catch (_) {
+                return [];
+            }
+        }
+        function recoverCartFromAnyKey() {
+            const bridgeRows = readBridgeCart();
+            if (bridgeRows.length) return bridgeRows;
+            const keyPool = [
+                scopedStorageKey("cart"),
+                scopedStorageKey("cartItems"),
+                scopedStorageKey("checkoutCart"),
+                guestScopedStorageKey("cart"),
+                guestScopedStorageKey("cartItems"),
+                guestScopedStorageKey("checkoutCart"),
+                "cart",
+                "cartItems",
+                "checkoutCart"
+            ];
+            const seen = new Set();
+            let best = [];
+            for (let i = 0; i < keyPool.length; i += 1) {
+                const key = String(keyPool[i] || "");
+                if (!key || seen.has(key)) continue;
+                seen.add(key);
+                const rows = normalizeCart(directReadJson(key, []));
+                if (rows.length > best.length) best = rows;
+            }
+            return best;
+        }
+
+        function wishlistKey(item) {
+            const id = String(item.id || "").trim();
+            const sellerEmail = String(item.sellerEmail || "").trim().toLowerCase();
+            const name = String(item.name || "").trim().toLowerCase();
+            return [id, sellerEmail || String(item.seller || "").trim().toLowerCase(), name].join("::");
+        }
+
+        function getDeliveryFee() {
+            return state.deliveryMode === "express" ? 35 : 0;
+        }
+
+        function getEtaText() {
+            return state.deliveryMode === "express" ? "Next day delivery" : "2-3 days delivery";
+        }
+
+        function applySort() {
+            const sort = byId("sortCart").value;
+            if (sort === "priceDesc") {
+                state.cart.sort(function (a, b) { return num(b.price) - num(a.price); });
+                return;
+            }
+            if (sort === "priceAsc") {
+                state.cart.sort(function (a, b) { return num(a.price) - num(b.price); });
+                return;
+            }
+            if (sort === "nameAsc") {
+                state.cart.sort(function (a, b) { return String(a.name).localeCompare(String(b.name)); });
+                return;
+            }
+        }
+
+        function updateDeliveryStatus() {
+            const note = byId("deliveryStatus");
+            if (!note) return;
+            note.textContent = state.deliveryMode === "express"
+                ? "Express delivery selected: +35.00 GMD, estimated next day."
+                : "Standard delivery selected: no extra delivery fee.";
+        }
+
+        function setCheckouting(active) {
+            state.checkingOut = !!active;
+            const btn = byId("checkoutBtn");
+            if (!btn) return;
+            btn.disabled = state.checkingOut || state.cart.length === 0;
+            btn.textContent = state.checkingOut ? "Preparing..." : "Proceed to Checkout";
+        }
+
+        function normalizeCart(raw) {
+            if (!Array.isArray(raw)) return [];
+            return raw
+                .filter(function (item) { return item && item.name; })
+                .map(function (item) {
+                    return {
+                        id: String(item.id || item.productId || ""),
+                        name: String(item.name || "Product"),
+                        seller: String(item.seller || "N/A"),
+                        sellerEmail: String(item.sellerEmail || ""),
+                        category: String(item.category || "general"),
+                        image: String(item.image || "matrixx.png"),
+                        price: num(item.price),
+                        quantity: Math.max(1, Math.floor(num(item.quantity || 1)))
+                    };
+                });
+        }
+
+        function persistCart() {
+            write("cart", state.cart);
+            write("cartItems", state.cart);
+        }
+
+        function normalizeLiveProductRow(item, index) {
+            const row = item && typeof item === "object" ? item : {};
+            const stock = Math.max(0, Math.floor(num(row.stock || row.quantity || row.qty || 0)));
+            return {
+                id: String(row.id || row.productId || row.productKey || ("PRD-" + index)),
+                productId: String(row.productId || row.id || row.productKey || ("PRD-" + index)),
+                productKey: String(row.productKey || row.id || row.productId || ("PRD-" + index)),
+                name: String(row.name || row.title || "Product"),
+                seller: String(row.seller || row.sellerName || ""),
+                sellerEmail: String(row.sellerEmail || ""),
+                price: num(row.price || 0),
+                stock: stock,
+                image: String(row.image || ""),
+                category: String(row.category || "general")
+            };
+        }
+
+        function loadLiveProducts() {
+            let rows = [];
+            if (window.SellerCore && typeof window.SellerCore.getMarketplaceProducts === "function") {
+                try {
+                    rows = window.SellerCore.getMarketplaceProducts({ includeOutOfStock: true, includeHidden: true });
+                } catch (_) {
+                    rows = [];
+                }
+            }
+            const fallback = read("products", []);
+            const fallbackRows = Array.isArray(fallback) ? fallback : [];
+            const merged = []
+                .concat(Array.isArray(rows) ? rows : [])
+                .concat(fallbackRows);
+            state.liveProducts = merged.map(normalizeLiveProductRow);
+        }
+
+        function matchLiveProduct(item) {
+            const id = String(item.id || item.productId || item.productKey || "");
+            const name = String(item.name || "").toLowerCase();
+            const seller = String(item.seller || "").toLowerCase();
+            const sellerEmail = String(item.sellerEmail || "").toLowerCase();
+            return state.liveProducts.find(function (product) {
+                const pId = String(product.id || product.productId || product.productKey || "");
+                if (id && pId && pId === id) return true;
+                const pName = String(product.name || "").toLowerCase();
+                const pSeller = String(product.seller || product.sellerName || "").toLowerCase();
+                const pSellerEmail = String(product.sellerEmail || "").toLowerCase();
+                if (sellerEmail && pSellerEmail && sellerEmail === pSellerEmail && name === pName) return true;
+                if (name && pName === name && (!seller || seller === pSeller)) return true;
+                return name === pName && seller === pSeller;
+            }) || null;
+        }
+
+        function syncCartWithStock() {
+            loadLiveProducts();
+            if (!Array.isArray(state.liveProducts) || state.liveProducts.length === 0) {
+                const stockStatus = byId("stockStatus");
+                if (stockStatus) {
+                    stockStatus.textContent = "Stock service is unavailable right now. Showing your saved cart items.";
+                }
+                return;
+            }
+            const notes = [];
+            const next = [];
+
+            state.cart.forEach(function (item) {
+                const live = matchLiveProduct(item);
+                if (!live) {
+                    notes.push(item.name + " was removed (no longer available).");
+                    return;
+                }
+                const available = Math.max(0, Math.floor(num(live.stock)));
+                if (available <= 0) {
+                    notes.push(item.name + " was removed (out of stock).");
+                    return;
+                }
+
+                const wanted = Math.max(1, Math.floor(num(item.quantity || 1)));
+                const quantity = Math.min(wanted, available);
+                if (quantity < wanted) {
+                    notes.push(item.name + " quantity adjusted to " + quantity + " due to stock.");
+                }
+
+                next.push({
+                    id: String(item.id || live.id || ""),
+                    name: String(item.name || live.name || "Product"),
+                    seller: String(item.seller || live.seller || live.sellerName || "N/A"),
+                    sellerEmail: String(item.sellerEmail || live.sellerEmail || ""),
+                    category: String(item.category || live.category || "general"),
+                    image: String(item.image || live.image || "matrixx.png"),
+                    price: num(live.price || item.price),
+                    quantity: quantity
+                });
+            });
+
+            state.cart = next;
+            persistCart();
+
+            const stockStatus = byId("stockStatus");
+            if (stockStatus) stockStatus.textContent = notes.join(" ");
+        }
+
+        function loadBuyerForm() {
+            const draft = read("buyerInfoDraft", null);
+            const buyer = read("buyerInfo", null);
+            const user = read("currentUser", null);
+            const source = draft || buyer || user || {};
+            byId("buyerName").value = source.name || source.fullName || "";
+            byId("buyerPhone").value = source.phone || "";
+            byId("buyerEmail").value = source.email || "";
+            byId("buyerAddress").value = source.address || "";
+        }
+
+        function saveBuyerDraft() {
+            const buyer = {
+                name: byId("buyerName").value.trim(),
+                phone: byId("buyerPhone").value.trim(),
+                email: byId("buyerEmail").value.trim(),
+                address: byId("buyerAddress").value.trim()
+            };
+            write("buyerInfoDraft", buyer);
+        }
+
+        function computeTotals() {
+            const items = state.cart.reduce(function (sum, item) { return sum + item.quantity; }, 0);
+            const subtotal = state.cart.reduce(function (sum, item) { return sum + (item.price * item.quantity); }, 0);
+            let shipping = subtotal >= 500 || subtotal === 0 ? 0 : 25;
+            const deliveryFee = getDeliveryFee();
+            let discount = 0;
+
+            if (state.coupon === "SAVE10") discount = couponMap.SAVE10(subtotal);
+            if (state.coupon === "FREEDEL") shipping = 0;
+
+            const total = Math.max(0, subtotal - discount + shipping + deliveryFee);
+            state.totals = {
+                items: items,
+                subtotal: subtotal,
+                discount: discount,
+                deliveryFee: deliveryFee,
+                shipping: shipping,
+                total: total
+            };
+        }
+
+        function renderSummary() {
+            computeTotals();
+            byId("sumItems").textContent = String(state.totals.items);
+            byId("sumSubtotal").textContent = money(state.totals.subtotal);
+            byId("sumDiscount").textContent = "- " + money(state.totals.discount);
+            byId("sumDelivery").textContent = money(state.totals.deliveryFee);
+            byId("sumShipping").textContent = money(state.totals.shipping);
+            byId("sumTotal").textContent = money(state.totals.total);
+            updateDeliveryStatus();
+            byId("checkoutBtn").disabled = state.cart.length === 0 || state.checkingOut;
+        }
+
+        function renderCart() {
+            const list = byId("cartList");
+            if (!state.cart.length) {
+                list.innerHTML = '<div class="empty">Your cart is empty. Add items from the shop.</div>';
+                renderSummary();
+                return;
+            }
+
+            applySort();
+            list.innerHTML = state.cart.map(function (item, index) {
+                const live = matchLiveProduct(item);
+                const liveStock = live ? Math.max(0, Math.floor(num(live.stock))) : 0;
+                const safeImage = esc(item.image || "matrixx.png");
+                const safeName = esc(item.name);
+                const safeSeller = esc(item.seller);
+                return `
+                    <article class="cart-item">
+                    <img loading="lazy" decoding="async" fetchpriority="low" src="${safeImage}" alt="${safeName}" onerror="this.onerror=null;this.src='matrixx.png';">
+                        <div>
+                            <div class="name">${safeName}</div>
+                            <div class="meta">Seller: ${safeSeller}</div>
+                            <div class="meta">Unit: ${money(item.price)}</div>
+                            <div class="meta">In Stock: ${liveStock}</div>
+                            <div class="price">Subtotal: ${money(item.price * item.quantity)}</div>
+                        </div>
+                        <div>
+                            <div class="qty">
+                                <button type="button" onclick="updateQty(${index}, -1)">-</button>
+                                <span>${item.quantity}</span>
+                                <button type="button" onclick="updateQty(${index}, 1)">+</button>
+                            </div>
+                            <div class="item-actions">
+                                <button class="remove" type="button" onclick="removeItem(${index})">Remove</button>
+                                <button class="remove" type="button" onclick="moveToWishlist(${index})">Move to Wishlist</button>
+                            </div>
+                        </div>
+                    </article>
+                `;
+            }).join("");
+
+            renderSummary();
+        }
+
+        function updateQty(index, delta) {
+            if (!state.cart[index]) return;
+            const live = matchLiveProduct(state.cart[index]);
+            const maxStock = live ? Math.max(0, Math.floor(num(live.stock))) : 0;
+            const next = state.cart[index].quantity + delta;
+            if (next <= 0) state.cart.splice(index, 1);
+            else if (maxStock > 0) state.cart[index].quantity = Math.min(next, maxStock);
+            else state.cart.splice(index, 1);
+            persistCart();
+            renderCart();
+        }
+
+        function removeItem(index) {
+            state.cart.splice(index, 1);
+            persistCart();
+            renderCart();
+        }
+
+        function moveToWishlist(index) {
+            const item = state.cart[index];
+            if (!item) return;
+            const rows = read("marketplaceWishlist", []);
+            const list = Array.isArray(rows) ? rows.slice() : [];
+            const key = wishlistKey(item);
+            if (!list.includes(key)) list.push(key);
+            write("marketplaceWishlist", list);
+            state.cart.splice(index, 1);
+            persistCart();
+            renderCart();
+            byId("stockStatus").textContent = item.name + " moved to wishlist.";
+        }
+
+        function clearCart() {
+            state.cart = [];
+            persistCart();
+            renderCart();
+            alert("Cart cleared");
+        }
+
+        function saveSnapshot() {
+            const payload = {
+                cart: state.cart,
+                coupon: state.coupon,
+                deliveryMode: state.deliveryMode,
+                savedAt: new Date().toISOString()
+            };
+            write("lastCartSnapshot", payload);
+            byId("stockStatus").textContent = "Cart snapshot saved.";
+        }
+
+        function restoreSnapshot() {
+            const snap = read("lastCartSnapshot", null);
+            if (!snap || !Array.isArray(snap.cart)) {
+                byId("stockStatus").textContent = "No snapshot found.";
+                return;
+            }
+            state.cart = normalizeCart(snap.cart);
+            state.coupon = snap.coupon || null;
+            state.deliveryMode = snap.deliveryMode === "express" ? "express" : "standard";
+            byId("couponInput").value = state.coupon || "";
+            byId("couponStatus").textContent = state.coupon ? ("Coupon restored: " + state.coupon) : "";
+            byId("deliveryMode").value = state.deliveryMode;
+            rawSet("cartDeliveryMode", state.deliveryMode);
+            persistCart();
+            syncCartWithStock();
+            renderCart();
+        }
+
+        function recheckStock() {
+            syncCartWithStock();
+            renderCart();
+        }
+
+        function applyCoupon() {
+            const code = byId("couponInput").value.trim().toUpperCase();
+            const status = byId("couponStatus");
+
+            if (!code) {
+                state.coupon = null;
+                rawRemove("cartCoupon");
+                status.textContent = "Coupon removed.";
+                renderSummary();
+                return;
+            }
+
+            if (!couponMap[code]) {
+                status.textContent = "Invalid coupon code.";
+                return;
+            }
+
+            state.coupon = code;
+            rawSet("cartCoupon", code);
+            status.textContent = "Coupon applied: " + code;
+            renderSummary();
+        }
+
+        async function checkout() {
+            if (state.checkingOut) return;
+            setCheckouting(true);
+            syncCartWithStock();
+            if (!state.cart.length) {
+                alert("Your cart is empty");
+                setCheckouting(false);
+                return;
+            }
+
+            const buyer = {
+                name: byId("buyerName").value.trim(),
+                phone: cleanPhone(byId("buyerPhone").value),
+                email: cleanEmail(byId("buyerEmail").value),
+                address: byId("buyerAddress").value.trim()
+            };
+
+            if (!buyer.name || !buyer.phone || !buyer.email || !buyer.address) {
+                alert("Please fill all buyer information fields");
+                setCheckouting(false);
+                return;
+            }
+            if (!isValidEmail(buyer.email)) {
+                alert("Please enter a valid email address");
+                setCheckouting(false);
+                return;
+            }
+            if (buyer.phone.length < 7) {
+                alert("Please enter a valid phone number");
+                setCheckouting(false);
+                return;
+            }
+
+            const buyerSaved = write("buyerInfo", buyer) && write("buyerInfoDraft", buyer);
+            const cartSaved = write("checkoutCart", state.cart);
+            const metaSaved = write("checkoutMeta", {
+                coupon: state.coupon,
+                subtotal: state.totals.subtotal,
+                discount: state.totals.discount,
+                shipping: state.totals.shipping + state.totals.deliveryFee,
+                deliveryFee: state.totals.deliveryFee,
+                deliveryMode: state.deliveryMode,
+                etaText: getEtaText(),
+                total: state.totals.total
+            });
+            if (!buyerSaved || !cartSaved || !metaSaved) {
+                alert("Could not prepare checkout data. Please try again.");
+                setCheckouting(false);
+                return;
+            }
+
+            // Bridge the selected products into the next page immediately so
+            // checkout can still render even if remote sync or cached reads lag.
+            try {
+                window.name = JSON.stringify({
+                    mmCartBridge: {
+                        cart: state.cart,
+                        buyer: buyer,
+                        meta: {
+                            coupon: state.coupon,
+                            subtotal: state.totals.subtotal,
+                            discount: state.totals.discount,
+                            shipping: state.totals.shipping + state.totals.deliveryFee,
+                            deliveryFee: state.totals.deliveryFee,
+                            deliveryMode: state.deliveryMode,
+                            etaText: getEtaText(),
+                            total: state.totals.total
+                        },
+                        createdAt: new Date().toISOString()
+                    }
+                });
+            } catch (_) {}
+
+            // MMStorage syncs remotely in the background; wait briefly to avoid losing checkout payload on redirect.
+            try {
+                if (window.MMStorage && typeof window.MMStorage.syncNow === "function") {
+                    await Promise.race([
+                        window.MMStorage.syncNow(),
+                        new Promise(function (resolve) { setTimeout(resolve, 1200); })
+                    ]);
+                }
+            } catch (_) {}
+
+            window.location.href = "checkout.html";
+        }
+
+        function init() {
+            state.cart = normalizeCart(read("cart", []));
+            if (!state.cart.length) {
+                const recovered = recoverCartFromAnyKey();
+                if (recovered.length) {
+                    state.cart = recovered;
+                    persistCart();
+                    const stockStatus = byId("stockStatus");
+                    if (stockStatus) stockStatus.textContent = "Recovered cart items from cached storage.";
+                }
+            }
+            state.deliveryMode = rawGet("cartDeliveryMode") === "express" ? "express" : "standard";
+            byId("deliveryMode").value = state.deliveryMode;
+            syncCartWithStock();
+            state.coupon = (rawGet("cartCoupon") || "").toUpperCase() || null;
+            if (state.coupon) {
+                byId("couponInput").value = state.coupon;
+                byId("couponStatus").textContent = "Coupon active: " + state.coupon;
+            }
+
+            renderCart();
+            loadBuyerForm();
+            setCheckouting(false);
+
+            ["buyerName", "buyerPhone", "buyerEmail", "buyerAddress"].forEach(function (id) {
+                byId(id).addEventListener("input", saveBuyerDraft);
+            });
+
+            byId("applyCouponBtn").addEventListener("click", applyCoupon);
+            byId("clearCartBtn").addEventListener("click", clearCart);
+            byId("recheckStockBtn").addEventListener("click", recheckStock);
+            byId("saveSnapshotBtn").addEventListener("click", saveSnapshot);
+            byId("restoreSnapshotBtn").addEventListener("click", restoreSnapshot);
+            byId("sortCart").addEventListener("change", function () {
+                renderCart();
+            });
+            byId("deliveryMode").addEventListener("change", function () {
+                state.deliveryMode = this.value === "express" ? "express" : "standard";
+                rawSet("cartDeliveryMode", state.deliveryMode);
+                renderSummary();
+            });
+            byId("checkoutBtn").addEventListener("click", checkout);
+        }
+
+        window.addEventListener("load", function () {
+            const ready = window.MMStorage && window.MMStorage.ready;
+            if (ready && typeof ready.then === "function") {
+                ready.finally(init);
+                return;
+            }
+            init();
+        });
+    </script>
+    <script defer src="upgrade.js"></script>
+  <script defer src="sw-register.js?v=20260226a"></script>
+  <script defer src="site-performance.js?v=20260226a"></script>
+</body>
+</html>
+
+
+
+

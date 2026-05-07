@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Admin Payments - MatrixMarket</title>
+    <link rel="stylesheet" href="admin-layout.css?v=20260227a">
+    <link rel="stylesheet" href="upgrade.css">
+    <script src="firebase-online-storage.js"></script>
+</head>
+<body class="admin-page">
+    <div id="adminHeader"></div>
+    <main class="admin-shell">
+        <section class="admin-titlebar">
+            <h1>Payment Requests</h1>
+            <div class="admin-actions">
+                <button class="btn-adm" id="refreshBtn" type="button">Refresh</button>
+                <button class="btn-adm" id="exportBtn" type="button">Export CSV</button>
+                <button class="btn-adm primary" id="bulkApproveBtn" type="button">Approve Pending</button>
+            </div>
+        </section>
+
+        <section class="admin-card">
+            <div class="adm-toolbar">
+                <input class="adm" id="searchInput" type="text" placeholder="Search by name, email, method">
+                <select class="adm" id="statusFilter">
+                    <option value="">All Status</option>
+                    <option value="pending">Pending</option>
+                    <option value="approved">Approved</option>
+                    <option value="declined">Declined</option>
+                    <option value="cancelled">Cancelled</option>
+                </select>
+                <select class="adm" id="typeFilter">
+                    <option value="">All Types</option>
+                    <option value="top">Top-Up</option>
+                    <option value="with">Withdrawal</option>
+                    <option value="subscription">Subscription</option>
+                </select>
+                <button class="btn-adm" id="resetBtn" type="button">Reset</button>
+            </div>
+        </section>
+
+        <section class="admin-card">
+            <div class="adm-table-wrap">
+                <table class="adm-table" id="paymentTable"></table>
+            </div>
+        </section>
+
+        <div class="adm-foot">Withdrawal charges are applied on approval at GMD 2 per GMD 10 requested.</div>
+    </main>
+
+    <script src="admin-core.js?v=20260222c"></script>
+    <script>
+        const state = { rows: [], filtered: [] };
+
+        function setHeader() {
+            document.getElementById("adminHeader").innerHTML = AdminCore.renderAdminHeader("admin-accept-payment.html");
+        }
+
+        function readRows() {
+            state.rows = AdminCore.getPayments().map(function (r, i) {
+                const method = AdminCore.str(r.method || r.paymentMethod || "-");
+                const payoutNumber = AdminCore.str(r.payoutNumber || r.payerNumber || "");
+                const transactionId = AdminCore.str(r.transactionId || r.txId || "");
+                const inferredType = AdminCore.str(r.type || (r.plan ? "Subscription" : "Payment"));
+                return {
+                    index: i,
+                    id: r.id || ("REQ-" + i),
+                    name: AdminCore.str(r.name || r.fullName || "-"),
+                    email: AdminCore.str(r.email || ""),
+                    amount: AdminCore.num(r.amount || 0),
+                    charge: AdminCore.num(r.charge || 0),
+                    netAmount: AdminCore.num(r.netAmount || 0),
+                    method: method,
+                    payoutNumber: payoutNumber,
+                    transactionId: transactionId,
+                    proof: AdminCore.str(r.proof || ""),
+                    type: inferredType,
+                    status: AdminCore.str(r.status || "Pending"),
+                    createdAt: r.createdAt || r.date || new Date().toISOString(),
+                    raw: r
+                };
+            });
+        }
+
+        function applyFilters() {
+            const q = AdminCore.str(document.getElementById("searchInput").value).toLowerCase();
+            const s = AdminCore.str(document.getElementById("statusFilter").value).toLowerCase();
+            const t = AdminCore.str(document.getElementById("typeFilter").value).toLowerCase();
+
+            state.filtered = state.rows.filter(function (r) {
+                const hay = [r.name, r.email, r.method, r.type, r.payoutNumber, r.transactionId, r.proof].join(" ").toLowerCase();
+                const statusOk = !s || r.status.toLowerCase().includes(s);
+                const typeOk = !t || r.type.toLowerCase().includes(t);
+                return (!q || hay.includes(q)) && statusOk && typeOk;
+            }).sort(function (a, b) {
+                return String(b.createdAt).localeCompare(String(a.createdAt));
+            });
+        }
+
+        function rowButtons(r) {
+            const safe = String(r.index);
+            if (r.status.toLowerCase() !== "pending") {
+                return '<button class="btn-adm" data-action="pending" data-id="' + safe + '">Set Pending</button>';
+            }
+            return '<button class="btn-adm success" data-action="approve" data-id="' + safe + '">Approve</button>' +
+                   '<button class="btn-adm danger" data-action="decline" data-id="' + safe + '">Decline</button>';
+        }
+
+        function renderTable() {
+            const table = document.getElementById("paymentTable");
+            const head = '<thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Type</th><th>Amount</th><th>Charge</th><th>Net</th><th>Method</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>';
+
+            if (!state.filtered.length) {
+                table.innerHTML = head + '<tbody><tr><td colspan="11" class="adm-empty">No payment requests found.</td></tr></tbody>';
+                return;
+            }
+
+            table.innerHTML = head + '<tbody>' + state.filtered.map(function (r) {
+                const isWithdrawal = r.type.toLowerCase().includes("withdraw");
+                const charge = isWithdrawal ? (r.charge > 0 ? r.charge : AdminCore.withdrawalCharge(r.amount)) : 0;
+                const net = isWithdrawal ? (r.netAmount > 0 ? r.netAmount : AdminCore.withdrawalNet(r.amount)) : r.amount;
+                const txLine = r.transactionId ? ("<br><span class=\"adm-note\">Tx: " + r.transactionId + "</span>") : "";
+                const walletLine = r.payoutNumber ? ("<br><span class=\"adm-note\">No: " + r.payoutNumber + "</span>") : "";
+                const methodText = r.method + walletLine + txLine;
+                return '<tr>' +
+                    '<td>' + r.id + '</td>' +
+                    '<td>' + r.name + '</td>' +
+                    '<td>' + (r.email || "-") + '</td>' +
+                    '<td>' + (r.type || "-") + '</td>' +
+                    '<td>' + AdminCore.fmtMoney(r.amount) + '</td>' +
+                    '<td>' + AdminCore.fmtMoney(charge) + '</td>' +
+                    '<td>' + AdminCore.fmtMoney(net) + '</td>' +
+                    '<td>' + methodText + '</td>' +
+                    '<td>' + AdminCore.badge(r.status) + '</td>' +
+                    '<td>' + AdminCore.fmtDate(r.createdAt) + '</td>' +
+                    '<td><div class="adm-inline-actions">' + rowButtons(r) + '</div></td>' +
+                    '</tr>';
+            }).join("") + '</tbody>';
+        }
+
+        function refresh() {
+            readRows();
+            applyFilters();
+            renderTable();
+        }
+
+        function decide(index, to) {
+            const i = Number(index);
+            if (!Number.isInteger(i)) return;
+            const map = { approve: "Approved", decline: "Declined", pending: "Pending" };
+            const status = map[to] || "Pending";
+            AdminCore.applyPaymentDecision(i, status);
+            refresh();
+        }
+
+        function initAdminAcceptPaymentPage() {
+            setHeader();
+            refresh();
+            window.addEventListener("storage", refresh);
+
+            document.getElementById("searchInput").addEventListener("input", refresh);
+            document.getElementById("statusFilter").addEventListener("change", refresh);
+            document.getElementById("typeFilter").addEventListener("change", refresh);
+            document.getElementById("refreshBtn").addEventListener("click", refresh);
+
+            document.getElementById("resetBtn").addEventListener("click", function () {
+                document.getElementById("searchInput").value = "";
+                document.getElementById("statusFilter").value = "";
+                document.getElementById("typeFilter").value = "";
+                refresh();
+            });
+
+            document.getElementById("bulkApproveBtn").addEventListener("click", function () {
+                const pending = state.rows.filter(function (r) { return r.status.toLowerCase() === "pending"; });
+                pending.forEach(function (r) { AdminCore.applyPaymentDecision(r.index, "Approved"); });
+                AdminCore.log("bulk_payment_approved", { count: pending.length });
+                refresh();
+            });
+
+            document.getElementById("exportBtn").addEventListener("click", function () {
+                const rows = state.filtered.map(function (r) {
+                    return {
+                        id: r.id,
+                        name: r.name,
+                        email: r.email,
+                        type: r.type,
+                        amount: r.amount,
+                        charge: r.charge > 0 ? r.charge : (r.type.toLowerCase().includes("withdraw") ? AdminCore.withdrawalCharge(r.amount) : 0),
+                        netAmount: r.netAmount > 0 ? r.netAmount : (r.type.toLowerCase().includes("withdraw") ? AdminCore.withdrawalNet(r.amount) : r.amount),
+                        method: r.method,
+                        payoutNumber: r.payoutNumber,
+                        status: r.status,
+                        date: AdminCore.fmtDate(r.createdAt)
+                    };
+                });
+                AdminCore.exportCSV(rows, "admin-payments.csv");
+                AdminCore.log("payments_csv_exported", { count: rows.length });
+            });
+
+            document.getElementById("paymentTable").addEventListener("click", function (e) {
+                const btn = e.target.closest("button[data-action]");
+                if (!btn) return;
+                decide(btn.dataset.id, btn.dataset.action);
+            });
+        }
+
+        function startAdminAcceptPaymentPage() {
+            const ready = window.MMStorage && window.MMStorage.ready;
+            if (ready && typeof ready.then === "function") {
+                ready.finally(initAdminAcceptPaymentPage);
+                return;
+            }
+            initAdminAcceptPaymentPage();
+        }
+
+        if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", startAdminAcceptPaymentPage);
+        else startAdminAcceptPaymentPage();
+    </script>
+    <script defer src="upgrade.js"></script>
+  <script defer src="sw-register.js?v=20260226a"></script>
+  <script defer src="site-performance.js?v=20260226a"></script>
+</body>
+</html>
+
+
+
+

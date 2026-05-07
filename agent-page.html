@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
+    <title>MatrixMarket AI Agent</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="upgrade.css">
+    <script defer src="firebase-online-storage.js"></script>
+    <style>
+        :root {
+            --bg: #f6fbfd;
+            --bg-soft: #eef6fa;
+            --panel: #ffffff;
+            --panel-alt: #f8fbfd;
+            --text: #17324a;
+            --muted: #617389;
+            --border: #d5e2eb;
+            --primary: #0a7c88;
+            --primary-deep: #085d66;
+            --accent: #ff8b52;
+            --accent-soft: #fff0e8;
+            --good: #1f9c6b;
+            --warn: #b55e18;
+            --shadow-sm: 0 6px 18px rgba(15, 23, 42, 0.06);
+            --shadow-md: 0 18px 42px rgba(15, 23, 42, 0.10);
+            --radius-lg: 22px;
+            --radius-md: 16px;
+            --radius-sm: 12px;
+        }
+
+        * { box-sizing: border-box; }
+
+        html {
+            -webkit-text-size-adjust: 100%;
+            text-size-adjust: 100%;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Aptos", "Segoe UI", "Helvetica Neue", sans-serif;
+            color: var(--text);
+            background:
+                radial-gradient(720px 360px at 0% 0%, rgba(10, 124, 136, 0.10), transparent),
+                radial-gradient(720px 360px at 100% 0%, rgba(255, 139, 82, 0.10), transparent),
+                linear-gradient(180deg, #f4fafc 0, #ffffff 220px);
+        }
+
+        a { color: inherit; }
+        img { display: block; max-width: 100%; }
+        button, input, textarea, select { font: inherit; }
+
+        .mm-shell {
+            width: min(1460px, calc(100% - 1.4rem));
+            margin: 0 auto;
+        }
+
+        .mm-header {
+            position: sticky;
+            top: 0;
+            z-index: 1200;
+            border-bottom: 1px solid rgba(213, 226, 235, 0.92);
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(16px);
+        }
+
+        .mm-header-inner {
+            width: min(1460px, calc(100% - 1.4rem));
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            gap: 0.9rem;
+            align-items: center;
+            padding: 0.75rem 0;
+        }
+
+        .mm-brand {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.72rem;
+            text-decoration: none;
+            min-width: 0;
+        }
+
+        .mm-brand img {
+            width: 2.8rem;
+            height: 2.8rem;
+            object-fit: cover;
+            border-radius: 14px;
+            border: 1px solid var(--border);
+            background: #fff;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .mm-brand-copy {
+            display: grid;
+            gap: 0.12rem;
+            min-width: 0;
+        }
+
+        .mm-brand-copy strong {
+            font-size: 1.08rem;
+            line-height: 1;
+            letter-spacing: -0.03em;
+        }
+
+        .mm-brand-copy span {
+            color: var(--muted);
+            font-size: 0.72rem;
+            font-weight: 800;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+        }
+
+        .mm-nav {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.45rem;
+            flex-wrap: wrap;
+        }
+
+        .mm-nav a,
+        .mm-top-cta {
+            border: 1px solid transparent;
+            border-radius: 999px;
+            padding: 0.58rem 0.9rem;
+            text-decoration: none;
+            color: var(--muted);
+            font-weight: 700;
+            transition: 180ms ease;
+        }
+
+        .mm-nav a:hover,
+        .mm-nav a.active {
+            color: var(--primary-deep);
+            border-color: var(--border);
+            background: rgba(10, 124, 136, 0.06);
+        }
+
+        .mm-top-cta {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: linear-gradient(135deg, var(--primary), var(--primary-deep));
+            color: #fff;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .mm-main {
+            padding: 1rem 0 1.4rem;
+            display: grid;
+            gap: 1rem;
+        }
+
+        .mm-hero {
+            border: 1px solid var(--border);
+            border-radius: 28px;
+            padding: 1.1rem;
+            background:
+                linear-gradient(135deg, rgba(10, 124, 136, 0.08), rgba(255, 139, 82, 0.08)),
+                var(--panel);
+            box-shadow: var(--shadow-md);
+            display: grid;
+            grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.9fr);
+            gap: 1rem;
+        }
+
+        .mm-kicker {
+            margin: 0 0 0.35rem;
+            color: var(--primary);
+            font-size: 0.78rem;
+            font-weight: 900;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+        }
+
+        .mm-hero h1 {
+            margin: 0;
+            font-size: clamp(2rem, 4vw, 3.2rem);
+            line-height: 0.98;
+            letter-spacing: -0.05em;
+        }
+
+        .mm-hero p {
+            margin: 0.65rem 0 0;
+            max-width: 780px;
+            color: var(--muted);
+            font-size: 1rem;
+        }
+
+        .mm-hero-actions,
+        .mm-status-row,
+        .mm-topic-chips,
+        .mm-side-links,
+        .mm-card-row,
+        .mm-composer-actions {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.65rem;
+        }
+
+        .mm-btn {
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            padding: 0.82rem 1rem;
+            background: #fff;
+            color: var(--text);
+            font-weight: 800;
+            cursor: pointer;
+            text-decoration: none;
+            transition: 180ms ease;
+        }
+
+        .mm-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .mm-btn.primary {
+            border-color: transparent;
+            background: linear-gradient(135deg, var(--primary), var(--primary-deep));
+            color: #fff;
+        }
+
+        .mm-btn.alt {
+            background: var(--panel-alt);
+        }
+
+        .mm-btn.soft {
+            background: var(--accent-soft);
+            border-color: rgba(255, 139, 82, 0.24);
+            color: #a44d17;
+        }
+
+        .mm-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.42rem;
+            padding: 0.5rem 0.72rem;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: rgba(255, 255, 255, 0.72);
+            color: var(--muted);
+            font-weight: 800;
+            font-size: 0.82rem;
+        }
+
+        .mm-pill.good {
+            color: var(--good);
+            border-color: rgba(31, 156, 107, 0.18);
+            background: rgba(31, 156, 107, 0.08);
+        }
+
+        .mm-pill.warn {
+            color: var(--warn);
+            border-color: rgba(181, 94, 24, 0.18);
+            background: rgba(181, 94, 24, 0.08);
+        }
+
+        .mm-hero-panel,
+        .mm-chat-card,
+        .mm-side-card {
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            background: var(--panel);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .mm-hero-panel {
+            padding: 1rem;
+            display: grid;
+            gap: 0.9rem;
+            align-content: start;
+        }
+
+        .mm-hero-panel strong {
+            font-size: 1.04rem;
+        }
+
+        .mm-hero-panel p {
+            margin: 0;
+            font-size: 0.94rem;
+        }
+
+        .mm-stat-grid {
+            display: grid;
+            gap: 0.7rem;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .mm-stat {
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            background: var(--panel-alt);
+            padding: 0.85rem;
+            display: grid;
+            gap: 0.25rem;
+        }
+
+        .mm-stat small {
+            color: var(--muted);
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .mm-stat strong {
+            font-size: 1.05rem;
+            line-height: 1.1;
+        }
+
+        .mm-layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.82fr);
+            gap: 1rem;
+            align-items: start;
+        }
+
+        .mm-chat-card {
+            padding: 1rem;
+            display: grid;
+            gap: 0.9rem;
+            min-height: 72vh;
+        }
+
+        .mm-card-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 0.8rem;
+            flex-wrap: wrap;
+        }
+
+        .mm-card-title h2,
+        .mm-side-card h3 {
+            margin: 0;
+            font-size: 1.15rem;
+            letter-spacing: -0.03em;
+        }
+
+        .mm-card-title p,
+        .mm-side-card p,
+        .mm-side-card li,
+        .mm-note {
+            margin: 0.35rem 0 0;
+            color: var(--muted);
+            font-size: 0.92rem;
+        }
+
+        .mm-chat-feed {
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            background:
+                linear-gradient(180deg, rgba(10, 124, 136, 0.03), rgba(255, 139, 82, 0.04)),
+                #fcfeff;
+            padding: 0.9rem;
+            min-height: 26rem;
+            max-height: 58vh;
+            overflow: auto;
+            display: grid;
+            gap: 0.8rem;
+        }
+
+        .mm-message {
+            display: grid;
+            gap: 0.3rem;
+            justify-items: start;
+        }
+
+        .mm-message.user {
+            justify-items: end;
+        }
+
+        .mm-message-label {
+            color: var(--muted);
+            font-size: 0.74rem;
+            font-weight: 900;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        .mm-bubble {
+            max-width: min(760px, 100%);
+            border-radius: 18px;
+            padding: 0.85rem 0.95rem;
+            border: 1px solid var(--border);
+            background: #fff;
+            color: var(--text);
+            box-shadow: var(--shadow-sm);
+            line-height: 1.55;
+            white-space: pre-wrap;
+        }
+
+        .mm-message.user .mm-bubble {
+            background: linear-gradient(135deg, rgba(10, 124, 136, 0.12), rgba(10, 124, 136, 0.06));
+            border-color: rgba(10, 124, 136, 0.18);
+        }
+
+        .mm-message.assistant .mm-bubble {
+            background: linear-gradient(135deg, rgba(255, 139, 82, 0.08), rgba(255, 255, 255, 0.94));
+        }
+
+        .mm-message.system .mm-bubble {
+            background: #f8fbfd;
+            color: var(--muted);
+        }
+
+        .mm-topic-chips button {
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            background: #fff;
+            color: var(--text);
+            padding: 0.72rem 0.9rem;
+            font-weight: 700;
+            cursor: pointer;
+            text-align: left;
+        }
+
+        .mm-topic-chips button:hover {
+            border-color: rgba(10, 124, 136, 0.26);
+            color: var(--primary-deep);
+        }
+
+        .mm-composer {
+            border: 1px solid var(--border);
+            border-radius: 22px;
+            background: #fff;
+            padding: 0.85rem;
+            display: grid;
+            gap: 0.75rem;
+        }
+
+        .mm-composer textarea {
+            width: 100%;
+            min-height: 122px;
+            resize: vertical;
+            border: none;
+            outline: none;
+            background: transparent;
+            color: var(--text);
+            font-size: 1rem;
+            line-height: 1.55;
+        }
+
+        .mm-composer textarea::placeholder {
+            color: #8a9aad;
+        }
+
+        .mm-composer-actions {
+            justify-content: space-between;
+        }
+
+        .mm-composer-meta {
+            color: var(--muted);
+            font-size: 0.86rem;
+        }
+
+        .mm-sidebar {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .mm-side-card {
+            padding: 1rem;
+            display: grid;
+            gap: 0.85rem;
+        }
+
+        .mm-side-card ul {
+            margin: 0;
+            padding-left: 1rem;
+            display: grid;
+            gap: 0.45rem;
+        }
+
+        .mm-side-links a,
+        .mm-side-links button {
+            flex: 1 1 150px;
+            justify-content: center;
+        }
+
+        .mm-server-box {
+            padding: 0.82rem 0.9rem;
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            background: var(--panel-alt);
+            display: grid;
+            gap: 0.32rem;
+        }
+
+        .mm-server-box code {
+            font-family: Consolas, "SFMono-Regular", monospace;
+            font-size: 0.82rem;
+            color: var(--primary-deep);
+            word-break: break-all;
+        }
+
+        .mm-footer-note {
+            padding: 0.1rem 0 1rem;
+            color: var(--muted);
+            font-size: 0.88rem;
+            text-align: center;
+        }
+
+        @media (max-width: 1180px) {
+            .mm-hero,
+            .mm-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .mm-chat-card {
+                min-height: auto;
+            }
+        }
+
+        @media (max-width: 860px) {
+            .mm-header-inner {
+                grid-template-columns: 1fr;
+                justify-items: start;
+            }
+
+            .mm-nav {
+                justify-content: flex-start;
+            }
+
+            .mm-top-cta {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .mm-chat-feed {
+                max-height: none;
+                min-height: 22rem;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .mm-shell,
+            .mm-header-inner {
+                width: min(1460px, calc(100% - 0.85rem));
+            }
+
+            .mm-main {
+                padding-top: 0.7rem;
+            }
+
+            .mm-hero,
+            .mm-chat-card,
+            .mm-side-card {
+                border-radius: 20px;
+                padding: 0.88rem;
+            }
+
+            .mm-hero h1 {
+                font-size: 1.72rem;
+            }
+
+            .mm-stat-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .mm-chat-feed {
+                padding: 0.72rem;
+                min-height: 19rem;
+            }
+
+            .mm-composer {
+                border-radius: 18px;
+                padding: 0.72rem;
+            }
+
+            .mm-composer textarea {
+                min-height: 108px;
+                font-size: 16px;
+            }
+
+            .mm-btn,
+            .mm-topic-chips button,
+            .mm-nav a,
+            .mm-top-cta {
+                min-height: 44px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="mm-header">
+        <div class="mm-header-inner">
+            <a class="mm-brand" href="index.html" aria-label="MatrixMarket home">
+                <img src="matrixx.png" alt="" width="44" height="44" decoding="async" loading="eager">
+                <span class="mm-brand-copy">
+                    <strong>MatrixMarket</strong>
+                    <span>AI Shopping Agent</span>
+                </span>
+            </a>
+
+            <nav class="mm-nav" aria-label="Main navigation">
+                <a href="index.html">Home</a>
+                <a href="shop.html">Shop</a>
+                <a href="auto-parts.html">Auto Parts</a>
+                <a href="buyers-orders.html">Orders</a>
+                <a href="chat.html">Chat</a>
+                <a href="seller-login.html">Sellers</a>
+                <a href="settings.html">Settings</a>
+                <a class="active" href="agent-page.html">AI Agent</a>
+            </nav>
+
+            <a class="mm-top-cta" href="#chatComposer">Ask MatrixMarket AI</a>
+        </div>
+    </header>
+
+    <main class="mm-shell mm-main">
+        <section class="mm-hero">
+            <div>
+                <p class="mm-kicker">Website intelligence</p>
+                <h1>Meet the AI agent that knows how MatrixMarket works.</h1>
+                <p>Ask about shopping, checkout, seller tools, orders, subscriptions, product posting, delivery coverage, support paths, and where to find things across the website. This assistant is grounded in the actual MatrixMarket page flow, not a generic chatbot script.</p>
+                <div class="mm-hero-actions" style="margin-top:0.95rem;">
+                    <a class="mm-btn primary" href="#chatComposer">Start chatting</a>
+                    <a class="mm-btn alt" href="shop.html">Browse products</a>
+                    <button class="mm-btn soft" id="openSupportBtn" type="button">Open support chat</button>
+                </div>
+                <div class="mm-status-row" style="margin-top:1rem;">
+                    <span class="mm-pill" id="serverStatusPill">Checking AI server...</span>
+                    <span class="mm-pill" id="userStatusPill">Guest session</span>
+                    <span class="mm-pill">Coverage: Senegal and The Gambia</span>
+                </div>
+            </div>
+
+            <aside class="mm-hero-panel" aria-label="AI highlights">
+                <strong>What this agent can help with</strong>
+                <div class="mm-stat-grid">
+                    <article class="mm-stat">
+                        <small>Buyer flow</small>
+                        <strong>Home, shop, cart, checkout, orders, support</strong>
+                    </article>
+                    <article class="mm-stat">
+                        <small>Seller flow</small>
+                        <strong>Login, dashboard, products, payouts, order queue</strong>
+                    </article>
+                    <article class="mm-stat">
+                        <small>Store rules</small>
+                        <strong>Subscription checks, stock sync, product visibility</strong>
+                    </article>
+                    <article class="mm-stat">
+                        <small>Escalation</small>
+                        <strong>Support chat, settings, order follow-up, admin paths</strong>
+                    </article>
+                </div>
+                <p>The NVIDIA key is intentionally kept out of the browser. This page talks to a local MatrixMarket AI server running on your machine.</p>
+            </aside>
+        </section>
+
+        <section class="mm-layout">
+            <article class="mm-chat-card">
+                <div class="mm-card-head">
+                    <div class="mm-card-title">
+                        <h2>MatrixMarket AI Conversation</h2>
+                        <p>Ask direct questions like “How do I post products as a seller?” or “Why can’t I check out with my seller wallet?”</p>
+                    </div>
+                    <div class="mm-card-row">
+                        <button class="mm-btn alt" id="refreshServerBtn" type="button">Refresh server</button>
+                        <button class="mm-btn alt" id="clearChatBtn" type="button">Clear chat</button>
+                    </div>
+                </div>
+
+                <div class="mm-chat-feed" id="chatFeed" aria-live="polite" aria-label="AI conversation"></div>
+
+                <div class="mm-topic-chips" aria-label="Quick prompts">
+                    <button type="button" data-prompt="How do I place an order on MatrixMarket from search to checkout?">How to place an order</button>
+                    <button type="button" data-prompt="How do seller subscriptions and product posting work on this website?">Seller subscription help</button>
+                    <button type="button" data-prompt="Where do I track my purchases, contact a seller, and report an order issue?">Track and report orders</button>
+                    <button type="button" data-prompt="Explain how the seller dashboard, seller products page, and order queue work.">Seller dashboard guide</button>
+                    <button type="button" data-prompt="What can customers do on the home page, shop page, and auto parts page?">Website tour</button>
+                </div>
+
+                <form class="mm-composer" id="chatForm">
+                    <label class="mm-note" for="chatInput">Message MatrixMarket AI</label>
+                    <textarea id="chatInput" placeholder="Ask about checkout, products, sellers, delivery, support, subscriptions, orders, or how to use any page on the website." required></textarea>
+                    <div class="mm-composer-actions">
+                        <span class="mm-composer-meta" id="composerMeta">The assistant will answer using MatrixMarket website knowledge plus your current session role when available.</span>
+                        <button class="mm-btn primary" id="chatComposer" type="submit">Send message</button>
+                    </div>
+                </form>
+            </article>
+
+            <aside class="mm-sidebar">
+                <section class="mm-side-card">
+                    <h3>Website Areas The AI Knows</h3>
+                    <ul>
+                        <li>Buyer journey: home, shop, auto parts, cart, checkout, orders, settings, chat.</li>
+                        <li>Seller journey: register, login, dashboard, product management, order queue, chat, withdrawals.</li>
+                        <li>Admin operations: sellers, products, orders, users, communications, logs.</li>
+                        <li>Marketplace rules: stock sync, purchase history, product visibility, delivery coverage, support escalation.</li>
+                    </ul>
+                </section>
+
+                <section class="mm-side-card">
+                    <h3>Need Human Support?</h3>
+                    <p>If AI is not enough, you can jump straight into the existing support flow.</p>
+                    <div class="mm-side-links">
+                        <button class="mm-btn primary" id="openSupportBtnSide" type="button">Chat with Support</button>
+                        <a class="mm-btn alt" href="buyers-orders.html">Open My Orders</a>
+                        <a class="mm-btn alt" href="settings.html">Account Settings</a>
+                    </div>
+                </section>
+
+                <section class="mm-side-card">
+                    <h3>AI Server</h3>
+                    <div class="mm-server-box">
+                        <strong id="serverLabel">Local MatrixMarket AI backend</strong>
+                        <code id="serverEndpoint">http://127.0.0.1:4050</code>
+                        <p id="serverNote">Start the local Python server before chatting so this page can reach NVIDIA securely.</p>
+                    </div>
+                    <div class="mm-side-links">
+                        <button class="mm-btn alt" id="copyServerBtn" type="button">Copy server URL</button>
+                        <button class="mm-btn alt" id="insertRunPromptBtn" type="button">How do I run it?</button>
+                    </div>
+                </section>
+
+                <section class="mm-side-card">
+                    <h3>Good Questions To Ask</h3>
+                    <ul>
+                        <li>How does checkout write purchases and seller order queues?</li>
+                        <li>Why are some products hidden or missing from the home page?</li>
+                        <li>How do auto-parts products get classified automatically?</li>
+                        <li>What is the difference between buyer chat and seller chat pages?</li>
+                        <li>What page should I use for a refund, complaint, or seller issue?</li>
+                    </ul>
+                </section>
+            </aside>
+        </section>
+
+        <div class="mm-footer-note">
+            MatrixMarket AI is designed to guide users through the website and explain its workflow. For account-specific actions, it points users to the correct page or human support path.
+        </div>
+    </main>
+
+    <script>
+        (function () {
+            const STORAGE_KEY = "matrixmarket_ai_chat_v1";
+            const SERVER_URL_KEY = "MM_AI_SERVER_URL";
+            const DEFAULT_SERVER = "http://127.0.0.1:4050";
+            const state = {
+                messages: [],
+                sending: false,
+                user: null,
+                server: DEFAULT_SERVER
+            };
+
+            function byId(id) { return document.getElementById(id); }
+            function str(v) { return String(v == null ? "" : v).trim(); }
+            function esc(v) {
+                return String(v == null ? "" : v)
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/\"/g, "&quot;")
+                    .replace(/'/g, "&#39;");
+            }
+
+            function getStorage() {
+                if (window.MMStorage && typeof window.MMStorage.getItem === "function") return window.MMStorage;
+                try {
+                    if (window.localStorage && typeof window.localStorage.getItem === "function") return window.localStorage;
+                } catch (_) {}
+                return {
+                    getItem: function () { return null; },
+                    setItem: function () {},
+                    removeItem: function () {}
+                };
+            }
+
+            function readJson(key, fallback) {
+                try {
+                    const raw = getStorage().getItem(key);
+                    if (!raw) return fallback;
+                    const parsed = JSON.parse(raw);
+                    return parsed == null ? fallback : parsed;
+                } catch (_) {
+                    return fallback;
+                }
+            }
+
+            function writeJson(key, value) {
+                try {
+                    getStorage().setItem(key, JSON.stringify(value));
+                } catch (_) {}
+            }
+
+            function setStatus(text, tone) {
+                const pill = byId("serverStatusPill");
+                pill.textContent = text;
+                pill.className = "mm-pill" + (tone ? " " + tone : "");
+            }
+
+            function defaultMessages() {
+                return [{
+                    role: "assistant",
+                    content: "I’m MatrixMarket AI. I can explain how this website works, help buyers and sellers find the right page, walk through checkout and orders, and answer questions about subscriptions, product posting, chat, support, and delivery coverage."
+                }];
+            }
+
+            function saveConversation() {
+                writeJson(STORAGE_KEY, state.messages.slice(-30));
+            }
+
+            function renderMessages() {
+                const box = byId("chatFeed");
+                if (!state.messages.length) state.messages = defaultMessages();
+                box.innerHTML = state.messages.map(function (message) {
+                    const role = str(message.role || "assistant").toLowerCase();
+                    const label = role === "user" ? "You" : (role === "assistant" ? "MatrixMarket AI" : "System");
+                    return '<article class="mm-message ' + esc(role) + '">' +
+                        '<div class="mm-message-label">' + esc(label) + '</div>' +
+                        '<div class="mm-bubble">' + esc(message.content || "") + '</div>' +
+                        '</article>';
+                }).join("");
+                box.scrollTop = box.scrollHeight;
+            }
+
+            function pushMessage(role, content) {
+                state.messages.push({ role: role, content: str(content) });
+                saveConversation();
+                renderMessages();
+            }
+
+            function loadUser() {
+                state.user = readJson("currentUser", null) || readJson("loggedInUser", null) || null;
+                const name = str(state.user && (state.user.fullName || state.user.name || state.user.username));
+                const role = state.user && state.user.isSeller ? "Seller" : "Buyer";
+                byId("userStatusPill").textContent = name ? (role + ": " + name) : "Guest session";
+            }
+
+            function openSupport() {
+                try {
+                    getStorage().setItem("chatWith", "Support");
+                } catch (_) {}
+                window.location.href = "chat.html?seller=" + encodeURIComponent("Support");
+            }
+
+            async function refreshServerStatus() {
+                const url = state.server.replace(/\/+$/, "");
+                byId("serverEndpoint").textContent = url;
+                try {
+                    const response = await fetch(url + "/health", { headers: { "Accept": "application/json" } });
+                    if (!response.ok) throw new Error("HTTP " + response.status);
+                    const data = await response.json();
+                    const ready = data && data.keyConfigured;
+                    setStatus(ready ? "AI server online" : "Server online, API key missing", ready ? "good" : "warn");
+                    byId("serverNote").textContent = ready
+                        ? "Backend is reachable and ready to send MatrixMarket questions to NVIDIA."
+                        : "Backend is reachable, but you still need to set the NVIDIA API key in an environment variable.";
+                } catch (_) {
+                    setStatus("AI server offline", "warn");
+                    byId("serverNote").textContent = "Run python matrixmarket_ai_server.py so this page can talk to the MatrixMarket AI backend.";
+                }
+            }
+
+            function conversationPayload() {
+                return state.messages
+                    .filter(function (message) {
+                        const role = str(message.role).toLowerCase();
+                        return role === "user" || role === "assistant";
+                    })
+                    .slice(-12)
+                    .map(function (message) {
+                        return {
+                            role: str(message.role || "assistant").toLowerCase(),
+                            content: str(message.content)
+                        };
+                    });
+            }
+
+            async function sendMessage(text) {
+                const content = str(text);
+                if (!content || state.sending) return;
+                const server = state.server.replace(/\/+$/, "");
+                state.sending = true;
+                byId("chatInput").disabled = true;
+                byId("chatComposer").disabled = true;
+                pushMessage("user", content);
+                pushMessage("system", "MatrixMarket AI is thinking...");
+
+                try {
+                    const response = await fetch(server + "/api/ai/chat", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "Accept": "application/json"
+                        },
+                        body: JSON.stringify({
+                            messages: conversationPayload(),
+                            userContext: {
+                                name: str(state.user && (state.user.fullName || state.user.name || state.user.username)),
+                                email: str(state.user && state.user.email),
+                                role: state.user && state.user.isSeller ? "seller" : "buyer"
+                            },
+                            pageContext: {
+                                page: "agent-page.html",
+                                url: window.location.href,
+                                referrer: document.referrer || ""
+                            }
+                        })
+                    });
+
+                    const data = await response.json().catch(function () { return {}; });
+                    state.messages = state.messages.filter(function (message) {
+                        return !(message.role === "system" && message.content === "MatrixMarket AI is thinking...");
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(str(data && (data.error || data.message)) || ("HTTP " + response.status));
+                    }
+
+                    pushMessage("assistant", str(data.reply || "I could not generate a reply right now."));
+                    setStatus("AI server online", "good");
+                } catch (error) {
+                    state.messages = state.messages.filter(function (message) {
+                        return !(message.role === "system" && message.content === "MatrixMarket AI is thinking...");
+                    });
+                    renderMessages();
+                    pushMessage("system", "The AI server could not answer right now. " + str(error && error.message ? error.message : "Unknown error") + ". Start the local server and make sure the NVIDIA API key is configured.");
+                    setStatus("AI server offline", "warn");
+                } finally {
+                    state.sending = false;
+                    byId("chatInput").disabled = false;
+                    byId("chatComposer").disabled = false;
+                    byId("chatInput").focus();
+                }
+            }
+
+            function restoreConversation() {
+                state.messages = readJson(STORAGE_KEY, defaultMessages());
+                if (!Array.isArray(state.messages) || !state.messages.length) {
+                    state.messages = defaultMessages();
+                }
+                renderMessages();
+            }
+
+            function bind() {
+                byId("chatForm").addEventListener("submit", function (event) {
+                    event.preventDefault();
+                    const input = byId("chatInput");
+                    const text = input.value;
+                    input.value = "";
+                    sendMessage(text);
+                });
+
+                byId("clearChatBtn").addEventListener("click", function () {
+                    state.messages = defaultMessages();
+                    saveConversation();
+                    renderMessages();
+                });
+
+                byId("refreshServerBtn").addEventListener("click", refreshServerStatus);
+                byId("openSupportBtn").addEventListener("click", openSupport);
+                byId("openSupportBtnSide").addEventListener("click", openSupport);
+
+                byId("copyServerBtn").addEventListener("click", function () {
+                    const target = state.server.replace(/\/+$/, "");
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(target).then(function () {
+                            byId("composerMeta").textContent = "Server URL copied: " + target;
+                        }).catch(function () {
+                            byId("composerMeta").textContent = "Server URL: " + target;
+                        });
+                    } else {
+                        byId("composerMeta").textContent = "Server URL: " + target;
+                    }
+                });
+
+                byId("insertRunPromptBtn").addEventListener("click", function () {
+                    byId("chatInput").value = "How do I run the MatrixMarket AI server locally?";
+                    byId("chatInput").focus();
+                });
+
+                document.querySelectorAll("[data-prompt]").forEach(function (button) {
+                    button.addEventListener("click", function () {
+                        const prompt = str(button.getAttribute("data-prompt"));
+                        byId("chatInput").value = prompt;
+                        byId("chatInput").focus();
+                    });
+                });
+            }
+
+            function start() {
+                state.server = str(readJson(SERVER_URL_KEY, DEFAULT_SERVER)) || DEFAULT_SERVER;
+                loadUser();
+                restoreConversation();
+                bind();
+                refreshServerStatus();
+            }
+
+            window.addEventListener("load", function () {
+                const ready = window.MMStorage && window.MMStorage.ready;
+                if (ready && typeof ready.then === "function") {
+                    ready.finally(start);
+                    return;
+                }
+                start();
+            });
+        })();
+    </script>
+    <script defer src="sw-register.js?v=20260226a"></script>
+    <script defer src="site-performance.js?v=20260226a"></script>
+</body>
+</html>

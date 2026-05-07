@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Seller Directory - MatrixMarket</title>
+    <link rel="stylesheet" href="seller-layout.css" />
+    <link rel="stylesheet" href="upgrade.css" />
+    <script src="firebase-online-storage.js"></script>
+    <style>
+        .directory-shell {
+            width: min(1220px, 100% - 1.2rem);
+            margin: 1rem auto 1.4rem;
+            display: grid;
+            gap: 0.8rem;
+        }
+
+        .hero {
+            border: 1px solid var(--sel-border);
+            border-radius: 16px;
+            background:
+                radial-gradient(900px 320px at -10% 0%, rgba(6, 182, 212, 0.2), transparent),
+                radial-gradient(880px 360px at 110% 10%, rgba(79, 70, 229, 0.2), transparent),
+                rgba(2, 6, 23, 0.45);
+            padding: 1rem;
+        }
+
+        .hero h1 {
+            margin: 0;
+            font-size: 1.4rem;
+        }
+
+        .hero p {
+            margin: 0.3rem 0 0;
+            color: var(--sel-muted);
+        }
+
+        .hero-stats {
+            margin-top: 0.7rem;
+            display: grid;
+            gap: 0.6rem;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .hero-stat {
+            border: 1px solid var(--sel-border);
+            border-radius: 12px;
+            background: rgba(2, 6, 23, 0.55);
+            padding: 0.65rem;
+        }
+
+        .hero-stat .label {
+            color: var(--sel-muted);
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .hero-stat .value {
+            margin-top: 0.2rem;
+            font-size: 1.28rem;
+            font-weight: 800;
+        }
+
+        .seller-card-grid {
+            display: grid;
+            gap: 0.75rem;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        }
+
+        .seller-tile {
+            border: 1px solid var(--sel-border);
+            border-radius: 14px;
+            background: rgba(2, 6, 23, 0.58);
+            padding: 0.8rem;
+            display: grid;
+            gap: 0.45rem;
+        }
+
+        .seller-tile h3 {
+            margin: 0;
+            font-size: 1.06rem;
+            color: #67e8f9;
+        }
+
+        .seller-sub {
+            color: var(--sel-muted);
+            font-size: 0.86rem;
+        }
+
+        .chip-row {
+            display: flex;
+            gap: 0.35rem;
+            flex-wrap: wrap;
+        }
+
+        .chip {
+            border: 1px solid var(--sel-border);
+            border-radius: 999px;
+            font-size: 0.73rem;
+            padding: 0.14rem 0.5rem;
+            color: #bfdbfe;
+            background: rgba(30, 41, 59, 0.45);
+        }
+
+        .tile-actions {
+            display: flex;
+            gap: 0.35rem;
+            flex-wrap: wrap;
+            margin-top: 0.2rem;
+        }
+
+        .toolbar-wrap {
+            border: 1px solid var(--sel-border);
+            border-radius: 14px;
+            background: rgba(2, 6, 23, 0.55);
+            padding: 0.75rem;
+        }
+
+        @media (max-width: 900px) {
+            .hero-stats {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body class="seller-page">
+    <header class="seller-header">
+        <div class="seller-header-inner">
+            <div class="seller-brand">MatrixMarket Sellers</div>
+            <nav class="seller-nav">
+                <a href="index.html">Home</a>
+                <a href="shop.html">Shop</a>
+                <a class="active" href="sellers.html">Sellers</a>
+                <a href="seller-login.html">Seller Login</a>
+                <a href="seller-register.html">Become a Seller</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="directory-shell">
+        <section class="hero">
+            <h1>Seller Directory</h1>
+            <p>Browse verified sellers, open direct chat, and shop by seller storefront.</p>
+            <div class="hero-stats" id="heroStats"></div>
+        </section>
+
+        <section class="toolbar-wrap">
+            <div class="sel-toolbar">
+                <input class="sel" id="searchInput" type="search" placeholder="Search name, store, email" />
+                <select class="sel" id="categoryFilter"><option value="">All Categories</option></select>
+                <select class="sel" id="statusFilter">
+                    <option value="">All Status</option>
+                    <option value="active">Active</option>
+                    <option value="pending">Pending</option>
+                    <option value="declined">Declined</option>
+                </select>
+                <select class="sel" id="sortFilter">
+                    <option value="topProducts">Top Products</option>
+                    <option value="topSales">Top Sales</option>
+                    <option value="topStock">Top Stock</option>
+                    <option value="nameAsc">Name A-Z</option>
+                    <option value="newest">Newest</option>
+                </select>
+            </div>
+        </section>
+
+        <section id="sellerGrid" class="seller-card-grid" aria-live="polite"></section>
+
+        <div class="sel-foot">Public seller discovery</div>
+    </main>
+
+    <script src="seller-core.js?v=20260222g"></script>
+    <script>
+        const state = { sellers: [], filtered: [], products: [], purchases: [] };
+
+        function byId(id) { return document.getElementById(id); }
+
+        function sellerStatus(seller) {
+            const status = SellerCore.str(seller.status || "pending").toLowerCase();
+            const sub = SellerCore.str(seller.subscription || "inactive").toLowerCase();
+            if (status === "approved" && sub === "active") return "active";
+            if (status === "declined" || status === "suspended") return "declined";
+            return "pending";
+        }
+
+        function sellerKeys(seller) {
+            return [
+                SellerCore.cleanEmail(seller.email || ""),
+                SellerCore.str(seller.store || "").toLowerCase(),
+                SellerCore.str(seller.fullName || seller.name || "").toLowerCase()
+            ].filter(Boolean);
+        }
+
+        function countsForSeller(seller) {
+            const keys = sellerKeys(seller);
+            const sellerProducts = state.products.filter(function (p) {
+                const pEmail = SellerCore.cleanEmail(p.sellerEmail || "");
+                const pName = SellerCore.str(p.seller || p.sellerName || "").toLowerCase();
+                return (pEmail && keys.includes(pEmail)) || (pName && keys.includes(pName));
+            });
+            const productCount = sellerProducts.length;
+            const activeProducts = sellerProducts.filter(function (p) {
+                return SellerCore.num(p.stock || 0) > 0;
+            }).length;
+            const soldOutProducts = Math.max(0, productCount - activeProducts);
+            const stockUnits = sellerProducts.reduce(function (sum, p) {
+                return sum + Math.max(0, Math.floor(SellerCore.num(p.stock || 0)));
+            }, 0);
+
+            const salesCount = state.purchases.filter(function (row) {
+                const rEmail = SellerCore.cleanEmail(row.sellerEmail || "");
+                const rName = SellerCore.str(row.seller || row.sellerName || "").toLowerCase();
+                return (rEmail && keys.includes(rEmail)) || (rName && keys.includes(rName));
+            }).length;
+
+            return { products: productCount, activeProducts: activeProducts, soldOutProducts: soldOutProducts, stockUnits: stockUnits, sales: salesCount };
+        }
+
+        function renderStats() {
+            const all = state.sellers;
+            const verified = all.filter(function (s) { return sellerStatus(s) === "active"; }).length;
+            const products = state.products.length;
+            const availableProducts = state.products.filter(function (p) { return SellerCore.num(p.stock || 0) > 0; }).length;
+            const totalStock = state.products.reduce(function (sum, p) { return sum + Math.max(0, Math.floor(SellerCore.num(p.stock || 0))); }, 0);
+
+            byId("heroStats").innerHTML = [
+                ["Total Sellers", all.length],
+                ["Verified Sellers", verified],
+                ["Listed Products", products],
+                ["Available Products", availableProducts],
+                ["Stock Units", totalStock]
+            ].map(function (item) {
+                return '<article class="hero-stat"><div class="label">' + item[0] + '</div><div class="value">' + item[1] + '</div></article>';
+            }).join("");
+        }
+
+        function applyFilters() {
+            const q = SellerCore.str(byId("searchInput").value).toLowerCase();
+            const category = SellerCore.str(byId("categoryFilter").value).toLowerCase();
+            const status = SellerCore.str(byId("statusFilter").value).toLowerCase();
+            const sort = SellerCore.str(byId("sortFilter").value);
+
+            state.filtered = state.sellers.filter(function (s) {
+                const hay = [s.fullName, s.store, s.email].join(" ").toLowerCase();
+                const cat = SellerCore.str(s.category || "general").toLowerCase();
+                return (!q || hay.includes(q)) && (!category || cat === category) && (!status || sellerStatus(s) === status);
+            });
+
+            state.filtered.sort(function (a, b) {
+                if (sort === "nameAsc") return a.fullName.localeCompare(b.fullName);
+                if (sort === "newest") return String(b.createdAt).localeCompare(String(a.createdAt));
+                if (sort === "topSales") {
+                    return countsForSeller(b).sales - countsForSeller(a).sales;
+                }
+                if (sort === "topStock") {
+                    return countsForSeller(b).stockUnits - countsForSeller(a).stockUnits;
+                }
+                return countsForSeller(b).products - countsForSeller(a).products;
+            });
+        }
+
+        function renderCards() {
+            const grid = byId("sellerGrid");
+            if (!state.filtered.length) {
+                grid.innerHTML = '<div class="sel-empty">No sellers found for this filter.</div>';
+                return;
+            }
+
+            grid.innerHTML = state.filtered.map(function (s) {
+                const counts = countsForSeller(s);
+                const badge = SellerCore.badge(sellerStatus(s));
+                const target = encodeURIComponent(SellerCore.str(s.store || s.fullName || s.name || s.email));
+                const email = encodeURIComponent(SellerCore.str(s.email || ""));
+
+                return '<article class="seller-tile">' +
+                    '<h3>' + (s.fullName || s.name) + '</h3>' +
+                    '<div class="seller-sub">' + (s.store || "No store name") + '</div>' +
+                    '<div class="seller-sub">' + (s.email || "No email") + '</div>' +
+                    '<div class="chip-row">' +
+                    '<span class="chip">Category: ' + (s.category || "general") + '</span>' +
+                    '<span class="chip">Products: ' + counts.products + '</span>' +
+                    '<span class="chip">Available: ' + counts.activeProducts + '</span>' +
+                    '<span class="chip">Sold Out: ' + counts.soldOutProducts + '</span>' +
+                    '<span class="chip">Stock: ' + counts.stockUnits + '</span>' +
+                    '<span class="chip">Sales: ' + counts.sales + '</span>' +
+                    '</div>' +
+                    '<div class="chip-row">' + badge + SellerCore.badge(s.subscription || "Inactive") + '</div>' +
+                    '<div class="tile-actions">' +
+                    '<button class="btn-sel" type="button" data-action="chat" data-target="' + target + '">Chat</button>' +
+                    '<button class="btn-sel primary" type="button" data-action="shop" data-email="' + email + '">Open Shop</button>' +
+                    '</div>' +
+                    '</article>';
+            }).join("");
+        }
+
+        function refresh() {
+            applyFilters();
+            renderCards();
+            renderStats();
+        }
+
+        function populateCategories() {
+            const cats = Array.from(new Set(state.sellers.map(function (s) {
+                return SellerCore.str(s.category || "general").toLowerCase();
+            }).filter(Boolean))).sort();
+
+            const select = byId("categoryFilter");
+            select.innerHTML = '<option value="">All Categories</option>' + cats.map(function (cat) {
+                return '<option value="' + cat + '">' + cat + '</option>';
+            }).join("");
+        }
+
+        function startChat(target) {
+            const contact = decodeURIComponent(target || "");
+            if (!contact) return;
+            MMStorage.setItem("chatWith", contact);
+            window.location.href = "chat.html?seller=" + encodeURIComponent(contact);
+        }
+
+        function openSellerShop(email) {
+            const sellerEmail = decodeURIComponent(email || "");
+            if (!sellerEmail) {
+                window.location.href = "sellers-shop.html";
+                return;
+            }
+            window.location.href = "sellers-shop.html?seller=" + encodeURIComponent(sellerEmail);
+        }
+
+        function initSellerDirectoryPage() {
+            state.sellers = SellerCore.getSellers();
+            state.products = SellerCore.getProducts().map(function (row, index) {
+                return SellerCore.normalizeProduct(row, index);
+            });
+            state.purchases = SellerCore.readJSON("purchases", []);
+
+            populateCategories();
+            refresh();
+
+            byId("searchInput").addEventListener("input", refresh);
+            byId("categoryFilter").addEventListener("change", refresh);
+            byId("statusFilter").addEventListener("change", refresh);
+            byId("sortFilter").addEventListener("change", refresh);
+
+            byId("sellerGrid").addEventListener("click", function (event) {
+                const button = event.target.closest("button[data-action]");
+                if (!button) return;
+                const action = button.dataset.action;
+                if (action === "chat") startChat(button.dataset.target || "");
+                if (action === "shop") openSellerShop(button.dataset.email || "");
+            });
+        }
+
+        function startSellerDirectoryPage() {
+            const ready = window.MMStorage && window.MMStorage.ready;
+            if (ready && typeof ready.then === "function") {
+                ready.finally(initSellerDirectoryPage);
+                return;
+            }
+            initSellerDirectoryPage();
+        }
+
+        if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", startSellerDirectoryPage);
+        else startSellerDirectoryPage();
+    </script>
+    <script defer src="upgrade.js"></script>
+  <script defer src="sw-register.js?v=20260226a"></script>
+  <script defer src="site-performance.js?v=20260226a"></script>
+</body>
+</html>
+
+
+
+

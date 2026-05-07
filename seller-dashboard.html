@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Seller Dashboard - MatrixMarket</title>
+  <link rel="stylesheet" href="seller-layout.css" />
+  <link rel="stylesheet" href="upgrade.css" />
+    <script src="firebase-online-storage.js"></script>
+</head>
+<body class="seller-page">
+  <div id="sellerHeader"></div>
+  <main class="seller-shell">
+    <section class="seller-titlebar">
+      <h1 id="welcomeTitle">Seller Dashboard</h1>
+      <div class="seller-actions">
+        <button class="btn-sel" id="refreshBtn" type="button">Refresh</button>
+        <a class="btn-sel" href="seller-products.html">Add Product</a>
+        <a class="btn-sel" href="seller-chat.html">Buyer Chat</a>
+        <a class="btn-sel" href="seller-withdrawal.html">Withdraw</a>
+        <a class="btn-sel primary" href="delivery.html">Manage Deliveries</a>
+      </div>
+    </section>
+
+    <section class="seller-grid cols-3" id="kpiGrid"></section>
+
+    <section class="seller-grid cols-2">
+      <article class="seller-card">
+        <div class="sel-split">
+          <h3 style="margin:0;">Recent Sales</h3>
+          <a class="btn-sel" href="seller-orders.html">Open Orders</a>
+        </div>
+        <div class="sel-table-wrap" style="margin-top:.55rem;">
+          <table class="sel-table" id="salesTable"></table>
+        </div>
+      </article>
+
+      <article class="seller-card">
+        <div class="sel-split">
+          <h3 style="margin:0;">Delivery Queue</h3>
+          <a class="btn-sel" href="delivery.html">Open Delivery</a>
+        </div>
+        <div class="sel-list" id="queueList" style="margin-top:.55rem;"></div>
+      </article>
+    </section>
+
+    <section class="seller-card">
+      <h3 style="margin:0 0 .5rem;">Seller Status</h3>
+      <div class="seller-grid cols-3" id="statusGrid"></div>
+    </section>
+
+    <div class="sel-foot">Seller dashboard overview</div>
+  </main>
+
+  <script src="seller-core.js?v=20260222g"></script>
+  <script>
+    let seller;
+
+    function setHeader() {
+      document.getElementById("sellerHeader").innerHTML = SellerCore.renderSellerHeader("seller-dashboard.html");
+    }
+
+    function renderKpis() {
+      const m = SellerCore.computeMetrics(seller);
+      const items = [
+        ["Products", m.products],
+        ["Sales", m.sales],
+        ["Earnings", SellerCore.fmtMoney(m.earnings)],
+        ["Pending Deliveries", m.pendingDeliveries],
+        ["Delivered", m.delivered],
+        ["Conversion", m.conversionRate.toFixed(1) + "%"]
+      ];
+      document.getElementById("kpiGrid").innerHTML = items.map(function (item) {
+        return '<article class="kpi"><div class="label">' + item[0] + '</div><div class="value">' + item[1] + '</div></article>';
+      }).join("");
+    }
+
+    function renderSales() {
+      const rows = SellerCore.getPurchasesForSeller(seller).sort(function (a, b) {
+        return String(b.date).localeCompare(String(a.date));
+      }).slice(0, 10);
+
+      const head = '<thead><tr><th>Order</th><th>Product</th><th>Buyer</th><th>Qty</th><th>Total</th><th>Date</th></tr></thead>';
+      if (!rows.length) {
+        document.getElementById("salesTable").innerHTML = head + '<tbody><tr><td colspan="6" class="sel-empty">No sales yet.</td></tr></tbody>';
+        return;
+      }
+
+      document.getElementById("salesTable").innerHTML = head + '<tbody>' + rows.map(function (r) {
+        return '<tr>' +
+          '<td>' + r.orderId + '</td>' +
+          '<td>' + r.productName + '</td>' +
+          '<td>' + (r.buyerName || r.buyerEmail) + '</td>' +
+          '<td>' + r.quantity + '</td>' +
+          '<td>' + SellerCore.fmtMoney(r.total) + '</td>' +
+          '<td>' + SellerCore.fmtDate(r.date) + '</td>' +
+          '</tr>';
+      }).join("") + '</tbody>';
+    }
+
+    function renderQueue() {
+      const rows = SellerCore.getSellerQueueRows(seller).sort(function (a, b) {
+        return String(b.date).localeCompare(String(a.date));
+      }).slice(0, 8);
+
+      if (!rows.length) {
+        document.getElementById("queueList").innerHTML = '<div class="sel-empty">No delivery tasks.</div>';
+        return;
+      }
+
+      document.getElementById("queueList").innerHTML = rows.map(function (r) {
+        return '<div class="sel-list-item">' +
+          '<strong>' + r.item + '</strong><br>' +
+          '<span class="sel-note">Order ' + r.orderId + ' • ' + r.buyer + '</span><br>' +
+          SellerCore.badge(r.status) +
+          '</div>';
+      }).join("");
+    }
+
+    function renderStatus() {
+      document.getElementById("statusGrid").innerHTML = [
+        ["Account", SellerCore.badge(seller.status || "Pending")],
+        ["Payment", SellerCore.badge(seller.paymentStatus || "Pending")],
+        ["Subscription", SellerCore.badge(seller.subscription || "Inactive")],
+        ["Plan", seller.plan || "basic"],
+        ["Store", seller.store || "-"],
+        ["Balance", SellerCore.fmtMoney(seller.balance || 0)]
+      ].map(function (item) {
+        return '<article class="kpi"><div class="label">' + item[0] + '</div><div class="value">' + item[1] + '</div></article>';
+      }).join("");
+    }
+
+    function refresh() {
+      seller = SellerCore.ensureSellerSession("seller-login.html");
+      if (!seller) return;
+      seller = SellerCore.upsertSeller(seller);
+      document.getElementById("welcomeTitle").textContent = "Welcome, " + (seller.fullName || seller.name || "Seller");
+      renderKpis();
+      renderSales();
+      renderQueue();
+      renderStatus();
+    }
+
+    function initSellerDashboardPage() {
+      setHeader();
+      refresh();
+      document.getElementById("refreshBtn").addEventListener("click", refresh);
+      window.addEventListener("storage", refresh);
+    }
+
+    function startSellerDashboardPage() {
+      const ready = window.MMStorage && window.MMStorage.ready;
+      if (ready && typeof ready.then === "function") {
+        ready.finally(initSellerDashboardPage);
+        return;
+      }
+      initSellerDashboardPage();
+    }
+
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", startSellerDashboardPage);
+    else startSellerDashboardPage();
+  </script>
+  <script defer src="upgrade.js"></script>
+  <script defer src="sw-register.js?v=20260226a"></script>
+  <script defer src="site-performance.js?v=20260226a"></script>
+</body>
+</html>
+
+
+

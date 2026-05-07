@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=0.3, viewport-fit=cover, shrink-to-fit=no" />
+  <meta name="description" content="MatrixMarket home page with live seller products, smart filters, comparison, wishlist, and fast checkout." />
+  <meta name="theme-color" content="#ffffff" />
+  <title>MatrixMarket - Smart Home</title>
+  <link rel="icon" type="image/x-icon" href="matrixx.png" />
+  <link rel="dns-prefetch" href="//matrixmarket-f72e0-default-rtdb.firebaseio.com" />
+  <link rel="preconnect" href="https://matrixmarket-f72e0-default-rtdb.firebaseio.com" crossorigin />
+  <link rel="dns-prefetch" href="//identitytoolkit.googleapis.com" />
+  <link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin />
+  <link rel="preload" as="image" href="matrixx.png" />
+  <link rel="preload" as="style" href="index-home.css?v=20260509a" />
+  <link rel="preload" as="script" href="index-home.js?v=20260509a" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" />
+  <link rel="stylesheet" href="index-home.css?v=20260509a" />
+  <style>
+    .mm-skip-link {
+      position: fixed;
+      left: -9999px;
+      top: 0.75rem;
+      z-index: 2000;
+      border: 1px solid #0ea5e9;
+      border-radius: 999px;
+      background: #ffffff;
+      color: #0f172a;
+      font-weight: 800;
+      padding: 0.55rem 0.85rem;
+      text-decoration: none;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+    }
+    .mm-skip-link:focus { left: 0.75rem; }
+    .mm-noscript {
+      width: min(1440px, calc(100% - 2rem));
+      margin: 1rem auto 0;
+      border: 1px solid #f59e0b;
+      border-radius: 18px;
+      padding: 0.9rem 1rem;
+      background: #fff7ed;
+      color: #9a3412;
+      font-weight: 700;
+    }
+    @media (max-width: 640px) {
+      .mm-noscript { width: min(1440px, calc(100% - 1rem)); }
+    }
+  </style>
+  <script defer src="firebase-online-storage.js?v=20260224c"></script>
+  <script defer src="seller-core.js?v=20260224a"></script>
+</head>
+<body>
+  <a class="mm-skip-link" href="#mainContent">Skip to products</a>
+  <noscript>
+    <div class="mm-noscript">
+      JavaScript is required to load live products and interactive filters. You can still browse static pages from the navigation links.
+    </div>
+  </noscript>
+
+  <!-- TOP UTILITY BAR -->
+  <div class="mm-utility-bar">
+    <div class="mm-utility-inner">
+      <span class="mm-utility-item">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+        Delivering to <strong>Banjul, The Gambia</strong>
+      </span>
+      <span class="mm-utility-item">
+        <span class="mm-pill online" id="onlineBadge">● Online</span>
+        <span class="mm-clock" id="clockBox">--:--:--</span>
+      </span>
+      <span class="mm-utility-item">
+        <span class="mm-wallet-inline-balance">Balance: <strong id="walletBalanceChip">0.00 GMD</strong></span>
+        <a class="mm-wallet-inline-topup" id="walletTopupLink" href="confirm-payment.html">Top Up</a>
+      </span>
+    </div>
+  </div>
+
+  <!-- MAIN HEADER -->
+  <header class="mm-header" id="mmHeader">
+    <div class="mm-topbar">
+      <div class="mm-brand-wrap">
+        <a class="mm-brand" href="index.html" aria-label="MatrixMarket home">
+          <img class="mm-brand-mark" src="matrixx.png" alt="" width="40" height="40" />
+          <span class="mm-brand-copy">
+            <strong class="mm-brand-title">Matrix<span>Market</span></strong>
+            <span class="mm-brand-tagline">Marketplace</span>
+          </span>
+        </a>
+      </div>
+
+      <div class="mm-search-shell" role="search" aria-label="Header product search">
+        <div class="mm-search-category">
+          <select aria-label="Search category">
+            <option>All</option>
+            <option>Electronics</option>
+            <option>Fashion</option>
+            <option>Home</option>
+          </select>
+        </div>
+        <input id="headerSearch" type="search" placeholder="Search products, categories, or sellers…" aria-label="Search products from header" autocomplete="off" />
+        <button class="mm-btn mm-search-btn" id="headerSearchBtn" type="button" aria-label="Run header search">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" fill="none"/></svg>
+        </button>
+      </div>
+
+      <div class="mm-top-actions" aria-label="Primary customer actions">
+        <a class="mm-top-link mm-top-link-account" href="settings.html" aria-label="Open account">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+          <span class="mm-top-link-text">
+            <span class="mm-top-link-sub">Hello,</span>
+            <strong id="userChip">Sign In</strong>
+          </span>
+        </a>
+        <a class="mm-top-link" href="buyers-orders.html">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2"/></svg>
+          <span class="mm-top-link-text">
+            <span class="mm-top-link-sub">Returns &amp;</span>
+            <strong>Orders</strong>
+          </span>
+        </a>
+        <a class="mm-cart" id="cartLink" href="cart.html" aria-label="Open cart">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+          <span class="mm-cart-count">0</span>
+          <span>Cart</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- NAV BAR -->
+    <div class="mm-header-body" id="mmHeaderBody">
+      <div class="mm-header-body-inner">
+        <nav class="mm-nav" id="mainNav" aria-label="Main navigation">
+          <a class="active" href="index.html">Home</a>
+          <a href="shop.html">Shop</a>
+          <a href="auto-parts.html">Auto Parts</a>
+          <a href="buyers-orders.html">Orders</a>
+          <a href="chat.html">Chat</a>
+          <a href="seller-login.html">Sell on MatrixMarket</a>
+          <a href="settings.html">Settings</a>
+        </nav>
+
+        <div class="mm-sync-tools">
+          <span class="mm-chip" id="syncChip">Last Sync: --</span>
+          <button class="mm-btn mm-btn-sync" id="syncBtn" type="button">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            Sync
+          </button>
+          <button class="mm-btn mm-btn-auto" id="autoSyncBtn" type="button">Auto On</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="mm-page" id="mainContent">
+
+    <!-- HERO BANNER -->
+    <section class="mm-hero" aria-labelledby="heroTitle">
+      <div class="mm-hero-copy">
+        <p class="mm-kicker">✦ Trusted Marketplace</p>
+        <h1 id="heroTitle">Shop Smart,<br/>Live Better</h1>
+        <p class="mm-hero-subtitle">Discover live seller inventory, compare deals faster, and move from browsing to checkout with less friction.</p>
+        <p class="mm-sync-note" id="syncNote">Loading live products from sellers…</p>
+        <div class="mm-actions">
+          <a class="mm-btn mm-primary" href="#productsSection">Shop Now</a>
+          <a class="mm-btn mm-secondary" href="shop.html">Browse Shop</a>
+          <a class="mm-btn mm-outline" href="cart.html">Go to Cart</a>
+        </div>
+        <div class="mm-hero-tools">
+          <button class="mm-tool-btn" id="remoteLoadBtn" type="button">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Refresh Remote
+          </button>
+          <button class="mm-tool-btn" id="shareBtn" type="button">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+            Share Filters
+          </button>
+          <button class="mm-tool-btn" id="csvBtn" type="button">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export CSV
+          </button>
+          <button class="mm-tool-btn" id="wishlistOnlyBtn" type="button">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+            Wishlist Only
+          </button>
+        </div>
+      </div>
+
+      <div class="mm-hero-media" aria-label="Marketplace highlights">
+        <div class="mm-hero-banner" id="heroNewestCard">
+          <div class="mm-hero-badge-wrap">
+            <span class="mm-hero-badge" id="heroNewestBadge">🆕 Newly Posted</span>
+          </div>
+          <img class="mm-hero-feature-media" id="heroNewestImage" src="matrixx.png" alt="" loading="lazy" decoding="async" fetchpriority="low" />
+          <div class="mm-hero-banner-copy">
+            <strong id="heroNewestName">Waiting for fresh listings</strong>
+            <span id="heroNewestMeta">MatrixMarket will feature the newest active seller listing here after sync.</span>
+            <div class="mm-hero-inline-list" aria-label="Newest product details">
+              <span class="mm-hero-inline-chip" id="heroNewestPrice">0.00 GMD</span>
+              <span class="mm-hero-inline-chip" id="heroNewestSeller">Seller: Marketplace</span>
+              <span class="mm-hero-inline-chip" id="heroNewestTime">Just synced</span>
+            </div>
+            <div class="mm-hero-cta-row">
+              <button class="mm-btn mm-primary" id="heroNewestOpenBtn" type="button" data-hero-action="open" data-hero-slot="newest" disabled>View Product</button>
+              <button class="mm-btn mm-outline" id="heroNewestCartBtn" type="button" data-hero-action="cart" data-hero-slot="newest" disabled>Add to Cart</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="mm-hero-points">
+          <article class="mm-promo-card mm-promo-product" id="heroTopSoldCard">
+            <small id="heroTopSoldBadge">🔥 Most Sold Product</small>
+            <strong id="heroTopSoldName">Sales data will appear here</strong>
+            <span id="heroTopSoldMeta">Once customers start ordering, this card will show the strongest moving product.</span>
+            <div class="mm-promo-stats">
+              <span class="mm-chip mm-chip-soft" id="heroTopSoldPrice">0.00 GMD</span>
+              <span class="mm-chip mm-chip-soft" id="heroTopSoldUnits">0 sold</span>
+            </div>
+            <div class="mm-promo-actions">
+              <button class="mm-btn mm-primary" id="heroTopSoldOpenBtn" type="button" data-hero-action="open" data-hero-slot="topSold" disabled>Open</button>
+              <button class="mm-btn mm-outline" id="heroTopSoldBuyBtn" type="button" data-hero-action="buy" data-hero-slot="topSold" disabled>Buy</button>
+            </div>
+          </article>
+          <article class="mm-promo-card">
+            <small>⚡ Fresh Today</small>
+            <strong id="heroFreshCount">0 products posted in the last 24 hours</strong>
+            <span id="heroFreshMeta">New active seller uploads show up here after every sync.</span>
+          </article>
+          <article class="mm-promo-card">
+            <small>⭐ Top Seller Live</small>
+            <strong id="heroSellerName">No seller highlights yet</strong>
+            <span id="heroSellerMeta">The seller with the deepest live catalog will appear here.</span>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- CATEGORIES SECTION -->
+    <section class="mm-card mm-categories-section" aria-labelledby="categorySectionTitle">
+      <div class="mm-head">
+        <div>
+          <p class="mm-section-eyebrow">Category manager</p>
+          <h2 id="categorySectionTitle">Browse Popular Categories</h2>
+        </div>
+        <a class="mm-link-arrow" href="#productsSection">View all products →</a>
+      </div>
+      <div class="mm-category-grid" id="categoryGrid">
+        <button class="mm-category-card" type="button" data-category-card="CAR">
+          <div class="mm-category-card-top">
+            <span class="mm-category-badge">Top live</span>
+            <span class="mm-category-count">2 live products</span>
+          </div>
+          <div class="mm-category-image-shell">
+            <span class="mm-category-monogram" aria-hidden="true">CA</span>
+          </div>
+          <div class="mm-category-copy">
+            <strong>CAR</strong>
+            <span>Fast access to active listings</span>
+          </div>
+          <div class="mm-category-card-foot">
+            <span>Open category</span>
+            <span aria-hidden="true">→</span>
+          </div>
+        </button>
+        <button class="mm-category-card" type="button" data-category-card="Engines">
+          <div class="mm-category-card-top">
+            <span class="mm-category-badge">Live now</span>
+            <span class="mm-category-count">1 live product</span>
+          </div>
+          <div class="mm-category-image-shell">
+            <span class="mm-category-monogram" aria-hidden="true">EN</span>
+          </div>
+          <div class="mm-category-copy">
+            <strong>Engines</strong>
+            <span>Ready for buyer discovery</span>
+          </div>
+          <div class="mm-category-card-foot">
+            <span>Open category</span>
+            <span aria-hidden="true">→</span>
+          </div>
+        </button>
+        <button class="mm-category-card" type="button" data-category-card="Headphone">
+          <div class="mm-category-card-top">
+            <span class="mm-category-badge">Live now</span>
+            <span class="mm-category-count">1 live product</span>
+          </div>
+          <div class="mm-category-image-shell">
+            <span class="mm-category-monogram" aria-hidden="true">HE</span>
+          </div>
+          <div class="mm-category-copy">
+            <strong>Headphone</strong>
+            <span>Shop current audio gear</span>
+          </div>
+          <div class="mm-category-card-foot">
+            <span>Open category</span>
+            <span aria-hidden="true">→</span>
+          </div>
+        </button>
+        <button class="mm-category-card" type="button" data-category-card="phones">
+          <div class="mm-category-card-top">
+            <span class="mm-category-badge">Live now</span>
+            <span class="mm-category-count">1 live product</span>
+          </div>
+          <div class="mm-category-image-shell">
+            <span class="mm-category-monogram" aria-hidden="true">PH</span>
+          </div>
+          <div class="mm-category-copy">
+            <strong>phones</strong>
+            <span>Browse mobile listings quickly</span>
+          </div>
+          <div class="mm-category-card-foot">
+            <span>Open category</span>
+            <span aria-hidden="true">→</span>
+          </div>
+        </button>
+        <button class="mm-category-card" type="button" data-category-card="chair">
+          <div class="mm-category-card-top">
+            <span class="mm-category-badge">Live now</span>
+            <span class="mm-category-count">1 live product</span>
+          </div>
+          <div class="mm-category-image-shell">
+            <span class="mm-category-monogram" aria-hidden="true">CH</span>
+          </div>
+          <div class="mm-category-copy">
+            <strong>chair</strong>
+            <span>See the latest furniture item</span>
+          </div>
+          <div class="mm-category-card-foot">
+            <span>Open category</span>
+            <span aria-hidden="true">→</span>
+          </div>
+        </button>
+      </div>
+    </section>
+
+    <!-- OVERVIEW GRID -->
+    <section class="mm-overview-grid" aria-label="Marketplace overview">
+      <article class="mm-card mm-stats-card" aria-labelledby="snapshotHeading">
+        <div class="mm-head">
+          <div>
+            <p class="mm-section-eyebrow">Marketplace snapshot</p>
+            <h2 id="snapshotHeading">Live Marketplace Snapshot</h2>
+          </div>
+        </div>
+        <div class="mm-stats" id="statsGrid">
+          <article class="mm-stat">
+            <div class="mm-stat-icon">📦</div>
+            <div class="value">0</div>
+            <div class="label">Visible</div>
+          </article>
+          <article class="mm-stat">
+            <div class="mm-stat-icon">🛒</div>
+            <div class="value">0</div>
+            <div class="label">All Products</div>
+          </article>
+          <article class="mm-stat">
+            <div class="mm-stat-icon">🏪</div>
+            <div class="value">0</div>
+            <div class="label">Sellers</div>
+          </article>
+          <article class="mm-stat">
+            <div class="mm-stat-icon">🏷️</div>
+            <div class="value">0</div>
+            <div class="label">Categories</div>
+          </article>
+        </div>
+      </article>
+
+      <article class="mm-card mm-quick-links" aria-labelledby="quickAccessHeading">
+        <div class="mm-head">
+          <div>
+            <p class="mm-section-eyebrow">Customer shortcuts</p>
+            <h2 id="quickAccessHeading">Popular Marketplace Tools</h2>
+          </div>
+          <span class="mm-chip mm-chip-soft">⌨️ Press / for search</span>
+        </div>
+        <div class="mm-help-grid">
+          <article class="mm-item">
+            <div class="mm-item-icon">⚙️</div>
+            <strong>Buyer Dashboard</strong>
+            <div class="mm-meta">Manage account details, wallet, and preferences.</div>
+            <div class="row"><a class="mm-btn mm-btn-sm" href="settings.html">Open Settings</a></div>
+          </article>
+          <article class="mm-item">
+            <div class="mm-item-icon">🏬</div>
+            <strong>Seller Center</strong>
+            <div class="mm-meta">Login or register as a seller and list products.</div>
+            <div class="row"><a class="mm-btn mm-btn-sm" href="seller-login.html">Seller Login</a></div>
+          </article>
+          <article class="mm-item">
+            <div class="mm-item-icon">💬</div>
+            <strong>Live Chat</strong>
+            <div class="mm-meta">Reach sellers directly for delivery and stock questions.</div>
+            <div class="row"><a class="mm-btn mm-btn-sm" href="chat.html">Open Chat</a></div>
+          </article>
+          <article class="mm-item">
+            <div class="mm-item-icon">🔒</div>
+            <strong>Secure Checkout</strong>
+            <div class="mm-meta">Ready to buy? Continue with the current cart.</div>
+            <div class="row"><a class="mm-btn mm-btn-sm" href="checkout.html">Checkout</a></div>
+          </article>
+        </div>
+      </article>
+    </section>
+
+    <!-- FEATURED / LATEST SECTION -->
+    <section class="mm-card mm-featured-section" aria-labelledby="featuredHeading">
+      <div class="mm-head">
+        <div>
+          <p class="mm-section-eyebrow">Featured section</p>
+          <h2 id="featuredHeading">Trending and Fresh Arrivals</h2>
+        </div>
+        <a class="mm-link-arrow" href="shop.html">Open full shop →</a>
+      </div>
+      <div class="mm-latest" id="latestGrid">
+        <div class="mm-empty">No latest products yet.</div>
+      </div>
+    </section>
+
+    <!-- MARKET SHELL: SIDEBAR + PRODUCTS -->
+    <section class="mm-market-shell" id="marketShell">
+      <button class="mm-sidebar-toggle" id="sidebarToggle" type="button" aria-expanded="false" aria-controls="marketSidebar">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="18" x2="18" y2="18"/></svg>
+        Filters &amp; Saved Items
+      </button>
+
+      <div class="mm-layout">
+        <aside class="mm-sidebar" id="marketSidebar">
+          <!-- FILTERS -->
+          <article class="mm-card mm-sidebar-card">
+            <div class="mm-head">
+              <div>
+                <p class="mm-section-eyebrow">Sidebar filters</p>
+                <h2>Filter &amp; Sort</h2>
+              </div>
+            </div>
+
+            <div class="mm-filters">
+              <div class="mm-filter-group">
+                <label class="mm-filter-label" for="searchInput">Search</label>
+                <input id="searchInput" type="search" placeholder="Name, seller, category…" aria-label="Search by name, seller, category" autocomplete="off" />
+              </div>
+              <div class="mm-filter-group">
+                <label class="mm-filter-label" for="minPrice">Min Price (GMD)</label>
+                <input id="minPrice" type="number" min="0" step="1" placeholder="0" aria-label="Minimum price in GMD" />
+              </div>
+              <div class="mm-filter-group">
+                <label class="mm-filter-label" for="categoryFilter">Category</label>
+                <select id="categoryFilter" aria-label="Filter by category">
+                  <option value="">All Categories</option>
+                </select>
+              </div>
+              <div class="mm-filter-group">
+                <label class="mm-filter-label" for="sellerFilter">Seller</label>
+                <select id="sellerFilter" aria-label="Filter by seller">
+                  <option value="">All Sellers</option>
+                </select>
+              </div>
+              <div class="mm-filter-group">
+                <label class="mm-filter-label" for="stockFilter">Stock Level</label>
+                <select id="stockFilter" aria-label="Filter by stock level">
+                  <option value="">Any Stock</option>
+                  <option value="5">Stock ≥ 5</option>
+                  <option value="10">Stock ≥ 10</option>
+                  <option value="20">Stock ≥ 20</option>
+                </select>
+              </div>
+              <div class="mm-filter-group">
+                <label class="mm-filter-label" for="freshFilter">Age</label>
+                <select id="freshFilter" aria-label="Filter by product age">
+                  <option value="">Any Age</option>
+                  <option value="1">24 Hours</option>
+                  <option value="7">7 Days</option>
+                  <option value="30">30 Days</option>
+                </select>
+              </div>
+              <div class="mm-filter-group">
+                <label class="mm-filter-label" for="sortFilter">Sort By</label>
+                <select id="sortFilter" aria-label="Sort products">
+                  <option value="newest">Newest</option>
+                  <option value="priceAsc">Price Low–High</option>
+                  <option value="priceDesc">Price High–Low</option>
+                  <option value="nameAsc">Name A–Z</option>
+                  <option value="stockDesc">Stock High–Low</option>
+                </select>
+              </div>
+              <div class="mm-filter-group">
+                <label class="mm-filter-label" for="pageSizeFilter">Per Page</label>
+                <select id="pageSizeFilter" aria-label="Products per page">
+                  <option value="8">8 / page</option>
+                  <option value="12" selected>12 / page</option>
+                  <option value="16">16 / page</option>
+                  <option value="24">24 / page</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="mm-filters mm-filters-row2">
+              <label class="mm-range-label" for="maxPrice">
+                Max Price
+                <input id="maxPrice" type="range" min="0" max="2000" value="2000" aria-label="Maximum price in GMD" />
+              </label>
+              <strong id="maxPriceLabel">2000 GMD</strong>
+              <button class="mm-btn mm-primary" id="applyBtn" type="button">Apply Filters</button>
+            </div>
+
+            <div class="mm-filters-actions">
+              <button class="mm-btn mm-outline" id="resetBtn" type="button">Reset</button>
+              <button class="mm-btn mm-outline" id="gridBtn" type="button">⊞ Grid</button>
+              <button class="mm-btn mm-outline" id="listBtn" type="button">☰ List</button>
+            </div>
+
+            <div class="mm-smart-actions">
+              <button class="mm-smart-btn" id="todayFilterBtn" type="button">🆕 New Today</button>
+              <button class="mm-smart-btn" id="budgetFilterBtn" type="button">💰 Budget ≤ 5000</button>
+              <button class="mm-smart-btn" id="highStockFilterBtn" type="button">📦 Stock ≥ 20</button>
+              <button class="mm-smart-btn mm-smart-btn-clear" id="clearAllBtn" type="button">✕ Show All</button>
+            </div>
+
+            <div class="mm-mini-stats">
+              <span class="mm-chip mm-chip-soft" id="resultMeta">Results: 0</span>
+              <span class="mm-chip mm-chip-soft" id="stockMeta">Visible Units: 0</span>
+            </div>
+          </article>
+
+          <!-- WISHLIST -->
+          <article class="mm-card mm-sidebar-card">
+            <div class="mm-head">
+              <h3>❤️ Wishlist (<span id="wishlistCount">0</span>)</h3>
+            </div>
+            <div id="wishlistList" class="mm-list">
+              <div class="mm-empty">No saved products.</div>
+            </div>
+          </article>
+
+          <!-- RECENTLY VIEWED -->
+          <article class="mm-card mm-sidebar-card">
+            <div class="mm-head">
+              <h3>🕐 Recently Viewed</h3>
+            </div>
+            <div id="recentList" class="mm-list">
+              <div class="mm-empty">No recent products.</div>
+            </div>
+          </article>
+
+          <!-- TOP SELLERS -->
+          <article class="mm-card mm-sidebar-card">
+            <div class="mm-head">
+              <h3>🏆 Top Sellers</h3>
+            </div>
+            <div id="sellerList" class="mm-list">
+              <div class="mm-empty">No seller data.</div>
+            </div>
+          </article>
+        </aside>
+
+        <!-- MAIN CONTENT -->
+        <section class="mm-main-content" id="productsSection">
+          <article class="mm-card">
+            <div class="mm-head">
+              <div>
+                <p class="mm-section-eyebrow">Main marketplace area</p>
+                <h2>All Seller Products</h2>
+              </div>
+              <span class="mm-chip mm-chip-soft" id="resultChip">0 items</span>
+            </div>
+            <div class="mm-market-banner">
+              <article class="mm-market-banner-copy">
+                <small>Live catalog overview</small>
+                <strong id="marketBannerTitle">Marketplace catalog is loading</strong>
+                <span id="marketBannerMeta">Browse active listings, compare offers, and move from discovery to checkout faster.</span>
+              </article>
+              <article class="mm-market-insight-card">
+                <small>Price range</small>
+                <strong id="marketRangeMeta">0.00 GMD - 0.00 GMD</strong>
+                <span>Quick price visibility across the current product view.</span>
+              </article>
+              <article class="mm-market-insight-card">
+                <small>Lead category</small>
+                <strong id="marketLeadCategory">No active category yet</strong>
+                <span>See which category is dominating buyer attention right now.</span>
+              </article>
+              <article class="mm-market-insight-card">
+                <small>Fresh listings</small>
+                <strong id="marketFreshMeta">0 new this week</strong>
+                <span>Fresh uploads help repeat buyers discover new inventory fast.</span>
+              </article>
+            </div>
+            <div class="mm-chips" id="categoryChips"></div>
+            <div class="mm-products" id="productGrid">
+              <div class="mm-empty">Loading products…</div>
+            </div>
+            <div class="mm-pager" id="pager"></div>
+          </article>
+
+          <article class="mm-card">
+            <div class="mm-head">
+              <div>
+                <p class="mm-section-eyebrow">Decision support</p>
+                <h2>Compare Products</h2>
+              </div>
+              <span class="mm-chip mm-chip-soft" id="compareCount">0 selected</span>
+            </div>
+            <div class="mm-compare-toolbar">
+              <div class="mm-compare-copy">
+                <strong id="compareInsightTitle">Ready to compare smartly</strong>
+                <span id="compareInsightMeta">Add up to 3 products to compare price, stock, category, and seller strength side by side.</span>
+              </div>
+              <button class="mm-btn mm-outline" id="compareClearBtn" type="button" disabled>Clear Compare</button>
+            </div>
+            <div id="compareList" class="mm-compare">
+              <div class="mm-empty">Add up to 3 products to compare.</div>
+            </div>
+          </article>
+
+          <article class="mm-card" aria-labelledby="supportHeading">
+            <div class="mm-head">
+              <div>
+                <p class="mm-section-eyebrow">Marketplace confidence</p>
+                <h2 id="supportHeading">Marketplace Help &amp; Reliability</h2>
+              </div>
+            </div>
+            <div class="mm-footer-grid">
+              <article class="mm-item mm-help-item">
+                <div class="mm-help-icon">🔄</div>
+                <strong>Sync Confidence</strong>
+                <div class="mm-meta">Use Sync for an immediate refresh. Auto mode updates every 30 seconds when enabled.</div>
+              </article>
+              <article class="mm-item mm-help-item">
+                <div class="mm-help-icon">⌨️</div>
+                <strong>Keyboard Controls</strong>
+                <div class="mm-meta">Press "/" to jump to search and press Escape to close the product modal.</div>
+              </article>
+              <article class="mm-item mm-help-item">
+                <div class="mm-help-icon">🔗</div>
+                <strong>Shareable Filters</strong>
+                <div class="mm-meta">Share Filters copies a URL with your active filters and view state.</div>
+              </article>
+              <article class="mm-item mm-help-item">
+                <div class="mm-help-icon">📊</div>
+                <strong>Data Portability</strong>
+                <div class="mm-meta">Export CSV saves exactly what is visible in your current result set.</div>
+              </article>
+            </div>
+          </article>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="mm-footer" aria-label="Site footer">
+    <div class="mm-footer-top">
+      <a href="#mainContent" class="mm-back-to-top">↑ Back to top</a>
+    </div>
+
+    <div class="mm-footer-inner">
+      <div class="mm-footer-col">
+        <h4>Get to Know Us</h4>
+        <a href="#aboutSection">About MatrixMarket</a>
+        <a href="chat.html">Contact Us</a>
+        <a href="#termsSection">Terms of Service</a>
+        <a href="#privacySection">Privacy Policy</a>
+      </div>
+      <div class="mm-footer-col">
+        <h4>Make Money With Us</h4>
+        <a href="seller-login.html">Sell on MatrixMarket</a>
+        <a href="seller-login.html">Become a Seller</a>
+        <a href="seller-login.html">Seller Dashboard</a>
+      </div>
+      <div class="mm-footer-col">
+        <h4>Payment Methods</h4>
+        <a href="confirm-payment.html">Wallet Top Up</a>
+        <a href="checkout.html">Secure Checkout</a>
+        <a href="buyers-orders.html">Order History</a>
+      </div>
+      <div class="mm-footer-col">
+        <h4>Let Us Help You</h4>
+        <a href="buyers-orders.html">Your Orders</a>
+        <a href="cart.html">Your Cart</a>
+        <a href="settings.html">Account Settings</a>
+        <a href="chat.html">Help &amp; Support</a>
+      </div>
+    </div>
+
+    <div class="mm-footer-brand-row">
+      <a class="mm-brand mm-brand-footer" href="index.html" aria-label="MatrixMarket home">
+        <img class="mm-brand-mark" src="matrixx.png" alt="" width="36" height="36" />
+        <span class="mm-brand-copy">
+          <strong>MatrixMarket</strong>
+          <span>Premium marketplace homepage</span>
+        </span>
+      </a>
+      <div class="mm-footer-socials" aria-label="Social icons">
+        <a class="mm-social-icon" href="#" aria-label="Facebook">
+          <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M14 8h3V4h-3c-3.3 0-6 2.7-6 6v2H5v4h3v6h4v-6h4l1-4h-5v-2c0-1.1.9-2 2-2Z"/></svg>
+        </a>
+        <a class="mm-social-icon" href="#" aria-label="Instagram">
+          <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M7 2h10a5 5 0 0 1 5 5v10a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5V7a5 5 0 0 1 5-5Zm5 5.2A4.8 4.8 0 1 0 16.8 12 4.8 4.8 0 0 0 12 7.2Zm6.1-.9a1.1 1.1 0 1 0 1.1 1.1 1.1 1.1 0 0 0-1.1-1.1ZM12 9.2A2.8 2.8 0 1 1 9.2 12 2.8 2.8 0 0 1 12 9.2Z"/></svg>
+        </a>
+        <a class="mm-social-icon" href="#" aria-label="Twitter">
+          <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M21 6.5a7.7 7.7 0 0 1-2.2.6 3.8 3.8 0 0 0 1.7-2.1 7.7 7.7 0 0 1-2.4.9 3.8 3.8 0 0 0-6.6 2.6c0 .3 0 .6.1.9A10.8 10.8 0 0 1 4 5.6a3.8 3.8 0 0 0 1.2 5.1 3.7 3.7 0 0 1-1.7-.5v.1a3.8 3.8 0 0 0 3 3.7 3.8 3.8 0 0 1-1.7.1 3.8 3.8 0 0 0 3.5 2.6A7.7 7.7 0 0 1 3 18.3a10.8 10.8 0 0 0 5.8 1.7c7 0 10.8-5.8 10.8-10.8v-.5A7.8 7.8 0 0 0 21 6.5Z"/></svg>
+        </a>
+      </div>
+    </div>
+
+    <div class="mm-footer-meta">
+      <p id="aboutSection" hidden>A cleaner way to browse live marketplace inventory, compare seller offers, and buy with confidence.</p>
+      <p id="termsSection">By using MatrixMarket, customers browse seller-provided listings, compare offers, and complete checkout through the active marketplace flow.</p>
+      <p id="privacySection">MatrixMarket keeps browsing tools, cart state, wishlist data, and sync preferences available locally for a faster shopping experience.</p>
+    </div>
+  </footer>
+
+  <!-- PRODUCT MODAL -->
+  <div class="mm-modal" id="productModal" role="dialog" aria-modal="true" aria-hidden="true" aria-label="Product details">
+    <div class="mm-modal-card">
+      <img id="modalImage" loading="lazy" decoding="async" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" alt="Product image" />
+      <div class="mm-modal-info">
+        <button class="mm-modal-close" id="modalClose" type="button" aria-label="Close modal">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+        <h3 id="modalName">Product</h3>
+        <div id="modalPrice" class="mm-price">0 GMD</div>
+        <div id="modalMeta" class="mm-meta"></div>
+        <p id="modalDesc" class="mm-meta"></p>
+        <div class="mm-actions">
+          <button class="mm-btn mm-outline" id="modalWish" type="button">❤️ Wishlist</button>
+          <button class="mm-btn mm-secondary" id="modalCart" type="button">🛒 Add to Cart</button>
+          <button class="mm-btn mm-primary" id="modalBuy" type="button">Buy Now</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toastWrap" class="mm-toast-wrap" aria-live="polite"></div>
+
+  <button
+    class="mm-ai-launcher"
+    id="aiLauncher"
+    type="button"
+    aria-label="Open MatrixMarket AI assistant"
+    aria-controls="aiAssistantPanel"
+    aria-expanded="false"
+  >
+    <span class="mm-ai-launcher-icon" aria-hidden="true">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3l1.7 4.3L18 9l-4.3 1.7L12 15l-1.7-4.3L6 9l4.3-1.7L12 3z"></path>
+        <path d="M18.5 14.5l.8 2 .2.8.8.2 2 .8-2 .8-.8.2-.2.8-.8 2-.8-2-.2-.8-.8-.2-2-.8 2-.8.8-.2.2-.8.8-2z"></path>
+        <path d="M5.5 15.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6.6-1.4z"></path>
+      </svg>
+    </span>
+    <span class="mm-ai-launcher-copy">
+      <strong>AI Help</strong>
+      <span>Ask anything</span>
+    </span>
+  </button>
+
+  <div class="mm-ai-panel" id="aiAssistantPanel" aria-hidden="true">
+    <div class="mm-ai-panel-backdrop" id="aiPanelBackdrop"></div>
+    <aside class="mm-ai-drawer" role="dialog" aria-modal="true" aria-labelledby="aiPanelTitle">
+      <div class="mm-ai-drawer-head">
+        <div class="mm-ai-drawer-title">
+          <p class="mm-section-eyebrow">Side Assistant</p>
+          <h2 id="aiPanelTitle">MatrixMarket AI</h2>
+        </div>
+        <button class="mm-ai-close" id="aiPanelClose" type="button" aria-label="Close AI assistant">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      <p class="mm-ai-drawer-copy">Customers can open this panel and ask product, order, checkout, or seller questions without leaving the home page.</p>
+      <div class="mm-ai-frame-shell">
+        <iframe
+          class="mm-ai-frame"
+          id="aiAssistantFrame"
+          src="agent-page.html"
+          title="MatrixMarket AI assistant"
+          loading="lazy"
+          referrerpolicy="strict-origin-when-cross-origin"
+        ></iframe>
+      </div>
+    </aside>
+  </div>
+
+  <script defer src="index-home.js?v=20260509a"></script>
+  <script defer src="sw-register.js?v=20260228a"></script>
+  <script defer src="site-performance.js?v=20260226a"></script>
+  <script>
+    (function () {
+      var launcher = document.getElementById('aiLauncher');
+      var panel = document.getElementById('aiAssistantPanel');
+      var closeBtn = document.getElementById('aiPanelClose');
+      var backdrop = document.getElementById('aiPanelBackdrop');
+
+      if (!launcher || !panel || !closeBtn || !backdrop) return;
+
+      function setPanelState(open) {
+        panel.classList.toggle('is-open', open);
+        panel.setAttribute('aria-hidden', open ? 'false' : 'true');
+        launcher.setAttribute('aria-expanded', open ? 'true' : 'false');
+        document.body.classList.toggle('mm-ai-open', open);
+      }
+
+      launcher.addEventListener('click', function () {
+        var isOpen = panel.classList.contains('is-open');
+        setPanelState(!isOpen);
+      });
+
+      closeBtn.addEventListener('click', function () {
+        setPanelState(false);
+        launcher.focus();
+      });
+
+      backdrop.addEventListener('click', function () {
+        setPanelState(false);
+      });
+
+      document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && panel.classList.contains('is-open')) {
+          setPanelState(false);
+          launcher.focus();
+        }
+      });
+    }());
+  </script>
+</body>
+</html>

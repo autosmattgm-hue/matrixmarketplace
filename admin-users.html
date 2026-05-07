@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Admin Users - MatrixMarket</title>
+    <link rel="stylesheet" href="admin-layout.css?v=20260227a">
+    <link rel="stylesheet" href="upgrade.css">
+    <script src="firebase-online-storage.js"></script>
+</head>
+<body class="admin-page">
+    <div id="adminHeader"></div>
+    <main class="admin-shell">
+        <section class="admin-titlebar">
+            <h1>Manage Users</h1>
+            <div class="admin-actions">
+                <button class="btn-adm" id="refreshBtn" type="button">Refresh</button>
+                <button class="btn-adm" id="exportBtn" type="button">Export CSV</button>
+                <a class="btn-adm primary" href="admin-edit-user-seller.html">Open Account Editor</a>
+            </div>
+        </section>
+
+        <section class="admin-card">
+            <div class="adm-toolbar">
+                <input class="adm" id="searchInput" type="text" placeholder="Search name, email, phone, country">
+                <select class="adm" id="statusFilter">
+                    <option value="">All Status</option>
+                    <option value="approved">Approved</option>
+                    <option value="pending">Pending</option>
+                    <option value="declined">Declined</option>
+                    <option value="suspended">Suspended</option>
+                </select>
+                <select class="adm" id="sortFilter">
+                    <option value="createdDesc">Newest First</option>
+                    <option value="createdAsc">Oldest First</option>
+                    <option value="nameAsc">Name A-Z</option>
+                    <option value="balanceDesc">Highest Balance</option>
+                </select>
+                <button class="btn-adm" id="bulkApproveBtn" type="button">Approve Filtered</button>
+            </div>
+        </section>
+
+        <section class="admin-card">
+            <div class="adm-table-wrap">
+                <table class="adm-table" id="userTable"></table>
+            </div>
+        </section>
+
+        <div class="adm-foot">User administration controls</div>
+    </main>
+
+    <script src="admin-core.js?v=20260222c"></script>
+    <script>
+        const state = { users: [], filtered: [] };
+
+        function setHeader() {
+            document.getElementById("adminHeader").innerHTML = AdminCore.renderAdminHeader("admin-users.html");
+        }
+
+        function readUsers() {
+            state.users = AdminCore.getUsers();
+        }
+
+        function applyFilters() {
+            const q = AdminCore.str(document.getElementById("searchInput").value).toLowerCase();
+            const statusFilter = AdminCore.str(document.getElementById("statusFilter").value).toLowerCase();
+            const sort = document.getElementById("sortFilter").value;
+
+            state.filtered = state.users.filter(function (u) {
+                const hay = [u.fullName, u.email, u.phone, u.country].join(" ").toLowerCase();
+                const st = AdminCore.str(u.status || u.paymentStatus || "pending").toLowerCase();
+                const statusOk = !statusFilter || st.includes(statusFilter);
+                return (!q || hay.includes(q)) && statusOk;
+            });
+
+            state.filtered.sort(function (a, b) {
+                if (sort === "createdAsc") return String(a.createdAt).localeCompare(String(b.createdAt));
+                if (sort === "nameAsc") return a.fullName.localeCompare(b.fullName);
+                if (sort === "balanceDesc") return AdminCore.num(b.balance) - AdminCore.num(a.balance);
+                return String(b.createdAt).localeCompare(String(a.createdAt));
+            });
+        }
+
+        function rowActions(email) {
+            const safe = encodeURIComponent(email);
+            return [
+                '<button class="btn-adm success" data-action="approve" data-email="' + safe + '">Approve</button>',
+                '<button class="btn-adm warning" data-action="suspend" data-email="' + safe + '">Suspend</button>',
+                '<button class="btn-adm" data-action="topup" data-email="' + safe + '">+50 GMD</button>',
+                '<button class="btn-adm danger" data-action="delete" data-email="' + safe + '">Delete</button>'
+            ].join("");
+        }
+
+        function renderTable() {
+            const table = document.getElementById("userTable");
+            const head = '<thead><tr><th>Name</th><th>Email</th><th>Country</th><th>Phone</th><th>Balance</th><th>Status</th><th>Payment</th><th>Subscription</th><th>Actions</th></tr></thead>';
+
+            if (!state.filtered.length) {
+                table.innerHTML = head + '<tbody><tr><td colspan="9" class="adm-empty">No users match this filter.</td></tr></tbody>';
+                return;
+            }
+
+            table.innerHTML = head + '<tbody>' + state.filtered.map(function (u) {
+                return '<tr>' +
+                    '<td>' + u.fullName + '</td>' +
+                    '<td>' + u.email + '</td>' +
+                    '<td>' + u.country + '</td>' +
+                    '<td>' + (u.phone || "-") + '</td>' +
+                    '<td>' + AdminCore.fmtMoney(u.balance) + '</td>' +
+                    '<td>' + AdminCore.badge(u.status || "pending") + '</td>' +
+                    '<td>' + AdminCore.badge(u.paymentStatus || "pending") + '</td>' +
+                    '<td>' + AdminCore.badge(u.subscription || "Inactive") + '</td>' +
+                    '<td><div class="adm-inline-actions">' + rowActions(u.email) + '</div></td>' +
+                    '</tr>';
+            }).join("") + '</tbody>';
+        }
+
+        function refresh() {
+            readUsers();
+            applyFilters();
+            renderTable();
+        }
+
+        function mutate(email, mode) {
+            const target = decodeURIComponent(email);
+            if (mode === "approve") {
+                AdminCore.updateAccountByEmail(target, {
+                    status: "Approved",
+                    paymentStatus: "Paid",
+                    subscription: "Active"
+                });
+                AdminCore.log("user_approved", { email: target });
+            }
+
+            if (mode === "suspend") {
+                AdminCore.updateAccountByEmail(target, {
+                    status: "Suspended",
+                    subscription: "Inactive"
+                });
+                AdminCore.log("user_suspended", { email: target });
+            }
+
+            if (mode === "topup") {
+                AdminCore.adjustBalance(target, 50);
+                AdminCore.log("user_balance_adjusted", { email: target, amount: 50 });
+            }
+
+            if (mode === "delete") {
+                if (!confirm("Delete this user account?")) return;
+                AdminCore.deleteAccount(target);
+                AdminCore.log("user_deleted", { email: target });
+            }
+
+            refresh();
+        }
+
+        function initAdminUsersPage() {
+            setHeader();
+            refresh();
+            window.addEventListener("storage", refresh);
+
+            document.getElementById("searchInput").addEventListener("input", refresh);
+            document.getElementById("statusFilter").addEventListener("change", refresh);
+            document.getElementById("sortFilter").addEventListener("change", refresh);
+            document.getElementById("refreshBtn").addEventListener("click", refresh);
+
+            document.getElementById("bulkApproveBtn").addEventListener("click", function () {
+                if (!state.filtered.length) return;
+                state.filtered.forEach(function (u) {
+                    AdminCore.updateAccountByEmail(u.email, {
+                        status: "Approved",
+                        paymentStatus: "Paid",
+                        subscription: "Active"
+                    });
+                });
+                AdminCore.log("bulk_user_approved", { count: state.filtered.length });
+                refresh();
+            });
+
+            document.getElementById("exportBtn").addEventListener("click", function () {
+                const rows = state.filtered.map(function (u) {
+                    return {
+                        name: u.fullName,
+                        email: u.email,
+                        country: u.country,
+                        phone: u.phone,
+                        balance: AdminCore.num(u.balance),
+                        status: u.status,
+                        paymentStatus: u.paymentStatus,
+                        subscription: u.subscription
+                    };
+                });
+                AdminCore.exportCSV(rows, "admin-users.csv");
+                AdminCore.log("users_csv_exported", { count: rows.length });
+            });
+
+            document.getElementById("userTable").addEventListener("click", function (e) {
+                const btn = e.target.closest("button[data-action]");
+                if (!btn) return;
+                mutate(btn.dataset.email, btn.dataset.action);
+            });
+        }
+
+        function startAdminUsersPage() {
+            const ready = window.MMStorage && window.MMStorage.ready;
+            if (ready && typeof ready.then === "function") {
+                ready.finally(initAdminUsersPage);
+                return;
+            }
+            initAdminUsersPage();
+        }
+
+        if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", startAdminUsersPage);
+        else startAdminUsersPage();
+    </script>
+    <script defer src="upgrade.js"></script>
+  <script defer src="sw-register.js?v=20260226a"></script>
+  <script defer src="site-performance.js?v=20260226a"></script>
+</body>
+</html>
+
+
+
+

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Admin Logs - MatrixMarket</title>
+    <link rel="stylesheet" href="admin-layout.css?v=20260227a">
+    <link rel="stylesheet" href="upgrade.css">
+    <script src="firebase-online-storage.js"></script>
+</head>
+<body class="admin-page">
+    <div id="adminHeader"></div>
+    <main class="admin-shell">
+        <section class="admin-titlebar">
+            <h1>Audit Logs</h1>
+            <div class="admin-actions">
+                <button class="btn-adm" id="refreshBtn" type="button">Refresh</button>
+                <button class="btn-adm" id="exportBtn" type="button">Export JSON</button>
+                <button class="btn-adm danger" id="clearBtn" type="button">Clear Logs</button>
+            </div>
+        </section>
+
+        <section class="admin-card">
+            <div class="adm-toolbar">
+                <input class="adm" id="searchInput" type="text" placeholder="Search action or details">
+                <select class="adm" id="actionFilter">
+                    <option value="">All Actions</option>
+                </select>
+                <select class="adm" id="limitFilter">
+                    <option value="50">Last 50</option>
+                    <option value="100">Last 100</option>
+                    <option value="250">Last 250</option>
+                    <option value="1000">Last 1000</option>
+                </select>
+                <button class="btn-adm" id="seedBtn" type="button">Add Test Event</button>
+            </div>
+        </section>
+
+        <section class="admin-card">
+            <div class="adm-table-wrap">
+                <table class="adm-table" id="logTable"></table>
+            </div>
+        </section>
+
+        <div class="adm-foot">Every admin decision page writes events to this log.</div>
+    </main>
+
+    <script src="admin-core.js?v=20260222c"></script>
+    <script>
+        const state = { logs: [], filtered: [] };
+
+        function setHeader() {
+            document.getElementById("adminHeader").innerHTML = AdminCore.renderAdminHeader("admin-logs.html");
+        }
+
+        function readLogs() {
+            state.logs = AdminCore.getAuditLogs();
+            const actions = Array.from(new Set(state.logs.map(function (l) { return l.action; }))).sort();
+            document.getElementById("actionFilter").innerHTML = '<option value="">All Actions</option>' + actions.map(function (a) {
+                return '<option value="' + a + '">' + a + '</option>';
+            }).join("");
+        }
+
+        function applyFilters() {
+            const q = AdminCore.str(document.getElementById("searchInput").value).toLowerCase();
+            const action = AdminCore.str(document.getElementById("actionFilter").value).toLowerCase();
+            const limit = Number(document.getElementById("limitFilter").value || 50);
+
+            state.filtered = state.logs.filter(function (l) {
+                const payload = JSON.stringify(l.details || {}).toLowerCase();
+                const hay = [l.action, payload].join(" ").toLowerCase();
+                return (!q || hay.includes(q)) && (!action || AdminCore.str(l.action).toLowerCase() === action);
+            }).slice(0, limit);
+        }
+
+        function renderTable() {
+            const table = document.getElementById("logTable");
+            const head = '<thead><tr><th>ID</th><th>Action</th><th>Timestamp</th><th>Details</th></tr></thead>';
+
+            if (!state.filtered.length) {
+                table.innerHTML = head + '<tbody><tr><td colspan="4" class="adm-empty">No logs match this filter.</td></tr></tbody>';
+                return;
+            }
+
+            table.innerHTML = head + '<tbody>' + state.filtered.map(function (l) {
+                return '<tr>' +
+                    '<td>' + l.id + '</td>' +
+                    '<td>' + l.action + '</td>' +
+                    '<td>' + AdminCore.fmtDate(l.at) + '</td>' +
+                    '<td><code>' + JSON.stringify(l.details || {}) + '</code></td>' +
+                    '</tr>';
+            }).join("") + '</tbody>';
+        }
+
+        function refresh() {
+            readLogs();
+            applyFilters();
+            renderTable();
+        }
+
+        function initAdminLogsPage() {
+            setHeader();
+            refresh();
+            window.addEventListener("storage", refresh);
+
+            document.getElementById("searchInput").addEventListener("input", refresh);
+            document.getElementById("actionFilter").addEventListener("change", refresh);
+            document.getElementById("limitFilter").addEventListener("change", refresh);
+
+            document.getElementById("refreshBtn").addEventListener("click", refresh);
+            document.getElementById("seedBtn").addEventListener("click", function () {
+                AdminCore.log("manual_test_event", { source: "admin-logs", random: Math.random().toString(36).slice(2, 8) });
+                refresh();
+            });
+            document.getElementById("exportBtn").addEventListener("click", function () {
+                AdminCore.exportJSON(state.filtered, "admin-logs.json");
+            });
+            document.getElementById("clearBtn").addEventListener("click", function () {
+                if (!confirm("Clear all audit logs?")) return;
+                AdminCore.writeJSON("adminAuditLogs", []);
+                refresh();
+            });
+        }
+
+        function startAdminLogsPage() {
+            const ready = window.MMStorage && window.MMStorage.ready;
+            if (ready && typeof ready.then === "function") {
+                ready.finally(initAdminLogsPage);
+                return;
+            }
+            initAdminLogsPage();
+        }
+
+        if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", startAdminLogsPage);
+        else startAdminLogsPage();
+    </script>
+    <script defer src="upgrade.js"></script>
+  <script defer src="sw-register.js?v=20260226a"></script>
+  <script defer src="site-performance.js?v=20260226a"></script>
+</body>
+</html>
+
+
+
+

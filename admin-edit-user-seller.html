@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Admin Account Editor - MatrixMarket</title>
+    <link rel="stylesheet" href="admin-layout.css?v=20260227a">
+    <link rel="stylesheet" href="upgrade.css">
+    <script src="firebase-online-storage.js"></script>
+</head>
+<body class="admin-page">
+    <div id="adminHeader"></div>
+    <main class="admin-shell">
+        <section class="admin-titlebar">
+            <h1>Unified Account Editor</h1>
+            <div class="admin-actions">
+                <button class="btn-adm" id="refreshBtn" type="button">Refresh</button>
+                <button class="btn-adm" id="exportBtn" type="button">Export CSV</button>
+                <button class="btn-adm primary" id="newAccountBtn" type="button">Create Account</button>
+            </div>
+        </section>
+
+        <section class="admin-card">
+            <div class="adm-toolbar">
+                <input class="adm" id="searchInput" type="text" placeholder="Search by name, email, role">
+                <select class="adm" id="roleFilter">
+                    <option value="">All Roles</option>
+                    <option value="user">Users</option>
+                    <option value="seller">Sellers</option>
+                </select>
+                <select class="adm" id="statusFilter">
+                    <option value="">All Status</option>
+                    <option value="approved">Approved</option>
+                    <option value="pending">Pending</option>
+                    <option value="declined">Declined</option>
+                    <option value="suspended">Suspended</option>
+                </select>
+                <button class="btn-adm" id="resetFilterBtn" type="button">Reset</button>
+            </div>
+            <p class="adm-note" style="margin-top:.4rem;">Use inline edits and click Save Row. Changing role moves account between users and sellers lists.</p>
+        </section>
+
+        <section class="admin-card">
+            <div class="adm-table-wrap">
+                <table class="adm-table" id="accountTable"></table>
+            </div>
+        </section>
+
+        <div class="adm-foot">Account edits are persisted to MMStorage collections.</div>
+    </main>
+
+    <script src="admin-core.js?v=20260222c"></script>
+    <script>
+        const state = { rows: [], filtered: [] };
+
+        function setHeader() {
+            document.getElementById("adminHeader").innerHTML = AdminCore.renderAdminHeader("admin-edit-user-seller.html");
+        }
+
+        function readRows() {
+            state.rows = AdminCore.getAllAccounts().sort(function (a, b) {
+                return String(b.createdAt).localeCompare(String(a.createdAt));
+            });
+        }
+
+        function applyFilters() {
+            const q = AdminCore.str(document.getElementById("searchInput").value).toLowerCase();
+            const role = AdminCore.str(document.getElementById("roleFilter").value).toLowerCase();
+            const status = AdminCore.str(document.getElementById("statusFilter").value).toLowerCase();
+
+            state.filtered = state.rows.filter(function (r) {
+                const hay = [r.fullName, r.email, r.role, r.country, r.store].join(" ").toLowerCase();
+                const roleOk = !role || r.role === role;
+                const statusOk = !status || AdminCore.str(r.status).toLowerCase().includes(status);
+                return (!q || hay.includes(q)) && roleOk && statusOk;
+            });
+        }
+
+        function rowHtml(r, idx) {
+            const roleOptions = ["user", "seller"].map(function (role) {
+                return '<option value="' + role + '" ' + (r.role === role ? "selected" : "") + '>' + role + '</option>';
+            }).join("");
+
+            const statusOptions = ["Pending", "Approved", "Declined", "Suspended"].map(function (s) {
+                return '<option value="' + s + '" ' + (AdminCore.str(r.status).toLowerCase() === s.toLowerCase() ? "selected" : "") + '>' + s + '</option>';
+            }).join("");
+
+            const paymentOptions = ["Pending", "Paid", "Declined"].map(function (s) {
+                return '<option value="' + s + '" ' + (AdminCore.str(r.paymentStatus).toLowerCase() === s.toLowerCase() ? "selected" : "") + '>' + s + '</option>';
+            }).join("");
+
+            const subOptions = ["Inactive", "Active"].map(function (s) {
+                return '<option value="' + s + '" ' + (AdminCore.str(r.subscription).toLowerCase() === s.toLowerCase() ? "selected" : "") + '>' + s + '</option>';
+            }).join("");
+
+            return '<tr data-row-index="' + idx + '">' +
+                '<td><input class="adm" data-field="fullName" value="' + r.fullName.replace(/"/g, '&quot;') + '"></td>' +
+                '<td><input class="adm" data-field="email" value="' + r.email.replace(/"/g, '&quot;') + '"></td>' +
+                '<td><select class="adm" data-field="role">' + roleOptions + '</select></td>' +
+                '<td><input class="adm" data-field="country" value="' + r.country.replace(/"/g, '&quot;') + '"></td>' +
+                '<td><input class="adm" data-field="store" value="' + (r.store || '').replace(/"/g, '&quot;') + '"></td>' +
+                '<td><input class="adm" data-field="plan" value="' + (r.plan || '').replace(/"/g, '&quot;') + '"></td>' +
+                '<td><input class="adm" type="number" min="0" step="0.01" data-field="balance" value="' + AdminCore.num(r.balance) + '"></td>' +
+                '<td><select class="adm" data-field="status">' + statusOptions + '</select></td>' +
+                '<td><select class="adm" data-field="paymentStatus">' + paymentOptions + '</select></td>' +
+                '<td><select class="adm" data-field="subscription">' + subOptions + '</select></td>' +
+                '<td><div class="adm-inline-actions">' +
+                '<button class="btn-adm success" data-action="save">Save</button>' +
+                '<button class="btn-adm danger" data-action="delete">Delete</button>' +
+                '</div></td>' +
+                '</tr>';
+        }
+
+        function renderTable() {
+            const table = document.getElementById("accountTable");
+            const head = '<thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Country</th><th>Store</th><th>Plan</th><th>Balance</th><th>Status</th><th>Payment</th><th>Subscription</th><th>Actions</th></tr></thead>';
+
+            if (!state.filtered.length) {
+                table.innerHTML = head + '<tbody><tr><td colspan="11" class="adm-empty">No accounts to display.</td></tr></tbody>';
+                return;
+            }
+
+            table.innerHTML = head + '<tbody>' + state.filtered.map(function (r, idx) { return rowHtml(r, idx); }).join("") + '</tbody>';
+        }
+
+        function refresh() {
+            readRows();
+            applyFilters();
+            renderTable();
+        }
+
+        function createAccount() {
+            const email = prompt("Enter new account email:", "");
+            if (!email) return;
+            const role = prompt("Role (user/seller):", "user");
+            const record = {
+                fullName: "New Account",
+                name: "New Account",
+                email: AdminCore.str(email).toLowerCase(),
+                role: AdminCore.str(role).toLowerCase() === "seller" ? "seller" : "user",
+                country: "Unknown",
+                plan: "basic",
+                store: "",
+                balance: 0,
+                status: "Pending",
+                paymentStatus: "Pending",
+                subscription: "Inactive",
+                createdAt: new Date().toISOString()
+            };
+            AdminCore.saveAccount(record);
+            AdminCore.log("account_created", { email: record.email, role: record.role });
+            refresh();
+        }
+
+        function saveFromRow(tr) {
+            const rowIndex = Number(tr.getAttribute("data-row-index"));
+            const src = state.filtered[rowIndex];
+            if (!src) return;
+
+            const next = { ...src };
+            tr.querySelectorAll("[data-field]").forEach(function (el) {
+                const field = el.getAttribute("data-field");
+                let val = el.value;
+                if (field === "balance") val = AdminCore.num(val);
+                next[field] = val;
+            });
+
+            next.name = next.fullName;
+            next.email = AdminCore.str(next.email).toLowerCase();
+            if (!next.email) {
+                alert("Email is required");
+                return;
+            }
+
+            AdminCore.saveAccount(next);
+            AdminCore.log("account_saved", { email: next.email, role: next.role });
+            refresh();
+        }
+
+        function deleteFromRow(tr) {
+            const rowIndex = Number(tr.getAttribute("data-row-index"));
+            const src = state.filtered[rowIndex];
+            if (!src) return;
+            if (!confirm("Delete account " + src.email + "?")) return;
+            AdminCore.deleteAccount(src.email);
+            AdminCore.log("account_deleted", { email: src.email });
+            refresh();
+        }
+
+        function initAdminAccountEditorPage() {
+            setHeader();
+            refresh();
+            window.addEventListener("storage", refresh);
+
+            document.getElementById("searchInput").addEventListener("input", refresh);
+            document.getElementById("roleFilter").addEventListener("change", refresh);
+            document.getElementById("statusFilter").addEventListener("change", refresh);
+
+            document.getElementById("resetFilterBtn").addEventListener("click", function () {
+                document.getElementById("searchInput").value = "";
+                document.getElementById("roleFilter").value = "";
+                document.getElementById("statusFilter").value = "";
+                refresh();
+            });
+
+            document.getElementById("refreshBtn").addEventListener("click", refresh);
+            document.getElementById("newAccountBtn").addEventListener("click", createAccount);
+
+            document.getElementById("exportBtn").addEventListener("click", function () {
+                const rows = state.filtered.map(function (r) {
+                    return {
+                        name: r.fullName,
+                        email: r.email,
+                        role: r.role,
+                        country: r.country,
+                        store: r.store,
+                        plan: r.plan,
+                        balance: AdminCore.num(r.balance),
+                        status: r.status,
+                        paymentStatus: r.paymentStatus,
+                        subscription: r.subscription
+                    };
+                });
+                AdminCore.exportCSV(rows, "admin-accounts.csv");
+                AdminCore.log("accounts_csv_exported", { count: rows.length });
+            });
+
+            document.getElementById("accountTable").addEventListener("click", function (e) {
+                const btn = e.target.closest("button[data-action]");
+                if (!btn) return;
+                const tr = btn.closest("tr");
+                if (!tr) return;
+                if (btn.dataset.action === "save") saveFromRow(tr);
+                if (btn.dataset.action === "delete") deleteFromRow(tr);
+            });
+        }
+
+        function startAdminAccountEditorPage() {
+            const ready = window.MMStorage && window.MMStorage.ready;
+            if (ready && typeof ready.then === "function") {
+                ready.finally(initAdminAccountEditorPage);
+                return;
+            }
+            initAdminAccountEditorPage();
+        }
+
+        if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", startAdminAccountEditorPage);
+        else startAdminAccountEditorPage();
+    </script>
+    <script defer src="upgrade.js"></script>
+  <script defer src="sw-register.js?v=20260226a"></script>
+  <script defer src="site-performance.js?v=20260226a"></script>
+</body>
+</html>
+
+
+
+
+

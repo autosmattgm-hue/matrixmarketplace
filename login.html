@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Login - MatrixMarketplace</title>
+    <link rel="icon" type="image/x-icon" href="matrixx.png">
+    <link rel="stylesheet" href="">
+    <style>
+        :root {
+            --bg1: #ffffff;
+            --bg2: #f4f8fb;
+            --accent: #0f766e;
+            --accent2: #2563eb;
+            --text: #122033;
+            --muted: #5f6c7b;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            padding: 1rem;
+            gap: 0.8rem;
+            font-family: "Poppins", sans-serif;
+            color: var(--text);
+            position: relative;
+            overflow: hidden;
+            background:
+                radial-gradient(900px 460px at -12% -8%, rgba(37, 99, 235, 0.10), transparent 58%),
+                radial-gradient(740px 360px at 110% 10%, rgba(15, 118, 110, 0.10), transparent 62%),
+                linear-gradient(180deg, var(--bg1), var(--bg2) 52%, #eef4f8 100%);
+        }
+
+        body::before,
+        body::after {
+            content: "";
+            position: fixed;
+            pointer-events: none;
+            filter: blur(42px);
+            opacity: 0.48;
+            z-index: 0;
+        }
+
+        body::before {
+            width: 280px;
+            height: 280px;
+            border-radius: 50%;
+            left: -80px;
+            bottom: -70px;
+            background: rgba(37, 99, 235, 0.10);
+        }
+
+        body::after {
+            width: 240px;
+            height: 240px;
+            border-radius: 50%;
+            right: -80px;
+            top: -60px;
+            background: rgba(15, 118, 110, 0.08);
+        }
+
+        .bg-grid {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+            opacity: 0.42;
+            background:
+                linear-gradient(rgba(148, 163, 184, 0.16) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(148, 163, 184, 0.16) 1px, transparent 1px);
+            background-size: 26px 26px;
+            mask-image: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.75) 0%, transparent 82%);
+        }
+
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .panel {
+            width: min(420px, 100%);
+            border: 1px solid rgba(219, 227, 239, 0.95);
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.94);
+            backdrop-filter: blur(12px);
+            box-shadow: 0 18px 40px rgba(15, 23, 42, 0.10);
+            padding: 1.2rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        h1 {
+            margin: 0 0 0.2rem;
+            font-size: 1.9rem;
+            color: #0f172a;
+            text-shadow: none;
+        }
+
+        .sub {
+            margin: 0 0 0.8rem;
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+
+        .net-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            border-radius: 999px;
+            border: 1px solid rgba(37, 99, 235, 0.14);
+            background: rgba(37, 99, 235, 0.08);
+            color: #1d4ed8;
+            padding: 0.26rem 0.56rem;
+            font-size: 0.75rem;
+            font-weight: 700;
+            margin-bottom: 0.45rem;
+        }
+
+        .net-pill.offline {
+            border-color: rgba(248, 113, 113, 0.58);
+            background: rgba(239, 68, 68, 0.18);
+            color: #fecaca;
+        }
+
+        .label {
+            display: block;
+            margin-top: 0.5rem;
+            margin-bottom: 0.26rem;
+            color: #1e293b;
+            font-size: 0.84rem;
+            font-weight: 600;
+        }
+
+        input[type="email"],
+        input[type="password"],
+        input[type="text"] {
+            width: 100%;
+            border: 1px solid #dbe3ef;
+            border-radius: 11px;
+            padding: 0.72rem;
+            background: #f8fafc;
+            color: #000000;
+            outline: none;
+        }
+
+        input[type="email"]::placeholder,
+        input[type="password"]::placeholder,
+        input[type="text"]::placeholder {
+            color: #111111;
+            opacity: 1;
+        }
+
+        input:focus {
+            border-color: #22c55e;
+            box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.12);
+        }
+
+        .password-row {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 0.45rem;
+            align-items: center;
+        }
+
+        .mini-btn {
+            border: 1px solid rgba(203, 213, 225, 0.5);
+            border-radius: 10px;
+            background: #ffffff;
+            color: #0f172a;
+            height: 40px;
+            padding: 0 0.7rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .caps {
+            display: none;
+            margin-top: 0.34rem;
+            font-size: 0.8rem;
+            color: #facc15;
+            font-weight: 600;
+        }
+
+        .actions {
+            margin-top: 0.58rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.6rem;
+            color: var(--muted);
+            font-size: 0.82rem;
+        }
+
+        .check {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .check input {
+            width: 15px;
+            height: 15px;
+            margin: 0;
+            accent-color: var(--accent);
+        }
+
+        .link {
+            border: none;
+            background: none;
+            color: #2563eb;
+            cursor: pointer;
+            text-decoration: underline;
+            text-underline-offset: 2px;
+            font-weight: 600;
+            padding: 0;
+        }
+
+        .submit {
+            width: 100%;
+            margin-top: 0.8rem;
+            border: none;
+            border-radius: 11px;
+            padding: 0.75rem;
+            font-weight: 700;
+            color: #fff;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            cursor: pointer;
+        }
+
+        .submit[disabled] { opacity: 0.7; cursor: not-allowed; }
+
+        .state {
+            display: none;
+            margin-top: 0.52rem;
+            color: #1d4ed8;
+            font-size: 0.86rem;
+            font-weight: 600;
+        }
+
+        .msg {
+            display: none;
+            margin-top: 0.6rem;
+            padding: 0.55rem 0.62rem;
+            border-radius: 10px;
+            font-size: 0.84rem;
+            border: 1px solid transparent;
+        }
+
+        .msg.success { color: #212523; background: rgba(34, 197, 94, 0.18); border-color: rgba(74, 222, 128, 0.5); }
+        .msg.error { color: #b91c1c; background: rgba(239, 68, 68, 0.10); border-color: rgba(248, 113, 113, 0.35); }
+        .msg.info { color: #1d4ed8; background: rgba(56, 189, 248, 0.10); border-color: rgba(56, 189, 248, 0.28); }
+
+        .quick-actions {
+            margin-top: 0.7rem;
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.42rem;
+        }
+
+        .ghost-action {
+            border: 1px solid rgba(148, 163, 184, 0.54);
+            border-radius: 10px;
+            background: #ffffff;
+            color: #0f172a;
+            font-size: 0.74rem;
+            font-weight: 700;
+            padding: 0.5rem 0.35rem;
+            cursor: pointer;
+            transition: 0.2s ease;
+        }
+
+        .ghost-action:hover {
+            border-color: rgba(34, 211, 238, 0.8);
+            color: #a5f3fc;
+        }
+
+        .meta-line {
+            margin-top: 0.58rem;
+            color: var(--muted);
+            font-size: 0.78rem;
+            opacity: 0.85;
+        }
+
+        .foot {
+            margin: 0.9rem 0 0;
+            font-size: 0.9rem;
+            color: var(--muted);
+        }
+
+        .foot a { color: #2563eb; text-decoration: none; font-weight: 700; }
+
+        .support {
+            width: min(420px, 100%);
+            border: 1px solid rgba(219, 227, 239, 0.95);
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.94);
+            backdrop-filter: blur(12px);
+            box-shadow: 0 14px 28px rgba(15, 23, 42, 0.10);
+            padding: 0.9rem;
+            text-align: center;
+            position: relative;
+            z-index: 1;
+        }
+
+        .support h2 { margin: 0 0 0.45rem; font-size: 1.1rem; }
+        .support p { margin: 0 0 0.45rem; color: var(--muted); font-size: 0.88rem; }
+        .support-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.45rem; }
+        .support-links a {
+            text-decoration: none;
+            color: #fff;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            border-radius: 10px;
+            padding: 0.45rem 0.62rem;
+            font-size: 0.78rem;
+            font-weight: 700;
+        }
+
+        .modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.22);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1200;
+            padding: 1rem;
+        }
+
+        .modal.open { display: flex; }
+
+        .modal-card {
+            width: min(420px, 100%);
+            border-radius: 14px;
+            border: 1px solid rgba(219, 227, 239, 0.95);
+            background: #ffffff;
+            padding: 0.9rem;
+            box-shadow: 0 18px 34px rgba(15, 23, 42, 0.12);
+        }
+
+        .modal-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+            margin-bottom: 0.42rem;
+        }
+
+        .modal-head h3 { margin: 0; font-size: 0.98rem; }
+        .modal-note { margin: 0 0 0.54rem; color: var(--muted); font-size: 0.82rem; }
+
+        .modal form { display: grid; gap: 0.45rem; }
+
+        @media (max-width: 520px) {
+            .quick-actions {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+    <link rel="stylesheet" href="upgrade.css">
+    <script src="firebase-online-storage.js"></script>
+</head>
+<body>
+    <div class="bg-grid" aria-hidden="true"></div>
+    <div class="panel">
+        <h1>Login</h1>
+        <p class="sub" style="color: white;">Sign in to continue as buyer or seller.</p>
+        <div id="onlineState" class="net-pill">Checking network...</div>
+
+        <form onsubmit="return loginUser(event)">
+            <label class="label" for="email" style="color: rgb(248, 237, 237);">Email Address</label>
+            <input type="email" id="email" placeholder="you@example.com" autocomplete="email" required>
+
+            <label class="label" for="password" style="color: rgb(248, 237, 237);">Password</label>
+            <div class="password-row">
+                <input type="password" id="password" placeholder="Enter your password" autocomplete="current-password" required>
+                <button id="togglePassword" class="mini-btn" type="button" aria-label="Show password" style="color: rgb(124, 123, 123);">Show</button>
+            </div>
+            <div id="capsWarn" class="caps">Caps Lock appears to be on.</div>
+
+            <div class="actions">
+                <label class="check" for="rememberMe">
+                    <input type="checkbox" id="rememberMe">
+                    <span>Remember email</span>
+                </label>
+                <button id="forgotBtn" class="link" type="button">Forgot password?</button>
+            </div>
+
+            <button id="loginBtn" class="submit" type="submit">Login</button>
+        </form>
+
+        <div id="loginState" class="state">Signing in...</div>
+        <div id="loginMessage" class="msg" role="status" aria-live="polite"></div>
+        <div class="quick-actions">
+            <button id="lastBuyerBtn" class="ghost-action" type="button">Use Last Buyer</button>
+            <button id="lastSellerBtn" class="ghost-action" type="button">Use Last Seller</button>
+            <button id="guestBtn" class="ghost-action" type="button">Continue as Guest</button>
+        </div>
+        <div id="lastLoginMeta" class="meta-line">Last login: none</div>
+        <p class="foot">Do not have an account? <a href="register.html">Register here</a></p>
+    </div>
+
+    <div class="support">
+        <h2>Need Help?</h2>
+        <p>Customer care is available 24/7.</p>
+        <div class="support-links">
+            <a href="mailto:support@neo-marketplace.com">Email Support</a>
+            <a href="tel:+2206785316">Call Us</a>
+            <a href="https://wa.me/qr/FDKDUI5V625OE1">Live Chat</a>
+        </div>
+    </div>
+
+    <div id="resetModal" class="modal" aria-hidden="true">
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="resetTitle">
+            <div class="modal-head">
+                <h3 id="resetTitle">Reset Password</h3>
+                <button id="closeResetBtn" class="mini-btn" type="button">Close</button>
+            </div>
+            <p class="modal-note">This updates your password in this app storage.</p>
+            <form onsubmit="return resetPassword(event)">
+                <input type="email" id="resetEmail" placeholder="Account email" autocomplete="email" required>
+                <input type="password" id="resetPasswordField" placeholder="New password (min 6 chars)" autocomplete="new-password" required>
+                <input type="password" id="resetConfirm" placeholder="Confirm new password" autocomplete="new-password" required>
+                <button id="resetBtn" class="submit" type="submit">Update Password</button>
+            </form>
+            <div id="resetMsg" class="msg" role="status" aria-live="polite"></div>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            const KEYS = {
+                REMEMBERED_EMAIL: "rememberedLoginEmail",
+                LAST_REGISTERED_EMAIL: "lastRegisteredEmail",
+                ATTEMPTS: "loginAttemptState",
+                LAST_LOGIN_META: "lastLoginMeta"
+            };
+            const MAX_ATTEMPTS = 5;
+            const ATTEMPT_WINDOW_MS = 5 * 60 * 1000;
+            const LOCK_MS = 60 * 1000;
+            let loginBusy = false;
+            let resetBusy = false;
+
+            function byId(id) { return document.getElementById(id); }
+
+            function storage() {
+                if (window.MMStorage && typeof window.MMStorage.getItem === "function") return window.MMStorage;
+                return window.localStorage;
+            }
+
+            function normalizeEmail(value) {
+                return String(value || "").trim().toLowerCase();
+            }
+
+            function safeDateText(value) {
+                const date = new Date(value || "");
+                if (Number.isNaN(date.getTime())) return "Unknown";
+                return date.toLocaleString();
+            }
+
+            function safeParse(raw, fallback) {
+                if (raw == null || raw === "") return fallback;
+                try {
+                    const parsed = JSON.parse(raw);
+                    return parsed == null ? fallback : parsed;
+                } catch (_) {
+                    return fallback;
+                }
+            }
+
+            function readList(key) {
+                const parsed = safeParse(storage().getItem(key), []);
+                if (Array.isArray(parsed)) return parsed;
+                if (parsed && typeof parsed === "object") {
+                    return Object.keys(parsed).map(function (entryKey) {
+                        const entry = parsed[entryKey];
+                        if (entry && typeof entry === "object") {
+                            if (!entry.email && !entry.mail) return Object.assign({ email: entryKey }, entry);
+                            return entry;
+                        }
+                        return { email: entryKey, value: entry };
+                    });
+                }
+                return [];
+            }
+
+            function deepField(source, key) {
+                let current = source;
+                for (let i = 0; i < 8; i += 1) {
+                    if (!current || typeof current !== "object") break;
+                    if (Object.prototype.hasOwnProperty.call(current, key)) {
+                        const value = current[key];
+                        if (value != null && value !== "") return value;
+                    }
+                    current = current.raw;
+                }
+                return "";
+            }
+
+            function recordEmail(record) {
+                return normalizeEmail(deepField(record, "email") || deepField(record, "mail"));
+            }
+
+            function recordPassword(record) {
+                return String(deepField(record, "password") || "");
+            }
+
+            function isSellerRecord(record) {
+                const role = String(record && (record.role || record.accountType || "")).toLowerCase();
+                return Boolean(record && (record.isSeller || role === "seller"));
+            }
+
+            function hasActiveSellerAccess(record) {
+                const status = String(record && record.status || "").toLowerCase();
+                const payment = String(record && record.paymentStatus || "").toLowerCase();
+                const subscription = String(record && record.subscription || "").toLowerCase();
+                return ["approved", "active", "success", "paid"].includes(status) ||
+                    ["approved", "active", "success", "paid"].includes(payment) ||
+                    subscription === "active";
+            }
+
+            function setBusy(isBusy) {
+                loginBusy = Boolean(isBusy);
+                byId("loginBtn").disabled = loginBusy;
+                byId("loginBtn").textContent = loginBusy ? "Signing in..." : "Login";
+                byId("loginState").style.display = loginBusy ? "block" : "none";
+            }
+
+            function setMessage(type, text) {
+                const node = byId("loginMessage");
+                node.className = type ? ("msg " + type) : "msg";
+                node.textContent = text || "";
+                node.style.display = text ? "block" : "none";
+            }
+
+            function setResetMessage(type, text) {
+                const node = byId("resetMsg");
+                node.className = type ? ("msg " + type) : "msg";
+                node.textContent = text || "";
+                node.style.display = text ? "block" : "none";
+            }
+
+            function updateOnlineState() {
+                const node = byId("onlineState");
+                if (!node) return;
+                const online = navigator.onLine;
+                node.classList.toggle("offline", !online);
+                node.textContent = online ? "Network: online" : "Network: offline";
+            }
+
+            function readLastLoginMeta() {
+                return safeParse(storage().getItem(KEYS.LAST_LOGIN_META), null);
+            }
+
+            function writeLastLoginMeta(record) {
+                const email = normalizeEmail(record && (record.email || record.mail));
+                const role = isSellerRecord(record) ? "Seller" : "Buyer";
+                storage().setItem(KEYS.LAST_LOGIN_META, JSON.stringify({
+                    email: email || "unknown",
+                    role: role,
+                    at: new Date().toISOString()
+                }));
+            }
+
+            function renderLastLoginMeta() {
+                const node = byId("lastLoginMeta");
+                if (!node) return;
+                const meta = readLastLoginMeta();
+                if (!meta || !meta.at) {
+                    node.textContent = "Last login: none";
+                    return;
+                }
+                node.textContent = "Last login: " + safeDateText(meta.at) + " - " + (meta.email || "unknown") + " (" + (meta.role || "Account") + ")";
+            }
+
+            function getSafeNextPath(defaultPath) {
+                const query = new URLSearchParams(window.location.search);
+                const next = String(query.get("next") || "").trim();
+                if (!next) return defaultPath;
+                if (next.startsWith("http://") || next.startsWith("https://") || next.startsWith("//")) return defaultPath;
+                if (next.startsWith("#")) return defaultPath;
+                if (next.includes("\\")) return defaultPath;
+                return next;
+            }
+
+            function createdStamp(record) {
+                const raw = deepField(record, "createdAt") || deepField(record, "updatedAt");
+                const parsed = Date.parse(String(raw || ""));
+                if (Number.isFinite(parsed)) return parsed;
+                const fallback = Number(deepField(record, "id"));
+                return Number.isFinite(fallback) ? fallback : 0;
+            }
+
+            function getLatestAccountEmail(kind) {
+                const users = readList("users");
+                const sellers = readList("sellers");
+                const rows = kind === "seller"
+                    ? sellers.slice()
+                    : users.filter(function (row) { return !isSellerRecord(row); });
+                if (!rows.length) return "";
+                rows.sort(function (a, b) { return createdStamp(b) - createdStamp(a); });
+                return recordEmail(rows[0]);
+            }
+
+            function prefillFromLast(kind) {
+                const email = getLatestAccountEmail(kind);
+                if (!email) {
+                    setMessage("info", "No recent " + (kind === "seller" ? "seller" : "buyer") + " account found.");
+                    return;
+                }
+                byId("email").value = email;
+                byId("password").focus();
+                setMessage("info", "Email loaded for recent " + (kind === "seller" ? "seller" : "buyer") + " account.");
+            }
+
+            function continueAsGuest() {
+                const guest = {
+                    id: "GUEST-" + Date.now(),
+                    fullName: "Guest User",
+                    name: "Guest User",
+                    email: "guest@matrixmarket.local",
+                    role: "buyer",
+                    accountType: "buyer",
+                    isGuest: true,
+                    isSeller: false,
+                    balance: 0,
+                    createdAt: new Date().toISOString()
+                };
+                storage().setItem("currentUser", JSON.stringify(guest));
+                storage().setItem("loggedInUser", JSON.stringify(guest));
+                storage().removeItem("currentSeller");
+                writeLastLoginMeta(guest);
+                window.location.href = getSafeNextPath("index.html");
+            }
+
+            function readAttemptState() {
+                const state = safeParse(storage().getItem(KEYS.ATTEMPTS), {});
+                return {
+                    count: Number(state.count) > 0 ? Number(state.count) : 0,
+                    firstAt: Number(state.firstAt) > 0 ? Number(state.firstAt) : 0,
+                    lockUntil: Number(state.lockUntil) > 0 ? Number(state.lockUntil) : 0
+                };
+            }
+
+            function writeAttemptState(state) {
+                storage().setItem(KEYS.ATTEMPTS, JSON.stringify(state));
+            }
+
+            function clearAttemptState() {
+                storage().removeItem(KEYS.ATTEMPTS);
+            }
+
+            function lockRemainingMs() {
+                const state = readAttemptState();
+                if (!state.lockUntil) return 0;
+                const left = state.lockUntil - Date.now();
+                if (left <= 0) {
+                    clearAttemptState();
+                    return 0;
+                }
+                return left;
+            }
+
+            function registerFailedAttempt() {
+                const now = Date.now();
+                const state = readAttemptState();
+                const within = state.firstAt && (now - state.firstAt) <= ATTEMPT_WINDOW_MS;
+                const count = within ? (state.count + 1) : 1;
+                writeAttemptState({
+                    count: count,
+                    firstAt: within ? state.firstAt : now,
+                    lockUntil: count >= MAX_ATTEMPTS ? (now + LOCK_MS) : 0
+                });
+                return count;
+            }
+
+            function resolveAuth(email, password) {
+                const users = readList("users");
+                const sellers = readList("sellers");
+                const user = users.find(function (row) {
+                    return recordEmail(row) === email && recordPassword(row) === password;
+                }) || null;
+                const seller = sellers.find(function (row) {
+                    return recordEmail(row) === email;
+                }) || null;
+                const sellerWithPassword = seller && recordPassword(seller) === password ? seller : null;
+                const authRecord = user || sellerWithPassword;
+                if (!authRecord) return null;
+                return Object.assign({}, authRecord, seller || {}, { email: email });
+            }
+
+            async function syncNow() {
+                try {
+                    if (window.MMStorage && typeof window.MMStorage.syncNow === "function") {
+                        await window.MMStorage.syncNow();
+                    }
+                } catch (_) {}
+            }
+
+            function openResetModal() {
+                byId("resetEmail").value = normalizeEmail(byId("email").value);
+                byId("resetPasswordField").value = "";
+                byId("resetConfirm").value = "";
+                setResetMessage("", "");
+                byId("resetModal").classList.add("open");
+                byId("resetModal").setAttribute("aria-hidden", "false");
+                byId("resetPasswordField").focus();
+            }
+
+            function closeResetModal() {
+                byId("resetModal").classList.remove("open");
+                byId("resetModal").setAttribute("aria-hidden", "true");
+            }
+
+            function strongPassword(value) {
+                const text = String(value || "");
+                return text.length >= 6 && /[A-Za-z]/.test(text) && /\d/.test(text);
+            }
+
+            function updatePasswordForList(rows, email, nextPassword) {
+                let found = false;
+                const updated = rows.map(function (row) {
+                    if (recordEmail(row) !== email) return row;
+                    found = true;
+                    const next = Object.assign({}, row, { password: nextPassword, updatedAt: new Date().toISOString() });
+                    if (next.raw && typeof next.raw === "object") {
+                        next.raw = Object.assign({}, next.raw, { password: nextPassword });
+                    }
+                    return next;
+                });
+                return { found: found, rows: updated };
+            }
+
+            window.resetPassword = async function resetPassword(event) {
+                event.preventDefault();
+                if (resetBusy) return false;
+                resetBusy = true;
+                byId("resetBtn").disabled = true;
+                setResetMessage("", "");
+
+                try {
+                    const email = normalizeEmail(byId("resetEmail").value);
+                    const nextPassword = byId("resetPasswordField").value;
+                    const confirm = byId("resetConfirm").value;
+
+                    if (!email) {
+                        setResetMessage("error", "Enter account email.");
+                        return false;
+                    }
+                    if (!strongPassword(nextPassword)) {
+                        setResetMessage("error", "Password must have 6+ chars with letters and numbers.");
+                        return false;
+                    }
+                    if (nextPassword !== confirm) {
+                        setResetMessage("error", "Password confirmation does not match.");
+                        return false;
+                    }
+
+                    const users = readList("users");
+                    const sellers = readList("sellers");
+                    const usersUpdate = updatePasswordForList(users, email, nextPassword);
+                    const sellersUpdate = updatePasswordForList(sellers, email, nextPassword);
+
+                    if (!usersUpdate.found && !sellersUpdate.found) {
+                        setResetMessage("error", "No account found for this email.");
+                        return false;
+                    }
+
+                    storage().setItem("users", JSON.stringify(usersUpdate.rows));
+                    storage().setItem("sellers", JSON.stringify(sellersUpdate.rows));
+                    await syncNow();
+                    setResetMessage("success", "Password updated. You can sign in now.");
+                    setMessage("success", "Password reset complete. Sign in with the new password.");
+                    setTimeout(closeResetModal, 650);
+                    return false;
+                } finally {
+                    resetBusy = false;
+                    byId("resetBtn").disabled = false;
+                }
+            };
+
+            window.loginUser = async function loginUser(event) {
+                event.preventDefault();
+                if (loginBusy) return false;
+
+                const ready = window.MMStorage && window.MMStorage.ready;
+                if (ready && typeof ready.then === "function") {
+                    await ready.catch(function () {});
+                }
+
+                const lockMs = lockRemainingMs();
+                if (lockMs > 0) {
+                    setMessage("error", "Too many attempts. Try again in " + Math.ceil(lockMs / 1000) + "s.");
+                    return false;
+                }
+
+                const email = normalizeEmail(byId("email").value);
+                const password = byId("password").value;
+                const remember = Boolean(byId("rememberMe").checked);
+                setMessage("", "");
+
+                if (!email || !password) {
+                    setMessage("error", "Enter both email and password.");
+                    return false;
+                }
+
+                setBusy(true);
+                let redirecting = false;
+                try {
+                    let sessionUser = resolveAuth(email, password);
+                    if (!sessionUser) {
+                        await syncNow();
+                        sessionUser = resolveAuth(email, password);
+                    }
+
+                    if (!sessionUser) {
+                        const failed = registerFailedAttempt();
+                        if (failed >= MAX_ATTEMPTS) {
+                            setMessage("error", "Too many failed attempts. Login locked for 60 seconds.");
+                        } else {
+                            setMessage("error", "Invalid email or password. " + (MAX_ATTEMPTS - failed) + " attempt(s) left.");
+                        }
+                        return false;
+                    }
+
+                    clearAttemptState();
+                    storage().setItem("currentUser", JSON.stringify(sessionUser));
+                    storage().setItem("loggedInUser", JSON.stringify(sessionUser));
+                    storage().removeItem(KEYS.LAST_REGISTERED_EMAIL);
+                    if (remember) storage().setItem(KEYS.REMEMBERED_EMAIL, email);
+                    else storage().removeItem(KEYS.REMEMBERED_EMAIL);
+                    writeLastLoginMeta(sessionUser);
+                    renderLastLoginMeta();
+
+                    if (isSellerRecord(sessionUser)) {
+                        storage().setItem("currentSeller", JSON.stringify(sessionUser));
+                        if (hasActiveSellerAccess(sessionUser)) {
+                            setMessage("success", "Seller login successful. Redirecting...");
+                            redirecting = true;
+                            window.location.href = getSafeNextPath("seller-dashboard.html");
+                        } else {
+                            setMessage("info", "Seller login successful. Continue payment/approval setup...");
+                            redirecting = true;
+                            window.location.href = "payment-status-sellers.html";
+                        }
+                        return false;
+                    }
+
+                    storage().removeItem("currentSeller");
+                    setMessage("success", "Login successful. Redirecting...");
+                    redirecting = true;
+                    window.location.href = getSafeNextPath("index.html");
+                    return false;
+                } finally {
+                    if (!redirecting) setBusy(false);
+                }
+            };
+
+            function hydratePage() {
+                const query = new URLSearchParams(window.location.search);
+                const remembered = normalizeEmail(storage().getItem(KEYS.REMEMBERED_EMAIL));
+                const registered = normalizeEmail(storage().getItem(KEYS.LAST_REGISTERED_EMAIL));
+                const queryEmail = normalizeEmail(query.get("email"));
+                const prefill = queryEmail || remembered || registered;
+                if (prefill) byId("email").value = prefill;
+                if (remembered) byId("rememberMe").checked = true;
+                if (query.get("registered") === "1") {
+                    setMessage("success", "Registration complete. You can sign in now.");
+                } else if (query.get("reset") === "1") {
+                    setMessage("success", "Password updated. Sign in with your new password.");
+                }
+                renderLastLoginMeta();
+                updateOnlineState();
+            }
+
+            function bindUi() {
+                const pass = byId("password");
+                const toggle = byId("togglePassword");
+
+                toggle.addEventListener("click", function () {
+                    const hidden = pass.type === "password";
+                    pass.type = hidden ? "text" : "password";
+                    toggle.textContent = hidden ? "Hide" : "Show";
+                });
+
+                function updateCaps(event) {
+                    byId("capsWarn").style.display = event.getModifierState && event.getModifierState("CapsLock") ? "block" : "none";
+                }
+
+                pass.addEventListener("keydown", updateCaps);
+                pass.addEventListener("keyup", updateCaps);
+                pass.addEventListener("blur", function () {
+                    byId("capsWarn").style.display = "none";
+                });
+
+                byId("forgotBtn").addEventListener("click", openResetModal);
+                byId("lastBuyerBtn").addEventListener("click", function () {
+                    prefillFromLast("buyer");
+                });
+                byId("lastSellerBtn").addEventListener("click", function () {
+                    prefillFromLast("seller");
+                });
+                byId("guestBtn").addEventListener("click", continueAsGuest);
+                byId("closeResetBtn").addEventListener("click", closeResetModal);
+                byId("resetModal").addEventListener("click", function (event) {
+                    if (event.target === byId("resetModal")) closeResetModal();
+                });
+                document.addEventListener("keydown", function (event) {
+                    if (event.key === "Escape") closeResetModal();
+                });
+                window.addEventListener("online", updateOnlineState);
+                window.addEventListener("offline", updateOnlineState);
+            }
+
+            function start() {
+                bindUi();
+                hydratePage();
+            }
+
+            const ready = window.MMStorage && window.MMStorage.ready;
+            if (ready && typeof ready.then === "function") ready.finally(start);
+            else start();
+        })();
+    </script>
+
+    <script defer src="upgrade.js"></script>
+    <script defer src="sw-register.js?v=20260226a"></script>
+    <script defer src="site-performance.js?v=20260226a"></script>
+</body>
+</html>
