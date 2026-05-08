@@ -19,13 +19,13 @@
   </style>
     <script src="firebase-online-storage.js"></script>
   <meta name="theme-color" content="#0f172a" />
-  <link rel="manifest" href="app.webmanifest" />
-  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <link rel="manifest" href="seller-app.webmanifest" />
+  <link rel="apple-touch-icon" href="seller.png" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-  <meta name="apple-mobile-web-app-title" content="MatrixMarket" />
+  <meta name="apple-mobile-web-app-title" content="MatrixMarket Seller" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="application-name" content="MatrixMarket" />
+  <meta name="application-name" content="MatrixMarket Seller" />
 </head>
 <body class="seller-page">
   <header class="seller-header">
@@ -94,14 +94,28 @@
     </section>
   </main>
 
-  <script src="seller-core.js?v=20260510i"></script>
+  <script src="seller-core.js?v=20260510j"></script>
   <script>
     const state = { plan: "Weekly - GMD1000/week" };
+    let registerBusy = false;
     function byId(id){ return document.getElementById(id); }
     function show(type, text){
       byId("okMsg").style.display = type === "ok" ? "block" : "none";
       byId("errMsg").style.display = type === "err" ? "block" : "none";
       (type === "ok" ? byId("okMsg") : byId("errMsg")).textContent = text;
+    }
+
+    function clearStatus() {
+      byId("okMsg").style.display = "none";
+      byId("errMsg").style.display = "none";
+      byId("okMsg").textContent = "";
+      byId("errMsg").textContent = "";
+    }
+
+    function setBusy(isBusy) {
+      registerBusy = Boolean(isBusy);
+      byId("registerBtn").disabled = registerBusy;
+      byId("registerBtn").textContent = registerBusy ? "Registering..." : "Register Seller";
     }
 
     async function syncStorage() {
@@ -112,8 +126,10 @@
     }
 
     async function registerSeller(){
+      if (registerBusy) return;
+      clearStatus();
       const fullName = byId("fullName").value.trim();
-      const email = byId("email").value.trim();
+      const email = SellerCore.cleanEmail(byId("email").value);
       const store = byId("store").value.trim();
       const phone = byId("phone").value.trim();
       const country = byId("country").value.trim();
@@ -130,13 +146,18 @@
         return;
       }
 
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        show("err", "Enter a valid business email address.");
+        return;
+      }
+
       if (!payerNumber || !transactionId) {
         show("err", "Enter your payment number and transaction reference.");
         return;
       }
 
-      if (password.length < 4) {
-        show("err", "Password must be at least 4 characters.");
+      if (password.length < 8 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) {
+        show("err", "Password must be at least 8 characters and include letters and numbers.");
         return;
       }
 
@@ -145,35 +166,40 @@
         return;
       }
 
-      const result = SellerCore.registerSeller({
-        fullName: fullName,
-        email: email,
-        store: store,
-        phone: phone,
-        country: country || "Unknown",
-        category: category || "general",
-        address: address,
-        password: password,
-        plan: state.plan
-      });
+      setBusy(true);
+      try {
+        const result = SellerCore.registerSeller({
+          fullName: fullName,
+          email: email,
+          store: store,
+          phone: phone,
+          country: country || "Unknown",
+          category: category || "general",
+          address: address,
+          password: password,
+          plan: state.plan
+        });
 
-      if (!result.ok) {
-        show("err", result.error || "Registration failed.");
-        return;
+        if (!result.ok) {
+          show("err", result.error || "Registration failed.");
+          return;
+        }
+
+        SellerCore.ensurePendingRequest(result.seller, {
+          type: "Subscription",
+          amount: SellerCore.planAmount(state.plan),
+          method: paymentMethod,
+          payerNumber: payerNumber,
+          transactionId: transactionId,
+          proof: "Paid via " + paymentMethod + " from " + payerNumber + " to 6785316. Ref: " + transactionId
+        });
+
+        show("ok", "Seller registered. Redirecting to payment status...");
+        await syncStorage();
+        window.location.href = "payment-status-sellers.html";
+      } finally {
+        setBusy(false);
       }
-
-      SellerCore.ensurePendingRequest(result.seller, {
-        type: "Subscription",
-        amount: SellerCore.planAmount(state.plan),
-        method: paymentMethod,
-        payerNumber: payerNumber,
-        transactionId: transactionId,
-        proof: "Paid via " + paymentMethod + " from " + payerNumber + " to 6785316. Ref: " + transactionId
-      });
-
-      show("ok", "Seller registered. Redirecting to payment status...");
-      await syncStorage();
-      window.location.href = "payment-status-sellers.html";
     }
 
     function initSellerRegisterPage() {
@@ -210,9 +236,10 @@
     <script defer src="site-admin-controls.js?v=20260510b"></script>
 
   <script defer src="site-performance.js?v=20260510b"></script>
-  <script defer src="mobile-app.js?v=20260510a"></script>
+  <script defer src="seller-mobile-app.js?v=20260510a"></script>
 </body>
 </html>
+
 
 
 

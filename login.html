@@ -795,7 +795,24 @@
             }
 
             function recordPassword(record) {
-                return String(deepField(record, "password") || "");
+                return String(
+                    deepField(record, "password") ||
+                    deepField(record, "pass") ||
+                    deepField(record, "pwd") ||
+                    ""
+                );
+            }
+
+            function latestMatchingRecord(rows, email, password) {
+                return rows
+                    .filter(function (row) {
+                        if (recordEmail(row) !== email) return false;
+                        if (password == null) return true;
+                        return recordPassword(row) === password;
+                    })
+                    .sort(function (a, b) {
+                        return createdStamp(b) - createdStamp(a);
+                    })[0] || null;
             }
 
             function isSellerRecord(record) {
@@ -970,16 +987,21 @@
             function resolveAuth(email, password) {
                 const users = readList("users");
                 const sellers = readList("sellers");
-                const user = users.find(function (row) {
-                    return recordEmail(row) === email && recordPassword(row) === password;
-                }) || null;
-                const seller = sellers.find(function (row) {
-                    return recordEmail(row) === email;
-                }) || null;
-                const sellerWithPassword = seller && recordPassword(seller) === password ? seller : null;
-                const authRecord = user || sellerWithPassword;
+                const user = latestMatchingRecord(users, email, password);
+                const seller = latestMatchingRecord(sellers, email, null);
+                const sellerWithPassword = latestMatchingRecord(sellers, email, password);
+                const sellerUser = latestMatchingRecord(users.filter(isSellerRecord), email, password);
+                const authRecord = user || sellerWithPassword || sellerUser;
                 if (!authRecord) return null;
-                return Object.assign({}, authRecord, seller || {}, { email: email });
+                const sellerOverlay = (isSellerRecord(authRecord) || sellerWithPassword) ? (sellerWithPassword || seller || null) : null;
+                const merged = Object.assign({}, authRecord, sellerOverlay || {}, {
+                    email: email,
+                    password: recordPassword(authRecord) || recordPassword(sellerOverlay)
+                });
+                if (!merged.accountType && isSellerRecord(merged)) merged.accountType = "seller";
+                if (!merged.role && isSellerRecord(merged)) merged.role = "seller";
+                if (isSellerRecord(merged)) merged.isSeller = true;
+                return merged;
             }
 
             async function syncNow() {

@@ -1,0 +1,47 @@
+{
+  "id": "./admin-login.html",
+  "name": "MatrixMarket Admin",
+  "short_name": "MM Admin",
+  "description": "Admin app for worker operations, orders, payments, users, sellers, and site oversight.",
+  "start_url": "./admin-login.html",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "browser"],
+  "background_color": "#ffffff",
+  "theme_color": "#0f172a",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "./admin.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "url": "./dashboard-admin.html",
+      "icons": [{ "src": "./admin.png", "sizes": "512x512", "type": "image/png" }]
+    },
+    {
+      "name": "Payments",
+      "short_name": "Payments",
+      "url": "./admin-accept-payment.html",
+      "icons": [{ "src": "./admin.png", "sizes": "512x512", "type": "image/png" }]
+    },
+    {
+      "name": "Orders",
+      "short_name": "Orders",
+      "url": "./admin-orders.html",
+      "icons": [{ "src": "./admin.png", "sizes": "512x512", "type": "image/png" }]
+    },
+    {
+      "name": "Users",
+      "short_name": "Users",
+      "url": "./admin-users.html",
+      "icons": [{ "src": "./admin.png", "sizes": "512x512", "type": "image/png" }]
+    }
+  ]
+}

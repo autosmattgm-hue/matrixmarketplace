@@ -258,7 +258,11 @@
   }
 
   function setSellers(list) {
-    writeJSON("sellers", list.map(denormalizeSeller));
+    const normalized = (Array.isArray(list) ? list : []).map(function (seller, index) {
+      return normalizeSeller(seller, index);
+    });
+    writeJSON("sellers", normalized.map(denormalizeSeller));
+    syncUsersFromSellers(normalized);
   }
 
   function normalizeRequestRows(raw) {
@@ -317,6 +321,7 @@
     const normalized = normalizeSeller({ ...(seller || {}), isSeller: true }, 0);
     writeJSON("currentSeller", normalized);
     writeJSON("currentUser", normalized);
+    writeJSON("loggedInUser", normalized);
     return normalized;
   }
 
@@ -325,6 +330,10 @@
     const currentUser = readJSON("currentUser", null);
     if (currentUser && currentUser.isSeller) {
       MMStorage.removeItem("currentUser");
+    }
+    const loggedInUser = readJSON("loggedInUser", null);
+    if (loggedInUser && loggedInUser.isSeller) {
+      MMStorage.removeItem("loggedInUser");
     }
   }
 
@@ -338,6 +347,7 @@
 
   function registerSeller(input) {
     const sellers = getSellers();
+    const users = getUsers();
     const email = cleanEmail(input.email);
     const store = str(input.store).toLowerCase();
 
@@ -346,6 +356,12 @@
     }
 
     if (sellers.some(function (s) { return cleanEmail(s.email) === email; })) {
+      return { ok: false, error: "Email already registered." };
+    }
+
+    if (users.some(function (row) {
+      return cleanEmail(deepField(row, "email", deepField(row, "mail", ""))) === email;
+    })) {
       return { ok: false, error: "Email already registered." };
     }
 
@@ -471,6 +487,64 @@
       });
     }
     return [];
+  }
+
+  function setUsers(list) {
+    writeJSON("users", Array.isArray(list) ? list : []);
+  }
+
+  function buildSellerUserRecord(seller, existing) {
+    const source = existing && typeof existing === "object" ? existing : {};
+    const normalized = normalizeSeller(seller, 0);
+    return {
+      ...source,
+      id: source.id || normalized.id || ("SELLERUSER-" + (normalized.email || Date.now())),
+      fullName: normalized.fullName,
+      name: normalized.name,
+      email: normalized.email,
+      password: normalized.password || str(source.password || source.pass || source.pwd),
+      phone: normalized.phone,
+      location: str(source.location || normalized.address || normalized.country || ""),
+      country: normalized.country,
+      address: normalized.address,
+      store: normalized.store,
+      category: normalized.category,
+      plan: normalized.plan,
+      amount: num(normalized.amount),
+      balance: num(normalized.balance),
+      walletBalance: num(source.walletBalance != null ? source.walletBalance : normalized.balance),
+      status: normalized.status,
+      paymentStatus: normalized.paymentStatus,
+      subscription: normalized.subscription,
+      proof: normalized.proof,
+      role: "seller",
+      accountType: "seller",
+      isSeller: true,
+      createdAt: source.createdAt || normalized.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+  }
+
+  function upsertSellerUserRecord(seller, usersList) {
+    if (!seller || !seller.email) return null;
+    const target = cleanEmail(seller.email);
+    const users = Array.isArray(usersList) ? usersList : getUsers();
+    const idx = users.findIndex(function (row) {
+      return cleanEmail(deepField(row, "email", deepField(row, "mail", ""))) === target;
+    });
+    const next = buildSellerUserRecord(seller, idx >= 0 ? users[idx] : null);
+    if (idx >= 0) users[idx] = next;
+    else users.push(next);
+    return next;
+  }
+
+  function syncUsersFromSellers(sellersList) {
+    const users = getUsers().slice();
+    (Array.isArray(sellersList) ? sellersList : []).forEach(function (seller) {
+      upsertSellerUserRecord(seller, users);
+    });
+    setUsers(users);
+    return users;
   }
 
   function resolveSellerPassword(seller) {

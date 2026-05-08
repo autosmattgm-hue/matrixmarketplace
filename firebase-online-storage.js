@@ -16,7 +16,25 @@
   const DATABASE_URL = String(firebaseConfig.databaseURL || "").replace(/\/+$/, "");
   const cache = Object.create(null);
   const localOnlyCache = Object.create(null);
+  const nativeLocalStorage = (() => {
+    try { return window.localStorage; } catch (_) {}
+    return null;
+  })();
   const LOCAL_ONLY_PREFIXES = ["firebase:"];
+  const LOCAL_ONLY_KEYS = new Set([
+    "currentUser",
+    "loggedInUser",
+    "currentSeller",
+    "currentAdminSession",
+    "mmOwnerConsoleSession",
+    "rememberedLoginEmail",
+    "lastRegisteredEmail",
+    "lastRegisteredAccountType",
+    "lastRegisteredName",
+    "loginAttemptState",
+    "lastLoginMeta"
+  ]);
+  const NATIVE_MIRROR_PREFIX = "__mm_native__:";
   const pending = new Map();
   let pendingClear = false;
   let syncing = false;
@@ -44,10 +62,70 @@
 
   function isLocalOnlyKey(key) {
     const k = String(key == null ? "" : key);
+    if (LOCAL_ONLY_KEYS.has(k)) return true;
     for (let i = 0; i < LOCAL_ONLY_PREFIXES.length; i += 1) {
       if (k.indexOf(LOCAL_ONLY_PREFIXES[i]) === 0) return true;
     }
     return false;
+  }
+
+  function nativeMirrorKey(key) {
+    return NATIVE_MIRROR_PREFIX + encodeURIComponent(String(key == null ? "" : key));
+  }
+
+  function readNativeMirror(key) {
+    if (!nativeLocalStorage) return null;
+    try {
+      return nativeLocalStorage.getItem(nativeMirrorKey(key));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function writeNativeMirror(key, value) {
+    if (!nativeLocalStorage) return;
+    try {
+      nativeLocalStorage.setItem(nativeMirrorKey(key), toRaw(value));
+    } catch (_) {}
+  }
+
+  function removeNativeMirror(key) {
+    if (!nativeLocalStorage) return;
+    try {
+      nativeLocalStorage.removeItem(nativeMirrorKey(key));
+    } catch (_) {}
+  }
+
+  function clearNativeMirrors() {
+    if (!nativeLocalStorage) return;
+    try {
+      const keysToRemove = [];
+      for (let i = 0; i < nativeLocalStorage.length; i += 1) {
+        const entryKey = nativeLocalStorage.key(i);
+        if (String(entryKey || "").indexOf(NATIVE_MIRROR_PREFIX) === 0) {
+          keysToRemove.push(entryKey);
+        }
+      }
+      keysToRemove.forEach((entryKey) => {
+        try { nativeLocalStorage.removeItem(entryKey); } catch (_) {}
+      });
+    } catch (_) {}
+  }
+
+  function hydrateNativeMirror() {
+    if (!nativeLocalStorage) return;
+    try {
+      for (let i = 0; i < nativeLocalStorage.length; i += 1) {
+        const entryKey = nativeLocalStorage.key(i);
+        const rawKey = String(entryKey || "");
+        if (rawKey.indexOf(NATIVE_MIRROR_PREFIX) !== 0) continue;
+        const key = decodeKey(rawKey.slice(NATIVE_MIRROR_PREFIX.length));
+        const value = nativeLocalStorage.getItem(rawKey);
+        if (value == null) continue;
+        if (isLocalOnlyKey(key)) localOnlyCache[key] = value;
+        else cache[key] = value;
+      }
+    } catch (_) {}
   }
 
   function remoteKeys() {
@@ -131,6 +209,7 @@
       const prev = hasRemoteKey(key) ? cache[key] : null;
       if (prev !== next) {
         cache[key] = next;
+        writeNativeMirror(key, next);
         dispatchStorageEvent(key, prev, next);
       }
       oldKeys.delete(key);
@@ -138,6 +217,7 @@
     oldKeys.forEach((key) => {
       const prev = cache[key];
       delete cache[key];
+      removeNativeMirror(key);
       dispatchStorageEvent(key, prev, null);
     });
   }
@@ -197,6 +277,8 @@
       if ((pendingClear || pending.size > 0) && onlineWritable()) flushPending();
     }
   }
+
+  hydrateNativeMirror();
 
   const ready = (async () => {
     try {
@@ -264,12 +346,14 @@
       if (isLocalOnlyKey(k)) {
         const prevLocal = hasLocalOnlyKey(k) ? localOnlyCache[k] : null;
         localOnlyCache[k] = next;
+        writeNativeMirror(k, next);
         if (prevLocal !== next) dispatchStorageEvent(k, prevLocal, next);
         return;
       }
 
       const prev = hasRemoteKey(k) ? cache[k] : null;
       cache[k] = next;
+      writeNativeMirror(k, next);
       pending.set(k, next);
       if (prev !== next) dispatchStorageEvent(k, prev, next);
       flushPending();
@@ -279,12 +363,14 @@
       if (isLocalOnlyKey(k)) {
         const prevLocal = hasLocalOnlyKey(k) ? localOnlyCache[k] : null;
         if (hasLocalOnlyKey(k)) delete localOnlyCache[k];
+        removeNativeMirror(k);
         if (prevLocal !== null) dispatchStorageEvent(k, prevLocal, null);
         return;
       }
 
       const prev = hasRemoteKey(k) ? cache[k] : null;
       if (hasRemoteKey(k)) delete cache[k];
+      removeNativeMirror(k);
       pending.set(k, null);
       if (prev !== null) dispatchStorageEvent(k, prev, null);
       flushPending();
@@ -302,8 +388,11 @@
       localCurrent.forEach((k) => {
         const prev = localOnlyCache[k];
         delete localOnlyCache[k];
+        removeNativeMirror(k);
         dispatchStorageEvent(k, prev, null);
       });
+      remoteCurrent.forEach((k) => removeNativeMirror(k));
+      clearNativeMirrors();
 
       if (remoteCurrent.length || pending.size > 0) {
         pendingClear = true;

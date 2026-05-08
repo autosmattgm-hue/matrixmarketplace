@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v20260510zc";
+const CACHE_VERSION = "v20260510zf";
 const STATIC_CACHE = `matrixmarket-static-${CACHE_VERSION}`;
 const PAGE_CACHE = `matrixmarket-pages-${CACHE_VERSION}`;
 const DATA_CACHE = `matrixmarket-data-${CACHE_VERSION}`;
@@ -21,12 +21,17 @@ const PRECACHE_URLS = [
   "./upgrade.css",
   "./index-home.css?v=20260509m",
   "./index-home.js?v=20260510b",
-  "./firebase-online-storage.js?v=20260224c",
-  "./seller-core.js?v=20260510i",
+  "./firebase-online-storage.js",
+  "./firebase-online-storage.js?v=20260510a",
+  "./seller-core.js?v=20260510j",
   "./admin-core.js?v=20260510ae",
   "./admin-login.html",
   "./app.webmanifest",
+  "./seller-app.webmanifest",
+  "./admin-app.webmanifest",
   "./mobile-app.js?v=20260510a",
+  "./seller-mobile-app.js?v=20260510a",
+  "./admin-mobile-app.js?v=20260510a",
   "./owner-console.html",
   "./site-admin-controls.js?v=20260510b",
   "./site-performance.js",
@@ -34,6 +39,8 @@ const PRECACHE_URLS = [
   "./sw-register.js",
   "./sw-register.js?v=20260228a",
   "./matrixx.png",
+  "./seller.png",
+  "./admin.png",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./icons/apple-touch-icon.png",

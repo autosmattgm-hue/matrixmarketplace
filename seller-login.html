@@ -19,13 +19,13 @@
   </style>
     <script src="firebase-online-storage.js"></script>
   <meta name="theme-color" content="#0f172a" />
-  <link rel="manifest" href="app.webmanifest" />
-  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <link rel="manifest" href="seller-app.webmanifest" />
+  <link rel="apple-touch-icon" href="seller.png" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-  <meta name="apple-mobile-web-app-title" content="MatrixMarket" />
+  <meta name="apple-mobile-web-app-title" content="MatrixMarket Seller" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="application-name" content="MatrixMarket" />
+  <meta name="application-name" content="MatrixMarket Seller" />
 </head>
 <body class="seller-page">
   <header class="seller-header">
@@ -61,7 +61,7 @@
     </section>
   </main>
 
-  <script src="seller-core.js?v=20260510i"></script>
+  <script src="seller-core.js?v=20260510j"></script>
   <script>
     let loginBusy = false;
     function byId(id){ return document.getElementById(id); }
@@ -83,7 +83,7 @@
       const state = byId("loginState");
       loginBusy = Boolean(isBusy);
       btn.disabled = loginBusy;
-      btn.textContent = text || (loginBusy ? "Loging in..." : "Login");
+      btn.textContent = text || (loginBusy ? "Logging in..." : "Login");
       state.style.display = loginBusy ? "block" : "none";
     }
 
@@ -94,8 +94,20 @@
       }
     }
 
+    function readStoredText(key) {
+      const store = window.MMStorage && typeof window.MMStorage.getItem === "function"
+        ? window.MMStorage
+        : window.localStorage;
+      try {
+        return String((store && store.getItem(key)) || "").trim();
+      } catch (_) {
+        return "";
+      }
+    }
+
     async function login(){
       if (loginBusy) return;
+      clearStatus();
       const identifier = byId("identifier").value.trim();
       const password = byId("password").value;
       if (!identifier) {
@@ -103,8 +115,7 @@
         return;
       }
 
-      setBusy(true, "Loging in...");
-      clearStatus();
+      setBusy(true, "Logging in...");
       let redirecting = false;
       try {
         await syncStorage();
@@ -134,7 +145,13 @@
         show("ok", "You are already logged in. Redirecting...");
         setTimeout(function(){ window.location.href = "seller-dashboard.html"; }, 600);
       } else if (active) {
+        byId("identifier").value = active.email || "";
         show("err", "Account found but subscription is not active yet. Complete payment and wait for admin approval.");
+      }
+
+      if (!byId("identifier").value) {
+        const lastRegisteredEmail = SellerCore.cleanEmail(readStoredText("lastRegisteredEmail"));
+        if (lastRegisteredEmail) byId("identifier").value = lastRegisteredEmail;
       }
 
       byId("loginBtn").addEventListener("click", login);
@@ -159,6 +176,8 @@
     <script defer src="site-admin-controls.js?v=20260510b"></script>
 
   <script defer src="site-performance.js?v=20260510b"></script>
-  <script defer src="mobile-app.js?v=20260510a"></script>
+  <script defer src="seller-mobile-app.js?v=20260510a"></script>
 </body>
 </html>
+
+
