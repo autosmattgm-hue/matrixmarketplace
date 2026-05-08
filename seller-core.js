@@ -1008,19 +1008,14 @@
     const purchases = readJSON("purchases", []);
     if (!Array.isArray(purchases)) return [];
 
-    const keys = [
-      cleanEmail(s.email),
-      str(s.store || "").toLowerCase(),
-      str(s.fullName || s.name || "").toLowerCase()
-    ];
+    const keys = sellerIdentityKeys(s);
 
     return purchases.filter(function (p) {
-      const byEmail = Boolean(keys[0]) && cleanEmail(p.sellerEmail || "") === keys[0];
-      const byName = str(p.seller || p.sellerName || "").toLowerCase();
-      return byEmail || (keys[1] && byName === keys[1]) || (keys[2] && byName === keys[2]);
+      return purchaseBelongsToSeller(p, keys);
     }).map(function (p) {
       return {
         orderId: str(p.orderId || "-"),
+        productId: str(p.productId || p.id || ""),
         productName: str(p.productName || p.name || "Product"),
         buyerEmail: str(p.buyerEmail || "-"),
         buyerName: str(p.buyerName || "-"),
@@ -1039,35 +1034,186 @@
     const queues = readJSON("sellerOrderQueues", {});
     if (!queues || typeof queues !== "object") return [];
 
-    const keys = [
-      str(s.store || ""),
-      str(s.fullName || s.name || ""),
-      cleanEmail(s.email)
-    ].filter(Boolean).map(function (k) { return k.toLowerCase(); });
+    const keys = sellerIdentityKeys(s);
 
     const rows = [];
     Object.keys(queues).forEach(function (queueKey) {
-      if (!keys.includes(str(queueKey).toLowerCase())) return;
       const items = Array.isArray(queues[queueKey]) ? queues[queueKey] : [];
       items.forEach(function (it, idx) {
+        const queueRow = it && typeof it === "object" ? it : {};
+        const queueMatch = queueRowBelongsToSeller(queueKey, queueRow, keys);
+        if (!queueMatch) return;
         rows.push({
           queueKey: queueKey,
           index: idx,
-          orderId: str(it.orderId || "-"),
-          buyer: str(it.buyer || it.name || "-"),
-          email: str(it.email || it.buyerEmail || "-"),
-          phone: str(it.phone || "-"),
-          address: str(it.address || "-"),
-          item: str(it.item || it.productName || "-"),
-          quantity: Math.max(1, Math.floor(num(it.quantity || 1))),
-          amount: num(it.amount || it.total || 0),
-          status: str(it.status || "pending"),
-          date: it.date || it.createdAt || new Date().toISOString(),
-          raw: it
+          orderId: str(queueRow.orderId || "-"),
+          productId: str(queueRow.productId || queueRow.id || ""),
+          buyer: str(queueRow.buyer || queueRow.name || "-"),
+          email: str(queueRow.email || queueRow.buyerEmail || "-"),
+          phone: str(queueRow.phone || "-"),
+          address: str(queueRow.address || "-"),
+          item: str(queueRow.item || queueRow.productName || "-"),
+          quantity: Math.max(1, Math.floor(num(queueRow.quantity || 1))),
+          amount: num(queueRow.amount || queueRow.total || 0),
+          status: str(queueRow.status || "pending"),
+          date: queueRow.date || queueRow.createdAt || new Date().toISOString(),
+          paymentMethod: str(queueRow.paymentMethod || ""),
+          deliveryOption: str(queueRow.deliveryOption || ""),
+          deliveryDate: str(queueRow.deliveryDate || ""),
+          deliveryWindow: str(queueRow.deliveryWindow || ""),
+          note: str(queueRow.note || ""),
+          raw: queueRow
         });
       });
     });
     return rows;
+  }
+
+  function deliveryRowSignature(row) {
+    const baseId = str(row && row.orderId || "").toLowerCase();
+    const email = cleanEmail(row && (row.buyerEmail || row.email || ""));
+    const productId = str(row && row.productId || "").toLowerCase();
+    const item = str(row && (row.item || row.productName || "")).toLowerCase();
+    return [baseId, email, productId || item].join("::");
+  }
+
+  function mergeDeliveryRow(base, extra) {
+    const left = base && typeof base === "object" ? base : {};
+    const right = extra && typeof extra === "object" ? extra : {};
+    const merged = { ...left, ...right };
+
+    [
+      "queueKey",
+      "queueIndex",
+      "orderId",
+      "productId",
+      "buyer",
+      "buyerEmail",
+      "email",
+      "buyerPhone",
+      "phone",
+      "address",
+      "paymentMethod",
+      "deliveryOption",
+      "deliveryDate",
+      "deliveryWindow",
+      "note",
+      "item",
+      "productName",
+      "image"
+    ].forEach(function (key) {
+      if (!str(merged[key])) merged[key] = str(left[key] || right[key] || "");
+    });
+
+    if (!merged.quantity) merged.quantity = Math.max(1, Math.floor(num(left.quantity || right.quantity || 1)));
+    if (!num(merged.unitPrice)) merged.unitPrice = num(left.unitPrice || right.unitPrice || left.price || right.price || 0);
+    if (!num(merged.amount)) merged.amount = num(left.amount || right.amount || left.total || right.total || 0);
+    if (!str(merged.status)) merged.status = str(left.status || right.status || "pending");
+    if (!str(merged.date)) merged.date = left.date || right.date || new Date().toISOString();
+
+    const sourceSet = new Set([].concat(left.sources || [], right.sources || [], left.source ? [left.source] : [], right.source ? [right.source] : []));
+    merged.sources = Array.from(sourceSet);
+    return merged;
+  }
+
+  function getSellerDeliveryRows(seller) {
+    const s = seller || getCurrentSeller();
+    if (!s) return [];
+
+    const orderLines = getSellerOrderLines(s).map(function (r) {
+      return {
+        source: "order",
+        sources: ["order"],
+        orderId: r.orderId,
+        productId: r.productId || "",
+        item: r.productName || "Product",
+        productName: r.productName || "Product",
+        image: r.image || "",
+        buyer: r.buyerName || r.buyerEmail || "-",
+        buyerEmail: r.buyerEmail || "",
+        email: r.buyerEmail || "",
+        buyerPhone: r.buyerPhone || "",
+        phone: r.buyerPhone || "",
+        address: r.address || "",
+        paymentMethod: r.paymentMethod || "",
+        deliveryOption: r.deliveryOption || "",
+        deliveryDate: r.deliveryDate || "",
+        deliveryWindow: r.deliveryWindow || "",
+        note: r.note || "",
+        quantity: Math.max(1, Math.floor(num(r.quantity || 1))),
+        unitPrice: num(r.price || 0),
+        amount: num(r.total || 0),
+        status: str(r.status || "pending"),
+        date: r.date
+      };
+    });
+
+    const purchases = getPurchasesForSeller(s).map(function (r) {
+      return {
+        source: "purchase",
+        sources: ["purchase"],
+        orderId: r.orderId,
+        productId: r.productId || "",
+        item: r.productName || "Product",
+        productName: r.productName || "Product",
+        buyer: r.buyerName || r.buyerEmail || "-",
+        buyerEmail: r.buyerEmail || "",
+        email: r.buyerEmail || "",
+        quantity: Math.max(1, Math.floor(num(r.quantity || 1))),
+        unitPrice: num(r.price || 0),
+        amount: num(r.total || 0),
+        status: str(r.status || "pending"),
+        date: r.date
+      };
+    });
+
+    const queue = getSellerQueueRows(s).map(function (q) {
+      return {
+        source: "queue",
+        sources: ["queue"],
+        queueKey: q.queueKey,
+        queueIndex: q.index,
+        orderId: q.orderId,
+        productId: q.productId || "",
+        item: q.item || "Product",
+        productName: q.item || "Product",
+        buyer: q.buyer || "-",
+        buyerEmail: q.email || "",
+        email: q.email || "",
+        buyerPhone: q.phone || "",
+        phone: q.phone || "",
+        address: q.address || "",
+        paymentMethod: q.paymentMethod || "",
+        deliveryOption: q.deliveryOption || "",
+        deliveryDate: q.deliveryDate || "",
+        deliveryWindow: q.deliveryWindow || "",
+        note: q.note || "",
+        quantity: Math.max(1, Math.floor(num(q.quantity || 1))),
+        unitPrice: q.quantity ? (num(q.amount || 0) / Math.max(1, num(q.quantity || 1))) : 0,
+        amount: num(q.amount || 0),
+        status: str(q.status || "pending"),
+        date: q.date
+      };
+    });
+
+    const merged = new Map();
+    orderLines.forEach(function (row) {
+      merged.set(deliveryRowSignature(row), row);
+    });
+    purchases.forEach(function (row) {
+      const key = deliveryRowSignature(row);
+      merged.set(key, mergeDeliveryRow(merged.get(key), row));
+    });
+    queue.forEach(function (row) {
+      const key = deliveryRowSignature(row);
+      merged.set(key, mergeDeliveryRow(merged.get(key), row));
+    });
+
+    return Array.from(merged.values()).map(function (row) {
+      const next = { ...row };
+      next.canUpdate = Boolean(next.orderId);
+      return next;
+    });
   }
 
   function sameOrderId(a, b) {
@@ -1078,18 +1224,54 @@
 
   function sellerIdentityKeys(seller) {
     const s = seller || {};
+    const products = getSellerProducts(s);
+    const productIds = new Set();
+    const productNames = new Set();
+    products.forEach(function (product) {
+      const productId = str(product && product.id || "");
+      const productName = str(product && product.name || "").toLowerCase();
+      if (productId) productIds.add(productId);
+      if (productName) productNames.add(productName);
+    });
     return {
       email: cleanEmail(s.email),
       store: str(s.store || "").toLowerCase(),
-      name: str(s.fullName || s.name || "").toLowerCase()
+      name: str(s.fullName || s.name || "").toLowerCase(),
+      productIds: productIds,
+      productNames: productNames
     };
+  }
+
+  function matchesSellerCatalogRow(row, keys) {
+    if (!row || typeof row !== "object" || !keys) return false;
+    const productId = str(row.productId || row.id || "");
+    const productName = str(row.item || row.productName || row.name || "").toLowerCase();
+    if (productId && keys.productIds && keys.productIds.has(productId)) return true;
+    if (productName && keys.productNames && keys.productNames.has(productName)) return true;
+    return false;
+  }
+
+  function queueRowBelongsToSeller(queueKey, row, keys) {
+    if (!row || typeof row !== "object") return false;
+    const byQueueKey = str(queueKey).toLowerCase();
+    const sellerEmail = cleanEmail(row.sellerEmail || "");
+    const sellerStore = str(row.sellerStore || row.seller || "").toLowerCase();
+    const sellerName = str(row.sellerName || row.seller || "").toLowerCase();
+    return (keys.email && (sellerEmail === keys.email || byQueueKey === keys.email)) ||
+      (keys.store && (sellerStore === keys.store || byQueueKey === keys.store)) ||
+      (keys.name && (sellerName === keys.name || byQueueKey === keys.name)) ||
+      matchesSellerCatalogRow(row, keys);
   }
 
   function purchaseBelongsToSeller(row, keys) {
     if (!row || typeof row !== "object") return false;
     const byEmail = Boolean(keys.email) && cleanEmail(row.sellerEmail || "") === keys.email;
     const byName = str(row.seller || row.sellerName || "").toLowerCase();
-    return byEmail || (keys.store && byName === keys.store) || (keys.name && byName === keys.name);
+    const byStore = str(row.sellerStore || row.store || "").toLowerCase();
+    return byEmail ||
+      (keys.store && (byName === keys.store || byStore === keys.store)) ||
+      (keys.name && byName === keys.name) ||
+      matchesSellerCatalogRow(row, keys);
   }
 
   function isBuyerOrderStorageKey(key) {
@@ -1105,6 +1287,17 @@
     const target = str(key);
     if (!target) return;
     if (!list.includes(target)) list.push(target);
+  }
+
+  function orderRowId(row) {
+    return str(row && (row.id || row.orderId || row.orderNumber) || "");
+  }
+
+  function orderRowTs(row) {
+    const direct = new Date(row && (row.updatedAt || row.placedAt || row.createdAt || row.date || "")).getTime();
+    if (Number.isFinite(direct) && direct > 0) return direct;
+    const fallback = num(row && (row.id || row.orderId || row.orderNumber));
+    return fallback > 1000000000 ? fallback : 0;
   }
 
   function findOrderStorageKeys(extraKeys) {
@@ -1178,6 +1371,106 @@
     return changed;
   }
 
+  function orderLineBelongsToSeller(line, keys) {
+    if (!line || typeof line !== "object") return false;
+    const sellerEmail = cleanEmail(line.sellerEmail || "");
+    const sellerName = str(line.seller || line.sellerName || "").toLowerCase();
+    return (keys.email && sellerEmail === keys.email) ||
+      (keys.store && sellerName === keys.store) ||
+      (keys.name && sellerName === keys.name) ||
+      matchesSellerCatalogRow(line, keys);
+  }
+
+  function getSellerOrderLines(seller) {
+    const s = seller || getCurrentSeller();
+    if (!s) return [];
+
+    const keys = sellerIdentityKeys(s);
+    const gathered = [];
+
+    findOrderStorageKeys().forEach(function (storageKey) {
+      const rows = readJSON(storageKey, []);
+      if (!Array.isArray(rows)) return;
+      rows.forEach(function (row) {
+        if (row && typeof row === "object") gathered.push(row);
+      });
+    });
+
+    const deduped = new Map();
+    gathered.forEach(function (row, index) {
+      const orderId = orderRowId(row);
+      const email = cleanEmail(row && (row.email || row.buyerEmail || ""));
+      const date = str(row && (row.placedAt || row.createdAt || row.date || row.updatedAt) || "");
+      const key = orderId ? ("id:" + orderId.toLowerCase()) : ("anon:" + email + "|" + date + "|" + index);
+      const prev = deduped.get(key);
+      if (!prev) {
+        deduped.set(key, row);
+        return;
+      }
+      const merged = orderRowTs(row) >= orderRowTs(prev) ? { ...prev, ...row } : { ...row, ...prev };
+      deduped.set(key, merged);
+    });
+
+    const out = [];
+    Array.from(deduped.values()).forEach(function (order) {
+      const items = Array.isArray(order && order.cart) ? order.cart : [];
+      items.forEach(function (line, index) {
+        if (!orderLineBelongsToSeller(line, keys)) return;
+        const qty = Math.max(1, Math.floor(num(line && (line.quantity || line.qty || 1))));
+        const unitPrice = num(line && (line.price || line.unitPrice || 0));
+        const lineTotal = num(line && (line.lineTotal || line.total || (unitPrice * qty)));
+        out.push({
+          orderId: orderRowId(order) || ("ORD-LINE-" + index),
+          productId: str(line && (line.productId || line.id || "")),
+          productName: str(line && (line.name || line.productName || "Product")),
+          image: str(line && line.image || "matrixx.png"),
+          buyerEmail: str(order && (order.email || order.buyerEmail || "")),
+          buyerName: str(order && (order.fullName || order.buyerName || order.name || "")),
+          buyerPhone: str(order && (order.phone || order.buyerPhone || "")),
+          address: str(order && order.address || ""),
+          paymentMethod: str(order && order.paymentMethod || ""),
+          deliveryOption: str(order && order.deliveryOption || ""),
+          deliveryDate: str(order && order.deliveryDate || ""),
+          deliveryWindow: str(order && order.deliveryWindow || ""),
+          note: str(order && order.note || ""),
+          quantity: qty,
+          price: unitPrice,
+          total: lineTotal,
+          date: order && (order.placedAt || order.createdAt || order.date || new Date().toISOString()),
+          status: str(order && order.status || "pending")
+        });
+      });
+    });
+
+    return out;
+  }
+
+  function patchQueueStatusForSellerByOrderId(seller, orderId, nextStatus, updatedAt) {
+    const s = seller || getCurrentSeller();
+    const targetOrderId = str(orderId);
+    if (!s || !targetOrderId) return false;
+
+    const queues = readJSON("sellerOrderQueues", {});
+    if (!queues || typeof queues !== "object") return false;
+
+    const keys = sellerIdentityKeys(s);
+    let changed = false;
+
+    Object.keys(queues).forEach(function (queueKey) {
+      const items = Array.isArray(queues[queueKey]) ? queues[queueKey] : [];
+      queues[queueKey] = items.map(function (entry) {
+        const row = entry && typeof entry === "object" ? entry : {};
+        const rowOrderId = str(row.orderId || row.id || row.orderNumber || "");
+        if (!sameOrderId(rowOrderId, targetOrderId) || !queueRowBelongsToSeller(queueKey, row, keys)) return entry;
+        changed = true;
+        return { ...row, status: nextStatus, updatedAt: updatedAt };
+      });
+    });
+
+    if (!changed) return false;
+    return writeJSON("sellerOrderQueues", queues);
+  }
+
   function patchPurchasesStatusForSeller(seller, orderId, nextStatus, updatedAt) {
     const rows = readJSON("purchases", []);
     if (!Array.isArray(rows) || !rows.length) return false;
@@ -1191,6 +1484,289 @@
     });
     if (!changed) return false;
     return writeJSON("purchases", nextRows);
+  }
+
+  function payoutBelongsToSeller(row, keys) {
+    if (!row || typeof row !== "object") return false;
+    const sellerEmail = cleanEmail(row.sellerEmail || row.email || "");
+    const sellerName = str(row.sellerName || row.seller || row.sellerStore || "").toLowerCase();
+    const productId = str(row.productId || "");
+    const productName = str(row.productName || row.item || "").toLowerCase();
+    return (keys.email && sellerEmail === keys.email) ||
+      (keys.store && sellerName === keys.store) ||
+      (keys.name && sellerName === keys.name) ||
+      (productId && keys.productIds && keys.productIds.has(productId)) ||
+      (productName && keys.productNames && keys.productNames.has(productName));
+  }
+
+  function acceptedOrderStatus(status) {
+    const s = str(status).toLowerCase();
+    return ["approved", "in-transit", "delivered", "completed", "processing", "shipped", "out-for-delivery"].includes(s);
+  }
+
+  function syncSellerSessionRecord(updatedSeller) {
+    if (!updatedSeller || !updatedSeller.email) return;
+    const current = getCurrentSeller();
+    if (current && cleanEmail(current.email) === cleanEmail(updatedSeller.email)) {
+      setCurrentSeller({ ...current, ...updatedSeller, balance: num(updatedSeller.balance) });
+    }
+  }
+
+  function payoutMatchesOrderRow(payout, row, keys) {
+    if (!payout || typeof payout !== "object" || !row || typeof row !== "object") return false;
+    if (!sameOrderId(payout.orderId, row.orderId)) return false;
+    if (!payoutBelongsToSeller(payout, keys)) return false;
+
+    const payoutProductId = str(payout.productId || "");
+    const rowProductId = str(row.productId || "");
+    const payoutProductName = str(payout.productName || payout.item || "").toLowerCase();
+    const rowProductName = str(row.product || row.productName || row.item || "").toLowerCase();
+    const payoutBuyerEmail = cleanEmail(payout.buyerEmail || "");
+    const rowBuyerEmail = cleanEmail(row.buyerEmail || row.email || "");
+
+    if (rowProductId && payoutProductId && payoutProductId === rowProductId) {
+      if (!rowBuyerEmail || !payoutBuyerEmail || payoutBuyerEmail === rowBuyerEmail) return true;
+    }
+
+    if (rowProductName && payoutProductName && payoutProductName === rowProductName) {
+      if (!rowBuyerEmail || !payoutBuyerEmail || payoutBuyerEmail === rowBuyerEmail) return true;
+    }
+
+    return false;
+  }
+
+  function ensureSellerPayoutForRow(seller, row, updatedAt) {
+    const s = seller || getCurrentSeller();
+    const sourceRow = row && typeof row === "object" ? row : null;
+    if (!s || !sourceRow) return false;
+
+    const orderId = str(sourceRow.orderId || sourceRow.id || sourceRow.orderNumber || "");
+    if (!orderId) return false;
+
+    const quantity = Math.max(1, Math.floor(num(sourceRow.quantity || 1)));
+    const amount = num(sourceRow.amount || sourceRow.total || (num(sourceRow.unitPrice || sourceRow.price || 0) * quantity));
+    if (amount <= 0) return false;
+
+    const payoutsRaw = readJSON("sellerPayouts", []);
+    const payouts = Array.isArray(payoutsRaw) ? payoutsRaw : [];
+    const keys = sellerIdentityKeys(s);
+    const exists = payouts.some(function (payout) {
+      return payoutMatchesOrderRow(payout, sourceRow, keys);
+    });
+    if (exists) return false;
+
+    const sellerLabel = str(s.store || s.fullName || s.name || sourceRow.sellerName || sourceRow.seller || "Seller");
+    payouts.push({
+      id: "PAYOUT-" + Date.now() + "-" + Math.random().toString(36).slice(2, 7),
+      orderId: orderId,
+      productId: str(sourceRow.productId || ""),
+      sellerEmail: cleanEmail(s.email || sourceRow.sellerEmail || ""),
+      sellerName: sellerLabel,
+      sellerStore: sellerLabel,
+      buyerEmail: cleanEmail(sourceRow.buyerEmail || sourceRow.email || ""),
+      buyerName: str(sourceRow.buyer || sourceRow.buyerName || sourceRow.email || ""),
+      productName: str(sourceRow.product || sourceRow.productName || sourceRow.item || "Product"),
+      quantity: quantity,
+      amount: amount,
+      source: "seller_order_recovery",
+      paymentMethod: str(sourceRow.paymentMethod || ""),
+      status: str(sourceRow.status || "pending") || "pending",
+      createdAt: updatedAt || new Date().toISOString()
+    });
+    writeJSON("sellerPayouts", payouts);
+    return true;
+  }
+
+  function creditSellerPayoutsForOrder(seller, orderId, nextStatus, updatedAt) {
+    const s = seller || getCurrentSeller();
+    if (!s || !orderId) return false;
+
+    const payoutsRaw = readJSON("sellerPayouts", []);
+    const payouts = Array.isArray(payoutsRaw) ? payoutsRaw : [];
+    if (!payouts.length) return false;
+
+    const keys = sellerIdentityKeys(s);
+    const normalizedStatus = str(nextStatus || "pending").toLowerCase();
+    let creditedAmount = 0;
+    let changed = false;
+
+    const nextPayouts = payouts.map(function (row) {
+      const payout = row && typeof row === "object" ? row : {};
+      if (!sameOrderId(payout.orderId, orderId) || !payoutBelongsToSeller(payout, keys)) return row;
+
+      if (["declined", "cancelled", "canceled", "rejected"].includes(normalizedStatus)) {
+        if (payout.balanceCreditedAt || payout.creditedAt) return row;
+        if (str(payout.status).toLowerCase() === "declined") return row;
+        changed = true;
+        return { ...payout, status: "declined", updatedAt: updatedAt };
+      }
+
+      if (!acceptedOrderStatus(normalizedStatus)) {
+        if (str(payout.status).toLowerCase() === normalizedStatus) return row;
+        changed = true;
+        return { ...payout, status: normalizedStatus || "pending", updatedAt: updatedAt };
+      }
+
+      if (payout.balanceCreditedAt || payout.creditedAt || str(payout.status).toLowerCase() === "credited") {
+        const creditedAt = payout.balanceCreditedAt || payout.creditedAt || payout.approvedAt || updatedAt;
+        const alreadySettled = str(payout.status).toLowerCase() === "credited" &&
+          Boolean(payout.approvedAt) &&
+          Boolean(payout.creditedAt || payout.balanceCreditedAt);
+        if (alreadySettled) return row;
+        changed = true;
+        return {
+          ...payout,
+          status: "credited",
+          approvedAt: payout.approvedAt || creditedAt,
+          creditedAt: payout.creditedAt || creditedAt,
+          balanceCreditedAt: payout.balanceCreditedAt || creditedAt,
+          updatedAt: payout.updatedAt || creditedAt
+        };
+      }
+
+      creditedAmount += num(payout.amount || payout.total || 0);
+      changed = true;
+      return { ...payout, status: "credited", approvedAt: updatedAt, creditedAt: updatedAt, balanceCreditedAt: updatedAt, updatedAt: updatedAt };
+    });
+
+    if (!changed) return false;
+    writeJSON("sellerPayouts", nextPayouts);
+
+    if (creditedAmount > 0) {
+      const sellers = getSellers();
+      const idx = sellers.findIndex(function (row) { return cleanEmail(row.email) === cleanEmail(s.email); });
+      if (idx >= 0) {
+        const nextBalance = num(sellers[idx].balance) + creditedAmount;
+        sellers[idx] = normalizeSeller({ ...sellers[idx], balance: nextBalance, updatedAt: updatedAt }, idx);
+        setSellers(sellers);
+        syncSellerSessionRecord(sellers[idx]);
+      }
+    }
+
+    return true;
+  }
+
+  function reconcileSellerSalesState(seller) {
+    const s = seller || getCurrentSeller();
+    if (!s) return false;
+
+    const merged = new Map();
+    const acceptedRows = [];
+
+    function candidateKey(row) {
+      return [
+        str(row && row.orderId || "").toLowerCase(),
+        cleanEmail(row && (row.buyerEmail || row.email || "")),
+        str(row && (row.productId || row.id || "")).toLowerCase() ||
+          str(row && (row.product || row.productName || row.item || "")).toLowerCase()
+      ].join("::");
+    }
+
+    function pushCandidate(row) {
+      if (!row || typeof row !== "object") return;
+      const orderId = str(row.orderId || row.id || row.orderNumber || "");
+      if (!orderId) return;
+      const key = candidateKey(row);
+      if (!key || merged.has(key)) return;
+      merged.set(key, row);
+      acceptedRows.push(row);
+    }
+
+    getSellerOrderLines(s).forEach(function (row) {
+      pushCandidate({
+        orderId: row.orderId,
+        productId: row.productId || "",
+        product: row.productName || row.item || "Product",
+        buyer: row.buyerName || row.buyerEmail || "",
+        buyerEmail: row.buyerEmail || "",
+        email: row.buyerEmail || "",
+        quantity: row.quantity,
+        unitPrice: row.price || 0,
+        amount: row.total || 0,
+        paymentMethod: row.paymentMethod || "",
+        status: row.status || "pending"
+      });
+    });
+
+    getPurchasesForSeller(s).forEach(function (row) {
+      pushCandidate({
+        orderId: row.orderId,
+        productId: row.productId || "",
+        product: row.productName || "Product",
+        buyer: row.buyerName || row.buyerEmail || "",
+        buyerEmail: row.buyerEmail || "",
+        email: row.buyerEmail || "",
+        quantity: row.quantity,
+        unitPrice: row.price || 0,
+        amount: row.total || 0,
+        paymentMethod: row.paymentMethod || "",
+        status: row.status || "pending"
+      });
+    });
+
+    getSellerQueueRows(s).forEach(function (row) {
+      pushCandidate({
+        orderId: row.orderId,
+        productId: row.productId || "",
+        product: row.item || row.productName || "Product",
+        buyer: row.buyer || row.email || "",
+        buyerEmail: row.email || "",
+        email: row.email || "",
+        quantity: row.quantity,
+        unitPrice: row.quantity ? (num(row.amount || 0) / Math.max(1, num(row.quantity || 1))) : 0,
+        amount: row.amount || 0,
+        paymentMethod: row.paymentMethod || "",
+        status: row.status || "pending"
+      });
+    });
+
+    const reconcileAt = new Date().toISOString();
+    let changed = false;
+    acceptedRows.forEach(function (row) {
+      if (ensureSellerPayoutForRow(s, row, reconcileAt)) changed = true;
+      if (acceptedOrderStatus(row.status || "pending")) {
+        if (creditSellerPayoutsForOrder(s, row.orderId, row.status, reconcileAt)) changed = true;
+      }
+    });
+    return changed;
+  }
+
+  function getSellerPayoutRows(seller, options) {
+    const s = seller || getCurrentSeller();
+    if (!s) return [];
+
+    const opts = options || {};
+    const payoutsRaw = readJSON("sellerPayouts", []);
+    const payouts = Array.isArray(payoutsRaw) ? payoutsRaw : [];
+    const keys = sellerIdentityKeys(s);
+
+    return payouts.filter(function (row) {
+      if (!payoutBelongsToSeller(row, keys)) return false;
+      if (opts.onlyCredited) {
+        const status = str(row && row.status || "").toLowerCase();
+        return status === "credited" || Boolean(row && (row.balanceCreditedAt || row.creditedAt));
+      }
+      return true;
+    }).map(function (row) {
+      const payout = row && typeof row === "object" ? row : {};
+      return {
+        id: str(payout.id || ""),
+        orderId: str(payout.orderId || ""),
+        productId: str(payout.productId || ""),
+        productName: str(payout.productName || payout.item || "Product"),
+        sellerEmail: str(payout.sellerEmail || ""),
+        sellerName: str(payout.sellerName || payout.seller || payout.sellerStore || ""),
+        buyerEmail: str(payout.buyerEmail || ""),
+        buyerName: str(payout.buyerName || ""),
+        quantity: Math.max(1, Math.floor(num(payout.quantity || 1))),
+        amount: num(payout.amount || payout.total || 0),
+        paymentMethod: str(payout.paymentMethod || ""),
+        status: str(payout.status || "pending"),
+        date: payout.balanceCreditedAt || payout.creditedAt || payout.approvedAt || payout.updatedAt || payout.createdAt || new Date().toISOString()
+      };
+    }).sort(function (a, b) {
+      return String(b.date).localeCompare(String(a.date));
+    });
   }
 
   function updateQueueStatus(seller, queueKey, index, nextStatus) {
@@ -1229,6 +1805,29 @@
     return true;
   }
 
+  function updateSellerOrderStatus(seller, row, nextStatus) {
+    const s = seller || getCurrentSeller();
+    if (!s || !row) return false;
+
+    const normalizedStatus = str(nextStatus || "pending");
+    const orderId = str(row.orderId || row.id || row.orderNumber || "");
+    if (!orderId) return false;
+
+    const updatedAt = new Date().toISOString();
+    let changed = false;
+
+    if (patchQueueStatusForSellerByOrderId(s, orderId, normalizedStatus, updatedAt)) changed = true;
+    if (patchBuyerOrdersEverywhere(orderId, normalizedStatus, updatedAt, {
+      email: row.buyerEmail || row.email || "",
+      phone: row.buyerPhone || row.phone || ""
+    })) changed = true;
+    if (patchPurchasesStatusForSeller(s, orderId, normalizedStatus, updatedAt)) changed = true;
+    if (ensureSellerPayoutForRow(s, row, updatedAt)) changed = true;
+    if (creditSellerPayoutsForOrder(s, orderId, normalizedStatus, updatedAt)) changed = true;
+
+    return changed;
+  }
+
   function computeMetrics(seller) {
     const s = seller || getCurrentSeller();
     if (!s) {
@@ -1244,12 +1843,16 @@
 
     const products = getSellerProducts(s);
     const purchases = getPurchasesForSeller(s);
-    const queue = getSellerQueueRows(s);
+    const creditedPayouts = getSellerPayoutRows(s, { onlyCredited: true });
+    const deliveryRows = getSellerDeliveryRows(s);
 
-    const earnings = purchases.reduce(function (sum, p) { return sum + num(p.total); }, 0);
-    const pendingDeliveries = queue.filter(function (q) { return str(q.status).toLowerCase() === "pending"; }).length;
-    const delivered = queue.filter(function (q) {
-      const st = str(q.status).toLowerCase();
+    const earnings = creditedPayouts.reduce(function (sum, row) { return sum + num(row.amount); }, 0);
+    const pendingDeliveries = deliveryRows.filter(function (row) {
+      const st = str(row.status).toLowerCase();
+      return st === "pending" || st === "processing";
+    }).length;
+    const delivered = deliveryRows.filter(function (row) {
+      const st = str(row.status).toLowerCase();
       return st === "delivered" || st === "completed";
     }).length;
 
@@ -1257,7 +1860,7 @@
 
     return {
       products: products.length,
-      sales: purchases.length,
+      sales: creditedPayouts.length,
       earnings: earnings,
       pendingDeliveries: pendingDeliveries,
       delivered: delivered,
@@ -1352,8 +1955,13 @@
     validateCartStock: validateCartStock,
     applyStockDeduction: applyStockDeduction,
     getPurchasesForSeller: getPurchasesForSeller,
+    getSellerPayoutRows: getSellerPayoutRows,
+    getSellerOrderLines: getSellerOrderLines,
     getSellerQueueRows: getSellerQueueRows,
+    getSellerDeliveryRows: getSellerDeliveryRows,
     updateQueueStatus: updateQueueStatus,
+    updateSellerOrderStatus: updateSellerOrderStatus,
+    reconcileSellerSalesState: reconcileSellerSalesState,
     computeMetrics: computeMetrics,
     renderSellerHeader: renderSellerHeader
   };

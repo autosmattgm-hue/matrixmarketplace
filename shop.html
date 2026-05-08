@@ -753,13 +753,17 @@
         <a href="chat.html">💬<span>Chat</span></a>
     </nav>
 
-    <script src="seller-core.js?v=20260222g"></script>
+    <script src="seller-core.js?v=20260510f"></script>
     <script>
         const state = { products: [], visible: [], latest: [], soldOutHidden: 0 };
         const BUYER_SCOPE_PREFIX = "__mm_buyer__";
         const SCOPED_KEYS = new Set(["cart", "cartItems", "checkoutCart", "checkoutMeta"]);
         const LEGACY_READ_THROUGH_KEYS = new Set(["cart", "cartItems", "checkoutCart", "checkoutMeta"]);
         let cachedUserScope = null;
+        let filterTimer = 0;
+        let renderFrame = 0;
+        let refreshTimer = 0;
+        let lastProductSignature = "";
 
         function byId(id) { return document.getElementById(id); }
         function num(v) { const n = Number(v); return Number.isFinite(n) ? n : 0; }
@@ -881,6 +885,17 @@
         }
         function latestItems(items, limit) {
             return (Array.isArray(items) ? items : []).slice().sort(function (a, b) { return productStamp(b) - productStamp(a); }).slice(0, limit);
+        }
+        function productSignature(items) {
+            return (Array.isArray(items) ? items : []).map(function (product) {
+                return [
+                    String(product && product.id || ""),
+                    String(product && (product.sellerEmail || product.seller || "")),
+                    num(product && product.price).toFixed(2),
+                    Math.max(0, Math.floor(num(product && product.stock))),
+                    String(product && (product.createdAt || product.updatedAt || ""))
+                ].join("~");
+            }).join("|");
         }
         function saveLatestCache(items) {
             const rows = latestItems(items, 12).map(function (p) {
@@ -1121,9 +1136,36 @@
         }
 
         function refresh() {
+            const previousSignature = lastProductSignature;
             loadProducts();
+            const nextSignature = productSignature(state.products);
+            const changed = nextSignature !== previousSignature;
+            lastProductSignature = nextSignature;
+            if (!changed && byId("productGrid").children.length) return;
+            populateFilters();
             applyFilters();
             renderProducts();
+        }
+
+        function requestRender(delayMs) {
+            if (filterTimer) clearTimeout(filterTimer);
+            filterTimer = setTimeout(function () {
+                filterTimer = 0;
+                if (renderFrame) return;
+                renderFrame = requestAnimationFrame(function () {
+                    renderFrame = 0;
+                    applyFilters();
+                    renderProducts();
+                });
+            }, Math.max(0, Math.floor(num(delayMs || 0))));
+        }
+
+        function requestRefresh(delayMs) {
+            if (refreshTimer) clearTimeout(refreshTimer);
+            refreshTimer = setTimeout(function () {
+                refreshTimer = 0;
+                refresh();
+            }, Math.max(0, Math.floor(num(delayMs || 0))));
         }
 
         function bindHeaderMenu() {
@@ -1161,15 +1203,11 @@
 
         function initShopPage() {
             bindHeaderMenu();
-            loadProducts();
-            populateFilters();
-            applyFilters();
-            renderProducts();
+            refresh();
 
             ["searchInput", "sellerFilter", "categoryFilter", "sortFilter", "minPrice", "maxPrice"].forEach(function (id) {
                 byId(id).addEventListener(id.includes("Input") ? "input" : "change", function () {
-                    applyFilters();
-                    renderProducts();
+                    requestRender(id === "searchInput" ? 120 : 0);
                 });
             });
 
@@ -1180,7 +1218,7 @@
                 byId("minPrice").value = "";
                 byId("maxPrice").value = "";
                 byId("sortFilter").value = "newest";
-                refresh();
+                requestRender(0);
             });
 
             byId("productGrid").addEventListener("click", function (event) {
@@ -1221,7 +1259,7 @@
                 }
             });
 
-            window.addEventListener("storage", refresh);
+            window.addEventListener("storage", function () { requestRefresh(120); });
         }
 
         function startShopPage() {
@@ -1237,8 +1275,9 @@
         else startShopPage();
     </script>
     <script defer src="upgrade.js"></script>
-    <script defer src="sw-register.js?v=20260226a"></script>
-    <script defer src="site-performance.js?v=20260226a"></script>
+      <script defer src="site-admin-controls.js?v=20260510b"></script>
+
+    <script defer src="site-performance.js?v=20260510b"></script>
 
     <!-- Additional enhancements (no core logic broken) -->
     <script>
@@ -1274,9 +1313,15 @@
             // Header shadow on scroll
             const header = document.getElementById('mainHeader');
             if (header) {
+                let headerTicking = false;
                 window.addEventListener('scroll', function() {
-                    header.classList.toggle('scrolled', window.scrollY > 10);
-                });
+                    if (headerTicking) return;
+                    headerTicking = true;
+                    requestAnimationFrame(function() {
+                        header.classList.toggle('scrolled', window.scrollY > 10);
+                        headerTicking = false;
+                    });
+                }, { passive: true });
             }
 
             // Latest products horizontal scroll arrows

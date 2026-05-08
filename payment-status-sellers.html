@@ -109,7 +109,7 @@
         <div class="sel-foot">Payment approval and subscription activation tracker</div>
     </main>
 
-    <script src="seller-core.js?v=20260222g"></script>
+    <script src="seller-core.js?v=20260510i"></script>
     <script>
         let seller = null;
         let latestRequest = null;
@@ -160,17 +160,6 @@
             return "pending";
         }
 
-        function maybeSyncSellerByRequest(request) {
-            if (!request) return;
-            const status = normalizeRequestStatus(request.status);
-            if (status !== "approved") return;
-            seller.status = "Approved";
-            seller.paymentStatus = "Paid";
-            seller.subscription = "Active";
-            seller = SellerCore.upsertSeller(seller);
-            SellerCore.setCurrentSeller(seller);
-        }
-
         function renderMetaList(containerId, rows) {
             byId(containerId).innerHTML = rows.map(function (item) {
                 return '<div class="meta-row"><strong>' + item[0] + '</strong><span>' + item[1] + '</span></div>';
@@ -183,7 +172,6 @@
 
             const request = latestRequestFor(seller.email);
             latestRequest = request;
-            maybeSyncSellerByRequest(request);
 
             const requestStatus = normalizeRequestStatus(request && request.status);
             const bannerTitle = request
@@ -216,6 +204,7 @@
                 ["Store", seller.store || "-"],
                 ["Email", seller.email || "-"],
                 ["Plan", seller.plan || "basic"],
+                ["Payment Status", SellerCore.badge(seller.paymentStatus || "Pending")],
                 ["Account Status", SellerCore.badge(seller.status || "Pending")],
                 ["Subscription", SellerCore.badge(seller.subscription || "Inactive")]
             ]);
@@ -317,8 +306,9 @@
         else startPaymentStatusSellersPage();
     </script>
     <script defer src="upgrade.js"></script>
-  <script defer src="sw-register.js?v=20260226a"></script>
-  <script defer src="site-performance.js?v=20260226a"></script>
+    <script defer src="site-admin-controls.js?v=20260510b"></script>
+
+  <script defer src="site-performance.js?v=20260510b"></script>
 </body>
 </html>
 

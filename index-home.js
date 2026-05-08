@@ -70,7 +70,17 @@
     lastSync: '--'
   };
 
+  const HOME_AUTO_SYNC_MS = 90000;
+  const HEADER_REFRESH_MS = 30000;
   let searchTimer = null;
+  let pendingFilterFrame = 0;
+  let pendingFilterArgs = { pushUrl: true, skipRecover: false };
+  let refreshTimer = 0;
+  let refreshInFlight = false;
+  let queuedRefresh = false;
+  let queuedRefreshSilent = true;
+  let reconcileTimer = 0;
+  let lastProductsSignature = '';
   let booted = false;
   let remoteFallbackBusy = false;
   let cachedUserScope = null;
@@ -326,6 +336,82 @@
   function setSyncNote(message) {
     const note = byId('syncNote');
     if (note) note.textContent = str(message || '');
+  }
+
+  function requestIdleTask(callback, timeoutMs) {
+    if (typeof callback !== 'function') return;
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(callback, { timeout: Math.max(250, num(timeoutMs) || 1000) });
+      return;
+    }
+    setTimeout(callback, 0);
+  }
+
+  function productSignature(rows) {
+    return (Array.isArray(rows) ? rows : []).map(function (row) {
+      return [
+        row && row._key,
+        num(row && row.price).toFixed(2),
+        Math.max(0, Math.floor(num(row && row.stock))),
+        row && row.isVisible === false ? 0 : 1,
+        str(row && (row.createdAt || row.updatedAt || ''))
+      ].join('~');
+    }).join('|');
+  }
+
+  function requestApplyFilters(pushUrl, skipRecover) {
+    pendingFilterArgs = {
+      pushUrl: pushUrl !== false,
+      skipRecover: Boolean(skipRecover)
+    };
+    if (pendingFilterFrame) return;
+    const runner = function () {
+      pendingFilterFrame = 0;
+      applyFilters(pendingFilterArgs.pushUrl, pendingFilterArgs.skipRecover);
+    };
+    if ('requestAnimationFrame' in window) {
+      pendingFilterFrame = requestAnimationFrame(runner);
+      return;
+    }
+    pendingFilterFrame = setTimeout(runner, 16);
+  }
+
+  function flushRefreshProducts() {
+    const silent = queuedRefreshSilent;
+    queuedRefreshSilent = true;
+    refreshInFlight = true;
+    requestIdleTask(function () {
+      try {
+        refreshProducts(silent);
+      } finally {
+        refreshInFlight = false;
+        if (queuedRefresh) {
+          queuedRefresh = false;
+          requestRefreshProducts(queuedRefreshSilent, 0);
+        }
+      }
+    }, 1200);
+  }
+
+  function requestRefreshProducts(silent, delayMs) {
+    if (silent === false) queuedRefreshSilent = false;
+    if (refreshInFlight) {
+      queuedRefresh = true;
+      return;
+    }
+    if (refreshTimer) clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(function () {
+      refreshTimer = 0;
+      flushRefreshProducts();
+    }, Math.max(0, Math.floor(num(delayMs || 0))));
+  }
+
+  function requestReconcile() {
+    if (reconcileTimer) clearTimeout(reconcileTimer);
+    reconcileTimer = setTimeout(function () {
+      reconcileTimer = 0;
+      try { reconcileHydratedState(); } catch (_) {}
+    }, 120);
   }
 
   function updateOnline() {
@@ -1514,14 +1600,33 @@
 
     const map = new Map();
     normalized.forEach(function (p) { map.set(p._key, p); });
-    state.products = Array.from(map.values()).sort(function (a, b) { return b.createdStamp - a.createdStamp; });
+    const nextProducts = Array.from(map.values()).sort(function (a, b) { return b.createdStamp - a.createdStamp; });
+    const nextSignature = productSignature(nextProducts);
+    const sameProducts = nextSignature === lastProductsSignature;
+
+    state.products = nextProducts;
+    lastProductsSignature = nextSignature;
     state.latest = state.products.slice(0, 8);
-    computeHeroHighlights();
 
     state.compare = new Set(Array.from(state.compare).filter(function (key) {
       return state.products.some(function (p) { return p._key === key; });
     }).slice(0, 3));
     write(KEYS.COMPARE, Array.from(state.compare));
+
+    state.lastSync = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    byId('syncChip').textContent = 'Last Sync: ' + state.lastSync;
+
+    if (sameProducts) {
+      if (state.products.length) {
+        byId('syncNote').textContent = 'Catalog checked at ' + state.lastSync + '. No product changes detected.';
+      } else {
+        byId('syncNote').textContent = 'Catalog checked at ' + state.lastSync + '. No visible in-stock products yet.';
+      }
+      if (!silent) toast('Catalog is already up to date.');
+      return;
+    }
+
+    computeHeroHighlights();
 
     write(KEYS.LATEST, state.latest.map(function (p) {
       return {
@@ -1554,7 +1659,6 @@
     renderSellerList();
     applyFilters(false);
 
-    state.lastSync = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     byId('syncChip').textContent = 'Last Sync: ' + state.lastSync;
     if (state.products.length) {
       byId('syncNote').textContent = 'Online sync completed at ' + state.lastSync + '. Showing ' + state.products.length + ' live products.';
@@ -1752,7 +1856,7 @@
       setSidebarOpen(!(shell && shell.classList.contains('filters-open')));
     });
 
-    byId('syncBtn').addEventListener('click', function () { refreshProducts(false); });
+    byId('syncBtn').addEventListener('click', function () { requestRefreshProducts(false, 0); });
 
     byId('autoSyncBtn').addEventListener('click', function () {
       state.autoSync = !state.autoSync;
@@ -1764,7 +1868,7 @@
     byId('headerSearchBtn').addEventListener('click', function () {
       byId('searchInput').value = byId('headerSearch').value.trim();
       state.page = 1;
-      applyFilters(true);
+      requestApplyFilters(true);
       closeHeader();
     });
 
@@ -1780,19 +1884,19 @@
       clearTimeout(searchTimer);
       searchTimer = setTimeout(function () {
         state.page = 1;
-        applyFilters(true);
-      }, 180);
+        requestApplyFilters(true);
+      }, 140);
     });
 
     byId('minPrice').addEventListener('input', function () {
       state.page = 1;
-      applyFilters(true);
+      requestApplyFilters(true);
     });
 
     ['categoryFilter', 'sellerFilter', 'stockFilter', 'freshFilter', 'sortFilter'].forEach(function (id) {
       byId(id).addEventListener('change', function () {
         state.page = 1;
-        applyFilters(true);
+        requestApplyFilters(true);
       });
     });
 
@@ -1801,7 +1905,7 @@
       savePrefs();
       byId('maxPriceLabel').textContent = Math.floor(num(this.value)) + ' GMD';
       state.page = 1;
-      applyFilters(true);
+      requestApplyFilters(true);
     });
 
     byId('pageSizeFilter').addEventListener('change', function () {
@@ -1809,10 +1913,10 @@
       if ([8, 12, 16, 24].includes(size)) state.pageSize = size;
       state.page = 1;
       savePrefs();
-      applyFilters(true);
+      requestApplyFilters(true);
     });
 
-    byId('applyBtn').addEventListener('click', function () { state.page = 1; applyFilters(true); });
+    byId('applyBtn').addEventListener('click', function () { state.page = 1; requestApplyFilters(true); });
     byId('resetBtn').addEventListener('click', resetFilters);
     byId('gridBtn').addEventListener('click', function () { setView('grid'); });
     byId('listBtn').addEventListener('click', function () { setView('list'); });
@@ -1826,7 +1930,7 @@
       this.textContent = state.onlyWishlist ? 'Wishlist Only On' : 'Wishlist Only';
       savePrefs();
       state.page = 1;
-      applyFilters(true);
+      requestApplyFilters(true);
     });
 
     byId('todayFilterBtn').addEventListener('click', function () {
@@ -1834,7 +1938,7 @@
       byId('freshFilter').value = state.quickMode === 'today' ? '1' : '';
       state.page = 1;
       savePrefs();
-      applyFilters(true);
+      requestApplyFilters(true);
     });
 
     byId('budgetFilterBtn').addEventListener('click', function () {
@@ -1847,14 +1951,14 @@
       }
       state.page = 1;
       savePrefs();
-      applyFilters(true);
+      requestApplyFilters(true);
     });
 
     byId('highStockFilterBtn').addEventListener('click', function () {
       state.quickMode = state.quickMode === 'highStock' ? '' : 'highStock';
       state.page = 1;
       savePrefs();
-      applyFilters(true);
+      requestApplyFilters(true);
     });
 
     byId('clearAllBtn').addEventListener('click', resetFilters);
@@ -1862,7 +1966,7 @@
     byId('remoteLoadBtn').addEventListener('click', function () {
       fetchRemoteProductsDirect().then(function (rows) {
         if (Array.isArray(rows) && rows.length) {
-          refreshProducts(false);
+          requestRefreshProducts(false, 0);
           return;
         }
         toast('Remote load failed.');
@@ -1878,7 +1982,7 @@
       state.chip = str(b.getAttribute('data-chip'));
       state.page = 1;
       renderCategoryChips();
-      applyFilters(true);
+      requestApplyFilters(true);
     });
 
     byId('categoryGrid').addEventListener('click', function (e) {
@@ -1888,7 +1992,7 @@
       state.chip = '';
       state.page = 1;
       renderCategoryChips();
-      applyFilters(true);
+      requestApplyFilters(true);
       setSidebarOpen(false);
       const target = byId('productsSection');
       if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1898,7 +2002,7 @@
       const b = e.target.closest('button[data-page]');
       if (!b || b.disabled) return;
       state.page = Math.max(1, Math.floor(num(b.getAttribute('data-page'))));
-      applyFilters(true);
+      requestApplyFilters(true);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     });
 
@@ -1968,7 +2072,7 @@
       if (!b) return;
       byId('sellerFilter').value = str(b.getAttribute('data-seller'));
       state.page = 1;
-      applyFilters(true);
+      requestApplyFilters(true);
       setSidebarOpen(false);
     });
 
@@ -2021,7 +2125,7 @@
 
     window.addEventListener('storage', function (e) {
       const key = e && typeof e.key === 'string' ? e.key : '';
-      if (!key || key === 'products') refreshProducts(true);
+      if (!key || key === 'products') requestRefreshProducts(true, 120);
       if (key === 'purchases') {
         computeHeroHighlights();
         renderHeroHighlights();
@@ -2032,16 +2136,16 @@
         loadPrefs();
         updateHeaderUser();
         updateCartCount();
-        applyFilters(true);
+        requestApplyFilters(true);
       }
     });
 
     window.addEventListener('focus', function () {
-      try { reconcileHydratedState(); } catch (_) {}
+      requestReconcile();
     });
     document.addEventListener('visibilitychange', function () {
       if (document.visibilityState !== 'visible') return;
-      try { reconcileHydratedState(); } catch (_) {}
+      requestReconcile();
     });
 
     document.addEventListener('keydown', function (e) {
@@ -2097,12 +2201,12 @@
       if (!document.hidden) tickClock();
     }, 1000);
     setInterval(function () {
-      if (state.autoSync && !document.hidden) refreshProducts(true);
-    }, 30000);
+      if (state.autoSync && !document.hidden && navigator.onLine) requestRefreshProducts(true, 0);
+    }, HOME_AUTO_SYNC_MS);
     setInterval(function () {
       if (document.hidden) return;
       try { updateHeaderUser(); } catch (_) {}
-    }, 5000);
+    }, HEADER_REFRESH_MS);
   }
 
   function start() {

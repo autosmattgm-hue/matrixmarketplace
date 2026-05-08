@@ -6,7 +6,91 @@
   <title>Seller Orders - MatrixMarket</title>
   <link rel="stylesheet" href="seller-layout.css" />
   <link rel="stylesheet" href="upgrade.css" />
-    <script src="firebase-online-storage.js"></script>
+  <script src="firebase-online-storage.js"></script>
+  <style>
+    .seller-orders-kpis {
+      display: grid;
+      gap: 0.7rem;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+    .seller-order-detail {
+      display: grid;
+      gap: 0.8rem;
+      grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+      align-items: start;
+    }
+    .seller-order-detail .sel-table-wrap {
+      min-height: 420px;
+    }
+    .seller-order-inspector {
+      display: grid;
+      gap: 0.7rem;
+    }
+    .seller-order-summary {
+      border: 1px solid var(--sel-border);
+      border-radius: 12px;
+      background: rgba(2, 6, 23, 0.45);
+      padding: 0.8rem;
+      display: grid;
+      gap: 0.4rem;
+    }
+    .seller-order-summary h3,
+    .seller-order-summary p {
+      margin: 0;
+    }
+    .seller-order-meta-grid {
+      display: grid;
+      gap: 0.55rem;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .seller-order-meta-grid .meta-row {
+      align-items: flex-start;
+    }
+    .seller-order-address,
+    .seller-order-note {
+      border: 1px solid var(--sel-border);
+      border-radius: 12px;
+      background: rgba(2, 6, 23, 0.45);
+      padding: 0.75rem;
+      line-height: 1.55;
+    }
+    .seller-order-address strong,
+    .seller-order-note strong {
+      display: block;
+      margin-bottom: 0.3rem;
+    }
+    .seller-order-actions {
+      display: flex;
+      gap: 0.4rem;
+      flex-wrap: wrap;
+    }
+    .seller-row-active {
+      outline: 1px solid rgba(103, 232, 249, 0.5);
+      background: rgba(6, 182, 212, 0.08);
+    }
+    .seller-order-contact {
+      display: grid;
+      gap: 0.16rem;
+    }
+    .seller-order-contact strong {
+      color: #fff;
+    }
+    .seller-order-empty {
+      border: 1px dashed var(--sel-border);
+      border-radius: 12px;
+      padding: 1rem;
+      color: var(--sel-muted);
+      text-align: center;
+      background: rgba(2, 6, 23, 0.35);
+    }
+    @media (max-width: 1100px) {
+      .seller-orders-kpis,
+      .seller-order-detail,
+      .seller-order-meta-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
 </head>
 <body class="seller-page">
   <div id="sellerHeader"></div>
@@ -42,46 +126,140 @@
     </section>
 
     <section class="seller-card">
-      <div class="sel-table-wrap">
-        <table class="sel-table" id="orderTable"></table>
-      </div>
+      <div id="orderKpis" class="seller-orders-kpis"></div>
     </section>
 
-    <div class="sel-foot">Order history and queue view</div>
+    <section class="seller-order-detail">
+      <div class="seller-card">
+        <div class="sel-table-wrap">
+          <table class="sel-table" id="orderTable"></table>
+        </div>
+      </div>
+
+      <aside class="seller-order-inspector">
+        <section class="seller-card">
+          <div id="detailBox" class="seller-order-empty">Select an order row to view full buyer and delivery details.</div>
+        </section>
+        <section class="seller-card">
+          <h3 style="margin:0 0 .5rem;">Seller Control Notes</h3>
+          <div class="sel-list">
+            <div class="sel-list-item">Use seller status actions to keep the buyer, seller, and admin views in sync.</div>
+            <div class="sel-list-item">Each row can show buyer name, email, phone, address, delivery timing, payment method, and note.</div>
+            <div class="sel-list-item">Export includes the richer buyer and delivery fields currently visible to this seller.</div>
+          </div>
+        </section>
+      </aside>
+    </section>
+
+    <div class="sel-foot">Seller order control center with buyer, delivery, payment, and status details.</div>
   </main>
 
-  <script src="seller-core.js?v=20260228a"></script>
+  <script src="seller-core.js?v=20260510i"></script>
   <script>
     let seller = null;
-    const state = { rows: [], filtered: [] };
+    const state = { rows: [], filtered: [], selectedId: "" };
+    let refreshTimer = null;
 
     function byId(id){ return document.getElementById(id); }
+    function esc(v){ return String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;"); }
+    function str(v){ return SellerCore.str(v); }
+    function low(v){ return SellerCore.str(v).toLowerCase(); }
+    function hasValue(v){ return !(v == null || String(v).trim() === ""); }
+
+    function statusWeight(value) {
+      const status = low(value);
+      if (status === "declined" || status === "cancelled" || status === "canceled" || status === "rejected") return 50;
+      if (status === "delivered" || status === "completed") return 40;
+      if (status === "in-transit" || status === "shipped" || status === "out-for-delivery") return 30;
+      if (status === "approved" || status === "processing") return 20;
+      if (status === "pending") return 10;
+      return status ? 5 : 0;
+    }
+
+    function pickPreferredStatus(current, next) {
+      const currentStatus = str(current || "");
+      const nextStatus = str(next || "");
+      if (!currentStatus) return nextStatus;
+      if (!nextStatus) return currentStatus;
+      return statusWeight(nextStatus) >= statusWeight(currentStatus) ? nextStatus : currentStatus;
+    }
+
+    function chooseValue(current, next) {
+      return hasValue(next) ? next : current;
+    }
+
+    function signature(row) {
+      return [
+        SellerCore.str(row.orderId || "").toLowerCase(),
+        SellerCore.str(row.buyerEmail || row.email || "").toLowerCase(),
+        SellerCore.str(row.productId || "").toLowerCase() || SellerCore.str(row.product || row.productName || row.item || "").toLowerCase()
+      ].join("|");
+    }
+
+    function mergeRow(base, next) {
+      const merged = { ...(base || {}) };
+      Object.keys(next || {}).forEach(function (key) {
+        if (key === "sources") return;
+        if (key === "status") {
+          merged[key] = pickPreferredStatus(merged[key], next[key]);
+          return;
+        }
+        merged[key] = chooseValue(merged[key], next[key]);
+      });
+      const sourceSet = new Set([].concat(base && base.sources || [], next && next.sources || [], next && next.source ? [next.source] : []));
+      merged.sources = Array.from(sourceSet);
+      merged.canUpdate = Boolean(merged.orderId);
+      return merged;
+    }
+
+    function rowId(row) {
+      return [
+        str(row && row.orderId || ""),
+        str(row && (row.buyerEmail || row.email) || "").toLowerCase(),
+        str(row && row.productId || "").toLowerCase() || str(row && (row.product || row.productName || row.item) || "").toLowerCase()
+      ].join("::");
+    }
 
     function setHeader(){
       byId("sellerHeader").innerHTML = SellerCore.renderSellerHeader("seller-orders.html");
     }
 
     function readRows(){
-      function signature(row) {
-        const qty = Math.max(1, Math.floor(SellerCore.num(row.quantity || 1)));
-        const amount = SellerCore.num(row.amount || 0).toFixed(2);
-        return [
-          SellerCore.str(row.orderId || "").toLowerCase(),
-          SellerCore.str(row.buyerEmail || "").toLowerCase(),
-          SellerCore.str(row.product || "").toLowerCase(),
-          qty,
-          amount
-        ].join("|");
-      }
+      const orderLines = (typeof SellerCore.getSellerOrderLines === "function" ? SellerCore.getSellerOrderLines(seller) : []).map(function (r) {
+        return {
+          source: "order",
+          sources: ["order"],
+          orderId: r.orderId,
+          productId: r.productId || "",
+          buyer: r.buyerName || r.buyerEmail,
+          buyerEmail: r.buyerEmail,
+          buyerPhone: r.buyerPhone || "",
+          address: r.address || "",
+          paymentMethod: r.paymentMethod || "",
+          deliveryOption: r.deliveryOption || "",
+          deliveryDate: r.deliveryDate || "",
+          deliveryWindow: r.deliveryWindow || "",
+          note: r.note || "",
+          product: r.productName,
+          quantity: r.quantity,
+          unitPrice: SellerCore.num(r.price || 0),
+          amount: SellerCore.num(r.total),
+          status: SellerCore.str(r.status || "pending"),
+          date: r.date
+        };
+      });
 
       const sales = SellerCore.getPurchasesForSeller(seller).map(function (r) {
         return {
           source: "purchase",
+          sources: ["purchase"],
           orderId: r.orderId,
+          productId: r.productId || "",
           buyer: r.buyerName || r.buyerEmail,
           buyerEmail: r.buyerEmail,
           product: r.productName,
           quantity: r.quantity,
+          unitPrice: SellerCore.num(r.price || 0),
           amount: SellerCore.num(r.total),
           status: SellerCore.str(r.status || "pending"),
           date: r.date
@@ -91,13 +269,22 @@
       const queue = SellerCore.getSellerQueueRows(seller).map(function (q) {
         return {
           source: "queue",
+          sources: ["queue"],
           queueKey: q.queueKey,
           queueIndex: q.index,
           orderId: q.orderId,
+          productId: q.productId || "",
           buyer: q.buyer,
           buyerEmail: q.email,
+          buyerPhone: q.phone || "",
+          address: q.address || "",
+          deliveryOption: q.deliveryOption || "",
+          deliveryDate: q.deliveryDate || "",
+          deliveryWindow: q.deliveryWindow || "",
+          note: q.note || "",
           product: q.item,
           quantity: q.quantity,
+          unitPrice: q.quantity ? (SellerCore.num(q.amount) / Math.max(1, SellerCore.num(q.quantity))) : 0,
           amount: SellerCore.num(q.amount),
           status: SellerCore.str(q.status || "pending"),
           date: q.date
@@ -105,8 +292,12 @@
       });
 
       const merged = new Map();
-      sales.forEach(function (row) {
+      orderLines.forEach(function (row) {
         merged.set(signature(row), row);
+      });
+      sales.forEach(function (row) {
+        const sig = signature(row);
+        merged.set(sig, mergeRow(merged.get(sig), row));
       });
       queue.forEach(function (row) {
         const sig = signature(row);
@@ -115,15 +306,18 @@
           merged.set(sig, row);
           return;
         }
-        if (prev.source !== "queue") {
-          merged.set(sig, { ...prev, ...row, source: "queue" });
-          return;
-        }
-        const prevDate = String(prev.date || "");
-        const nextDate = String(row.date || "");
-        merged.set(sig, nextDate >= prevDate ? row : prev);
+        merged.set(sig, mergeRow(prev, row));
       });
-      state.rows = Array.from(merged.values());
+      state.rows = Array.from(merged.values()).map(function (row) {
+        const next = { ...row };
+        if (!next.sources) next.sources = [next.source || "unknown"];
+        next.rowId = rowId(next);
+        next.canUpdate = Boolean(next.orderId);
+        return next;
+      });
+      if (state.selectedId && !state.rows.some(function (row) { return row.rowId === state.selectedId; })) {
+        state.selectedId = "";
+      }
     }
 
     function applyFilters(){
@@ -132,7 +326,10 @@
       const sort = byId("sortFilter").value;
 
       state.filtered = state.rows.filter(function (r) {
-        const hay = [r.orderId, r.buyer, r.buyerEmail, r.product].join(" ").toLowerCase();
+        const hay = [
+          r.orderId, r.buyer, r.buyerEmail, r.buyerPhone, r.product,
+          r.address, r.note, r.paymentMethod, r.deliveryOption, r.deliveryDate
+        ].join(" ").toLowerCase();
         return (!q || hay.includes(q)) && (!st || r.status.toLowerCase().includes(st));
       });
 
@@ -142,42 +339,137 @@
         if (sort === "amountAsc") return a.amount - b.amount;
         return String(b.date).localeCompare(String(a.date));
       });
+
+      if (!state.selectedId && state.filtered.length) {
+        state.selectedId = state.filtered[0].rowId;
+      }
+    }
+
+    function selectedRow() {
+      return state.filtered.find(function (row) { return row.rowId === state.selectedId; }) ||
+        state.rows.find(function (row) { return row.rowId === state.selectedId; }) ||
+        null;
+    }
+
+    function renderKpis() {
+      const rows = state.filtered.length ? state.filtered : state.rows;
+      const pending = rows.filter(function (row) { return low(row.status) === "pending"; }).length;
+      const inTransit = rows.filter(function (row) { return low(row.status) === "in-transit"; }).length;
+      const delivered = rows.filter(function (row) {
+        const status = low(row.status);
+        return status === "delivered" || status === "completed";
+      }).length;
+      const revenue = rows.reduce(function (sum, row) { return sum + SellerCore.num(row.amount); }, 0);
+
+      byId("orderKpis").innerHTML = [
+        ["Visible Rows", rows.length],
+        ["Pending", pending],
+        ["In Transit", inTransit],
+        ["Delivered", delivered],
+        ["Revenue", SellerCore.fmtMoney(revenue)]
+      ].map(function (row) {
+        return '<article class="kpi"><div class="label">' + esc(row[0]) + '</div><div class="value">' + esc(row[1]) + '</div></article>';
+      }).join("");
+    }
+
+    function renderDetail() {
+      const row = selectedRow();
+      const box = byId("detailBox");
+      if (!row) {
+        box.className = "seller-order-empty";
+        box.textContent = "Select an order row to view full buyer and delivery details.";
+        return;
+      }
+
+      box.className = "";
+      box.innerHTML =
+        '<div class="seller-order-summary">' +
+        '<h3>' + esc(row.product || "Order Item") + '</h3>' +
+        '<p>Order ' + esc(row.orderId || "-") + ' for ' + esc(row.buyer || row.buyerEmail || "Buyer") + '.</p>' +
+        '<div class="seller-order-actions">' +
+        '<button class="btn-sel" type="button" data-detail-action="pending">Pending</button>' +
+        '<button class="btn-sel success" type="button" data-detail-action="approved">Approve</button>' +
+        '<button class="btn-sel warning" type="button" data-detail-action="in-transit">In Transit</button>' +
+        '<button class="btn-sel success" type="button" data-detail-action="delivered">Delivered</button>' +
+        '<button class="btn-sel danger" type="button" data-detail-action="declined">Decline</button>' +
+        '</div>' +
+        '</div>' +
+        '<div class="seller-order-meta-grid">' +
+        '<div class="meta-row"><strong>Order ID</strong><span>' + esc(row.orderId || "-") + '</span></div>' +
+        '<div class="meta-row"><strong>Status</strong><span>' + SellerCore.badge(row.status || "pending") + '</span></div>' +
+        '<div class="meta-row"><strong>Buyer</strong><span>' + esc(row.buyer || "-") + '</span></div>' +
+        '<div class="meta-row"><strong>Email</strong><span>' + esc(row.buyerEmail || "-") + '</span></div>' +
+        '<div class="meta-row"><strong>Phone</strong><span>' + esc(row.buyerPhone || "-") + '</span></div>' +
+        '<div class="meta-row"><strong>Payment</strong><span>' + esc((row.paymentMethod || "-").toUpperCase()) + '</span></div>' +
+        '<div class="meta-row"><strong>Product</strong><span>' + esc(row.product || "-") + '</span></div>' +
+        '<div class="meta-row"><strong>Product ID</strong><span>' + esc(row.productId || "-") + '</span></div>' +
+        '<div class="meta-row"><strong>Quantity</strong><span>' + esc(row.quantity || 0) + '</span></div>' +
+        '<div class="meta-row"><strong>Unit Price</strong><span>' + SellerCore.fmtMoney(row.unitPrice || 0) + '</span></div>' +
+        '<div class="meta-row"><strong>Amount</strong><span>' + SellerCore.fmtMoney(row.amount || 0) + '</span></div>' +
+        '<div class="meta-row"><strong>Placed</strong><span>' + esc(SellerCore.fmtDate(row.date)) + '</span></div>' +
+        '<div class="meta-row"><strong>Delivery</strong><span>' + esc(row.deliveryOption || "-") + '</span></div>' +
+        '<div class="meta-row"><strong>Delivery Date</strong><span>' + esc(row.deliveryDate || "-") + '</span></div>' +
+        '<div class="meta-row"><strong>Window</strong><span>' + esc(row.deliveryWindow || "-") + '</span></div>' +
+        '<div class="meta-row"><strong>Source</strong><span>' + esc((row.sources || []).join(", ") || row.source || "-") + '</span></div>' +
+        '</div>' +
+        '<div class="seller-order-address"><strong>Delivery Address</strong>' + esc(row.address || "No delivery address provided.") + '</div>' +
+        '<div class="seller-order-note"><strong>Order Note</strong>' + esc(row.note || "No order note provided.") + '</div>';
     }
 
     function renderTable(){
-      const head = '<thead><tr><th>Order</th><th>Buyer</th><th>Product</th><th>Qty</th><th>Amount</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>';
+      const head = '<thead><tr><th>Order</th><th>Buyer</th><th>Contact</th><th>Product</th><th>Qty</th><th>Amount</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>';
       const table = byId("orderTable");
 
       if (!state.filtered.length) {
-        table.innerHTML = head + '<tbody><tr><td colspan="8" class="sel-empty">No orders found.</td></tr></tbody>';
+        table.innerHTML = head + '<tbody><tr><td colspan="9" class="sel-empty">No orders found.</td></tr></tbody>';
+        renderKpis();
+        renderDetail();
         return;
       }
 
       table.innerHTML = head + '<tbody>' + state.filtered.map(function (r, i) {
-        const canUpdate = r.source === "queue";
-        return '<tr>' +
+        const activeClass = r.rowId === state.selectedId ? ' class="seller-row-active"' : "";
+        return '<tr data-row-index="' + i + '"' + activeClass + '>' +
           '<td>' + (r.orderId || "-") + '</td>' +
-          '<td>' + (r.buyer || "-") + '<br><span class="sel-note">' + (r.buyerEmail || "-") + '</span></td>' +
-          '<td>' + r.product + '</td>' +
+          '<td><div class="seller-order-contact"><strong>' + esc(r.buyer || "-") + '</strong><span class="sel-note">' + esc(r.buyerEmail || "-") + '</span></div></td>' +
+          '<td>' + esc(r.buyerPhone || "-") + '<br><span class="sel-note">' + esc(r.paymentMethod || "-") + '</span></td>' +
+          '<td>' + esc(r.product) + '<br><span class="sel-note">' + esc(r.address || "No address") + '</span></td>' +
           '<td>' + r.quantity + '</td>' +
           '<td>' + SellerCore.fmtMoney(r.amount) + '</td>' +
           '<td>' + SellerCore.badge(r.status) + '</td>' +
           '<td>' + SellerCore.fmtDate(r.date) + '</td>' +
-          '<td><div class="sel-inline-actions">' + (canUpdate
+          '<td><div class="sel-inline-actions">' + (r.canUpdate
             ? '<button class="btn-sel" data-action="pending" data-index="' + i + '">Pending</button>' +
+              '<button class="btn-sel success" data-action="approved" data-index="' + i + '">Approve</button>' +
               '<button class="btn-sel warning" data-action="in-transit" data-index="' + i + '">In Transit</button>' +
               '<button class="btn-sel success" data-action="delivered" data-index="' + i + '">Delivered</button>' +
               '<button class="btn-sel danger" data-action="declined" data-index="' + i + '">Decline</button>'
-            : '<span class="sel-note">History</span>') +
+            : '<span class="sel-note">Read Only</span>') +
           '</div></td>' +
           '</tr>';
       }).join("") + '</tbody>';
+      renderKpis();
+      renderDetail();
     }
 
     function refresh(){
+      seller = SellerCore.ensureSellerSession("seller-login.html");
+      if (!seller) return;
+      if (typeof SellerCore.reconcileSellerSalesState === "function") {
+        SellerCore.reconcileSellerSalesState(seller);
+        seller = SellerCore.getCurrentSeller() || seller;
+      }
       readRows();
       applyFilters();
       renderTable();
+    }
+
+    function scheduleRefresh() {
+      if (refreshTimer) window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(function () {
+        refreshTimer = null;
+        refresh();
+      }, 60);
     }
 
     function exportCSV(){
@@ -185,17 +477,27 @@
         alert("No rows to export.");
         return;
       }
-      const headers = ["orderId","buyer","buyerEmail","product","quantity","amount","status","date"];
+      const headers = ["orderId","buyer","buyerEmail","buyerPhone","address","paymentMethod","deliveryOption","deliveryDate","deliveryWindow","product","productId","quantity","unitPrice","amount","status","note","date","sources"];
       const csv = [headers.join(",")].concat(state.filtered.map(function (r) {
         const row = {
           orderId: r.orderId,
           buyer: r.buyer,
           buyerEmail: r.buyerEmail,
+          buyerPhone: r.buyerPhone || "",
+          address: r.address || "",
+          paymentMethod: r.paymentMethod || "",
+          deliveryOption: r.deliveryOption || "",
+          deliveryDate: r.deliveryDate || "",
+          deliveryWindow: r.deliveryWindow || "",
           product: r.product,
+          productId: r.productId || "",
           quantity: r.quantity,
+          unitPrice: SellerCore.num(r.unitPrice || 0),
           amount: r.amount,
           status: r.status,
-          date: SellerCore.fmtDate(r.date)
+          note: r.note || "",
+          date: SellerCore.fmtDate(r.date),
+          sources: (r.sources || []).join("|")
         };
         return headers.map(function (h) { return '"' + String(row[h]).replace(/"/g, '""') + '"'; }).join(",");
       })).join("\n");
@@ -209,8 +511,8 @@
     }
 
     function updateQueueRow(row, status){
-      if (!row || row.source !== "queue") return;
-      SellerCore.updateQueueStatus(seller, row.queueKey, row.queueIndex, status);
+      if (!row || !row.canUpdate) return;
+      SellerCore.updateSellerOrderStatus(seller, row, status);
       refresh();
     }
 
@@ -220,26 +522,43 @@
       setHeader();
       refresh();
 
-      byId("refreshBtn").addEventListener("click", refresh);
-      byId("searchInput").addEventListener("input", refresh);
-      byId("statusFilter").addEventListener("change", refresh);
-      byId("sortFilter").addEventListener("change", refresh);
+      byId("refreshBtn").addEventListener("click", scheduleRefresh);
+      byId("searchInput").addEventListener("input", scheduleRefresh);
+      byId("statusFilter").addEventListener("change", scheduleRefresh);
+      byId("sortFilter").addEventListener("change", scheduleRefresh);
       byId("exportBtn").addEventListener("click", exportCSV);
       byId("resetBtn").addEventListener("click", function(){
         byId("searchInput").value = "";
         byId("statusFilter").value = "";
         byId("sortFilter").value = "newest";
-        refresh();
+        scheduleRefresh();
       });
 
       byId("orderTable").addEventListener("click", function(e){
         const btn = e.target.closest("button[data-action]");
-        if (!btn) return;
-        const row = state.filtered[Number(btn.dataset.index)];
+        if (btn) {
+          const row = state.filtered[Number(btn.dataset.index)];
+          if (!row) return;
+          state.selectedId = row.rowId;
+          updateQueueRow(row, btn.dataset.action);
+          return;
+        }
+        const tr = e.target.closest("tr[data-row-index]");
+        if (!tr) return;
+        const row = state.filtered[Number(tr.dataset.rowIndex)];
         if (!row) return;
-        updateQueueRow(row, btn.dataset.action);
+        state.selectedId = row.rowId;
+        renderTable();
       });
-      window.addEventListener("storage", refresh);
+
+      byId("detailBox").addEventListener("click", function (e) {
+        const btn = e.target.closest("button[data-detail-action]");
+        if (!btn) return;
+        const row = selectedRow();
+        if (!row) return;
+        updateQueueRow(row, btn.dataset.detailAction);
+      });
+      window.addEventListener("storage", scheduleRefresh);
     }
 
     function startSellerOrdersPage() {
@@ -255,8 +574,9 @@
     else startSellerOrdersPage();
   </script>
   <script defer src="upgrade.js"></script>
-  <script defer src="sw-register.js?v=20260226a"></script>
-  <script defer src="site-performance.js?v=20260226a"></script>
+    <script defer src="site-admin-controls.js?v=20260510b"></script>
+
+  <script defer src="site-performance.js?v=20260510b"></script>
 </body>
 </html>
 

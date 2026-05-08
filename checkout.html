@@ -139,7 +139,7 @@
     </aside>
   </main>
 
-  <script src="seller-core.js?v=20260222g"></script>
+  <script src="seller-core.js?v=20260510i"></script>
   <script src="api-client.js"></script>
   <script>
     const state = {
@@ -509,22 +509,27 @@
     }
 
     function creditSellers(orderId, buyer, timestamp, paymentMethod) {
-      const sellersRaw = read("sellers", []);
-      const sellers = normalizeSellers(sellersRaw);
-      if (!sellers.length) return;
-
       const payoutsRaw = read("sellerPayouts", []);
       const payouts = Array.isArray(payoutsRaw) ? payoutsRaw : [];
       state.cart.forEach(function (item) {
-        const idx = findSellerIndex(sellers, item);
-        if (idx < 0) return;
         const amount = num(item.price) * Math.max(1, Math.floor(num(item.quantity || 1)));
-        sellers[idx].balance = num(sellers[idx].balance) + amount;
+        const sellerEmail = cleanEmail(item.sellerEmail || "");
+        const sellerName = String(item.seller || "Seller").trim();
+        const productId = String(item.id || item.productId || "");
+        const exists = payouts.some(function (row) {
+          return String(row && row.orderId || "") === String(orderId) &&
+            cleanEmail(row && (row.sellerEmail || "")) === sellerEmail &&
+            String(row && (row.productId || "")) === productId &&
+            String(row && (row.productName || "")) === String(item.name || "");
+        });
+        if (exists) return;
         payouts.push({
           id: "PAYOUT-" + Date.now() + "-" + Math.random().toString(36).slice(2, 7),
           orderId: orderId,
-          sellerEmail: sellers[idx].email || item.sellerEmail || "",
-          sellerName: sellers[idx].store || sellers[idx].fullName || sellers[idx].name || item.seller || "Seller",
+          productId: productId,
+          sellerEmail: sellerEmail,
+          sellerName: sellerName,
+          sellerStore: sellerName,
           buyerEmail: buyer.email,
           buyerName: buyer.name,
           productName: item.name,
@@ -532,12 +537,11 @@
           amount: amount,
           source: "buyer_checkout",
           paymentMethod: paymentMethod,
-          status: "credited",
+          status: "pending",
           createdAt: timestamp
         });
       });
 
-      write("sellers", sellers);
       write("sellerPayouts", payouts);
     }
 
@@ -1147,12 +1151,15 @@
       partialWarning = !safeRun("Purchases write", function () {
         const purchases = read("purchases", []);
         state.cart.forEach(function (item) {
+          const sellerLabel = str(item.seller || "");
           purchases.push({
             orderId: orderId,
+            productId: item.id || item.productId || "",
             productName: item.name,
             sellerEmail: item.sellerEmail || "",
-            sellerName: item.seller,
-            seller: item.seller,
+            sellerName: sellerLabel,
+            sellerStore: sellerLabel,
+            seller: sellerLabel,
             buyerEmail: buyer.email,
             buyerName: buyer.name,
             ownerEmail: ownerEmail,
@@ -1170,10 +1177,17 @@
       partialWarning = !safeRun("Seller queue write", function () {
         const sellerQueues = read("sellerOrderQueues", {});
         state.cart.forEach(function (item) {
-          const key = item.seller || "Unknown Seller";
+          const sellerEmail = cleanEmail(item.sellerEmail || "");
+          const sellerLabel = str(item.seller || "Unknown Seller");
+          const key = sellerEmail || sellerLabel || "Unknown Seller";
           if (!sellerQueues[key]) sellerQueues[key] = [];
           sellerQueues[key].push({
             orderId: orderId,
+            productId: item.id || item.productId || "",
+            sellerEmail: sellerEmail,
+            seller: sellerLabel,
+            sellerName: sellerLabel,
+            sellerStore: sellerLabel,
             buyer: buyer.name,
             email: buyer.email,
             phone: buyer.phone,
@@ -1351,8 +1365,9 @@
     });
   </script>
   <script defer src="upgrade.js"></script>
-  <script defer src="sw-register.js?v=20260226a"></script>
-  <script defer src="site-performance.js?v=20260226a"></script>
+    <script defer src="site-admin-controls.js?v=20260510b"></script>
+
+  <script defer src="site-performance.js?v=20260510b"></script>
 </body>
 </html>
 

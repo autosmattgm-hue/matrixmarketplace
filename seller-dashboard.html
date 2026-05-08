@@ -52,9 +52,10 @@
     <div class="sel-foot">Seller dashboard overview</div>
   </main>
 
-  <script src="seller-core.js?v=20260222g"></script>
+  <script src="seller-core.js?v=20260510i"></script>
   <script>
     let seller;
+    let refreshTimer = null;
 
     function setHeader() {
       document.getElementById("sellerHeader").innerHTML = SellerCore.renderSellerHeader("seller-dashboard.html");
@@ -76,13 +77,15 @@
     }
 
     function renderSales() {
-      const rows = SellerCore.getPurchasesForSeller(seller).sort(function (a, b) {
-        return String(b.date).localeCompare(String(a.date));
-      }).slice(0, 10);
+      const rows = (typeof SellerCore.getSellerPayoutRows === "function"
+        ? SellerCore.getSellerPayoutRows(seller, { onlyCredited: true })
+        : []).sort(function (a, b) {
+          return String(b.date).localeCompare(String(a.date));
+        }).slice(0, 10);
 
       const head = '<thead><tr><th>Order</th><th>Product</th><th>Buyer</th><th>Qty</th><th>Total</th><th>Date</th></tr></thead>';
       if (!rows.length) {
-        document.getElementById("salesTable").innerHTML = head + '<tbody><tr><td colspan="6" class="sel-empty">No sales yet.</td></tr></tbody>';
+        document.getElementById("salesTable").innerHTML = head + '<tbody><tr><td colspan="6" class="sel-empty">No approved sales yet.</td></tr></tbody>';
         return;
       }
 
@@ -92,14 +95,16 @@
           '<td>' + r.productName + '</td>' +
           '<td>' + (r.buyerName || r.buyerEmail) + '</td>' +
           '<td>' + r.quantity + '</td>' +
-          '<td>' + SellerCore.fmtMoney(r.total) + '</td>' +
+          '<td>' + SellerCore.fmtMoney(r.amount) + '</td>' +
           '<td>' + SellerCore.fmtDate(r.date) + '</td>' +
           '</tr>';
       }).join("") + '</tbody>';
     }
 
     function renderQueue() {
-      const rows = SellerCore.getSellerQueueRows(seller).sort(function (a, b) {
+      const rows = (typeof SellerCore.getSellerDeliveryRows === "function"
+        ? SellerCore.getSellerDeliveryRows(seller)
+        : SellerCore.getSellerQueueRows(seller)).sort(function (a, b) {
         return String(b.date).localeCompare(String(a.date));
       }).slice(0, 8);
 
@@ -110,8 +115,9 @@
 
       document.getElementById("queueList").innerHTML = rows.map(function (r) {
         return '<div class="sel-list-item">' +
-          '<strong>' + r.item + '</strong><br>' +
-          '<span class="sel-note">Order ' + r.orderId + ' • ' + r.buyer + '</span><br>' +
+          '<strong>' + (r.item || r.productName || "Product") + '</strong><br>' +
+          '<span class="sel-note">Order ' + r.orderId + ' • ' + (r.buyer || r.buyerName || r.email || "-") + '</span><br>' +
+          '<span class="sel-note">' + (r.deliveryOption || "Delivery") + ' • ' + (r.deliveryDate || "No date") + '</span><br>' +
           SellerCore.badge(r.status) +
           '</div>';
       }).join("");
@@ -134,6 +140,10 @@
       seller = SellerCore.ensureSellerSession("seller-login.html");
       if (!seller) return;
       seller = SellerCore.upsertSeller(seller);
+      if (typeof SellerCore.reconcileSellerSalesState === "function") {
+        SellerCore.reconcileSellerSalesState(seller);
+        seller = SellerCore.getCurrentSeller() || SellerCore.upsertSeller(seller);
+      }
       document.getElementById("welcomeTitle").textContent = "Welcome, " + (seller.fullName || seller.name || "Seller");
       renderKpis();
       renderSales();
@@ -141,11 +151,19 @@
       renderStatus();
     }
 
+    function scheduleRefresh() {
+      if (refreshTimer) window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(function () {
+        refreshTimer = null;
+        refresh();
+      }, 60);
+    }
+
     function initSellerDashboardPage() {
       setHeader();
       refresh();
-      document.getElementById("refreshBtn").addEventListener("click", refresh);
-      window.addEventListener("storage", refresh);
+      document.getElementById("refreshBtn").addEventListener("click", scheduleRefresh);
+      window.addEventListener("storage", scheduleRefresh);
     }
 
     function startSellerDashboardPage() {
@@ -161,8 +179,9 @@
     else startSellerDashboardPage();
   </script>
   <script defer src="upgrade.js"></script>
-  <script defer src="sw-register.js?v=20260226a"></script>
-  <script defer src="site-performance.js?v=20260226a"></script>
+    <script defer src="site-admin-controls.js?v=20260510b"></script>
+
+  <script defer src="site-performance.js?v=20260510b"></script>
 </body>
 </html>
 

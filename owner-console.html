@@ -1,0 +1,2021 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Owner Console - MatrixMarket</title>
+    <link rel="stylesheet" href="admin-layout.css?v=20260227a" />
+    <style>
+        .owner-shell {
+            width: min(1380px, 100% - 1.2rem);
+        }
+
+        .owner-login {
+            position: fixed;
+            inset: 0;
+            z-index: 4000;
+            display: grid;
+            place-items: center;
+            padding: 1rem;
+            background:
+                radial-gradient(900px 420px at 20% 0%, rgba(16, 185, 129, 0.18), transparent),
+                radial-gradient(1000px 460px at 100% 0%, rgba(14, 165, 233, 0.18), transparent),
+                radial-gradient(800px 380px at 50% 100%, rgba(245, 158, 11, 0.12), transparent),
+                rgba(2, 6, 23, 0.88);
+            backdrop-filter: blur(14px);
+        }
+
+        .owner-login-layout {
+            width: min(1120px, 100%);
+            display: grid;
+            gap: 1rem;
+            grid-template-columns: 1.15fr 0.85fr;
+            align-items: stretch;
+        }
+
+        .owner-login-panel,
+        .owner-login-card {
+            background: rgba(15, 23, 42, 0.95);
+            border: 1px solid rgba(148, 163, 184, 0.26);
+            border-radius: 20px;
+            padding: 1.1rem;
+            box-shadow: 0 24px 70px rgba(2, 6, 23, 0.45);
+        }
+
+        .owner-login-panel {
+            display: grid;
+            gap: 1rem;
+            align-content: start;
+            background:
+                linear-gradient(180deg, rgba(15, 23, 42, 0.94), rgba(8, 15, 31, 0.98)),
+                rgba(15, 23, 42, 0.95);
+        }
+
+        .owner-login-kicker {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            width: fit-content;
+            padding: 0.36rem 0.7rem;
+            border-radius: 999px;
+            background: rgba(16, 185, 129, 0.12);
+            border: 1px solid rgba(16, 185, 129, 0.28);
+            color: #d1fae5;
+            font-size: 0.75rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .owner-login-hero h1 {
+            margin: 0.5rem 0 0.45rem;
+            font-size: clamp(1.8rem, 4vw, 2.8rem);
+            line-height: 1.05;
+        }
+
+        .owner-login-hero p {
+            margin: 0;
+            color: #cbd5e1;
+            line-height: 1.6;
+            max-width: 58ch;
+        }
+
+        .owner-login-stats {
+            display: grid;
+            gap: 0.65rem;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .owner-stat-card {
+            border: 1px solid rgba(148, 163, 184, 0.16);
+            border-radius: 16px;
+            padding: 0.85rem;
+            background: rgba(2, 6, 23, 0.4);
+        }
+
+        .owner-stat-card strong,
+        .owner-stat-card span,
+        .owner-stat-card small {
+            display: block;
+        }
+
+        .owner-stat-card strong {
+            font-size: 1.2rem;
+            margin-bottom: 0.18rem;
+        }
+
+        .owner-stat-card span {
+            color: #e2e8f0;
+            font-size: 0.9rem;
+        }
+
+        .owner-stat-card small {
+            margin-top: 0.2rem;
+            color: var(--adm-muted);
+            font-size: 0.78rem;
+        }
+
+        .owner-login-grid {
+            display: grid;
+            gap: 0.85rem;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .owner-security-box {
+            border: 1px solid rgba(148, 163, 184, 0.16);
+            border-radius: 16px;
+            padding: 0.9rem;
+            background: rgba(2, 6, 23, 0.4);
+        }
+
+        .owner-security-box h3,
+        .owner-login-card h2 {
+            margin: 0 0 0.55rem;
+            font-size: 0.98rem;
+        }
+
+        .owner-security-list {
+            display: grid;
+            gap: 0.4rem;
+            color: #cbd5e1;
+            font-size: 0.85rem;
+        }
+
+        .owner-security-list div {
+            display: flex;
+            justify-content: space-between;
+            gap: 0.75rem;
+            padding-bottom: 0.36rem;
+            border-bottom: 1px dashed rgba(148, 163, 184, 0.16);
+        }
+
+        .owner-security-list div:last-child {
+            border-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        .owner-status-strip {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.45rem;
+        }
+
+        .owner-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            border-radius: 999px;
+            padding: 0.38rem 0.72rem;
+            font-size: 0.78rem;
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            background: rgba(2, 6, 23, 0.48);
+            color: #dbeafe;
+        }
+
+        .owner-login-card h1 {
+            margin: 0 0 0.25rem;
+            font-size: 1.55rem;
+        }
+
+        .owner-login-card p {
+            margin: 0 0 0.8rem;
+            color: var(--adm-muted);
+            line-height: 1.5;
+        }
+
+        .owner-login-card .adm {
+            width: 100%;
+        }
+
+        .owner-login-meta {
+            display: grid;
+            gap: 0.7rem;
+            margin: 0.75rem 0;
+        }
+
+        .owner-login-row {
+            display: grid;
+            gap: 0.65rem;
+            grid-template-columns: 1fr 170px;
+        }
+
+        .owner-hint {
+            min-height: 1.1rem;
+            color: #cbd5e1;
+            font-size: 0.82rem;
+        }
+
+        .owner-caps {
+            color: #fde68a;
+        }
+
+        .owner-login-card .admin-actions {
+            margin-top: 0.8rem;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.6rem;
+        }
+
+        .owner-actions-left {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.45rem;
+        }
+
+        .owner-login-card .admin-actions {
+            margin-top: 0.8rem;
+        }
+
+        .owner-error {
+            color: #fca5a5;
+            min-height: 1.2rem;
+            margin-top: 0.5rem;
+            font-size: 0.84rem;
+        }
+
+        .owner-hidden {
+            display: none !important;
+        }
+
+        .owner-titlebar {
+            align-items: flex-start;
+        }
+
+        .owner-titlebar p {
+            margin: 0.35rem 0 0;
+            color: var(--adm-muted);
+            max-width: 760px;
+        }
+
+        .owner-quicknav {
+            display: flex;
+            gap: 0.45rem;
+            flex-wrap: wrap;
+        }
+
+        .owner-section-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            margin-bottom: 0.7rem;
+        }
+
+        .owner-section-title h2,
+        .owner-section-title h3 {
+            margin: 0;
+            font-size: 1.02rem;
+        }
+
+        .owner-info-grid {
+            display: grid;
+            gap: 0.8rem;
+            grid-template-columns: 2fr 1fr;
+        }
+
+        .owner-note-box {
+            border: 1px solid var(--adm-border);
+            border-radius: 14px;
+            padding: 0.8rem;
+            background: rgba(2, 6, 23, 0.42);
+        }
+
+        .owner-note-box strong {
+            display: block;
+            margin-bottom: 0.35rem;
+        }
+
+        .owner-pulse {
+            display: grid;
+            gap: 0.45rem;
+        }
+
+        .owner-pulse div {
+            display: flex;
+            justify-content: space-between;
+            gap: 0.75rem;
+            font-size: 0.88rem;
+            border-bottom: 1px dashed rgba(148, 163, 184, 0.2);
+            padding-bottom: 0.35rem;
+        }
+
+        .owner-pulse div:last-child {
+            border-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        .owner-stacked {
+            display: grid;
+            gap: 0.8rem;
+        }
+
+        .owner-toolbar {
+            display: grid;
+            gap: 0.6rem;
+            grid-template-columns: 2fr repeat(2, minmax(0, 1fr)) auto;
+        }
+
+        .owner-toolbar.products {
+            grid-template-columns: 2fr repeat(2, minmax(0, 1fr)) auto;
+        }
+
+        .owner-toolbar.payments {
+            grid-template-columns: 2fr repeat(2, minmax(0, 1fr)) auto;
+        }
+
+        .owner-toolbar.orders {
+            grid-template-columns: 2fr repeat(2, minmax(0, 1fr)) auto;
+        }
+
+        .owner-toolbar.accounts {
+            grid-template-columns: 2fr repeat(2, minmax(0, 1fr)) auto;
+        }
+
+        .owner-toolbar.logs {
+            grid-template-columns: 2fr auto;
+        }
+
+        .owner-inline {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.35rem;
+        }
+
+        .owner-muted {
+            color: var(--adm-muted);
+            font-size: 0.82rem;
+        }
+
+        .owner-list {
+            display: grid;
+            gap: 0.55rem;
+        }
+
+        .owner-form-grid {
+            display: grid;
+            gap: 0.65rem;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .owner-check {
+            display: flex;
+            align-items: center;
+            gap: 0.55rem;
+            border: 1px solid var(--adm-border);
+            border-radius: 12px;
+            background: rgba(2, 6, 23, 0.42);
+            padding: 0.7rem;
+            font-size: 0.9rem;
+        }
+
+        .owner-check input {
+            width: 18px;
+            height: 18px;
+        }
+
+        .owner-form-grid .full {
+            grid-column: 1 / -1;
+        }
+
+        .owner-two-col {
+            display: grid;
+            gap: 0.8rem;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .owner-summary-list {
+            display: grid;
+            gap: 0.5rem;
+        }
+
+        .owner-summary-item {
+            border: 1px solid rgba(148, 163, 184, 0.16);
+            border-radius: 12px;
+            background: rgba(2, 6, 23, 0.42);
+            padding: 0.7rem;
+        }
+
+        .owner-summary-item strong,
+        .owner-summary-item span,
+        .owner-summary-item small {
+            display: block;
+        }
+
+        .owner-summary-item span {
+            margin-top: 0.16rem;
+            color: var(--adm-muted);
+            font-size: 0.82rem;
+        }
+
+        .owner-summary-item small {
+            margin-top: 0.16rem;
+            color: #cbd5e1;
+        }
+
+        .owner-preview {
+            border: 1px solid var(--adm-border);
+            border-radius: 14px;
+            padding: 0.9rem;
+            background: rgba(2, 6, 23, 0.46);
+            min-height: 120px;
+        }
+
+        .owner-preview.info { border-color: rgba(6, 182, 212, 0.4); }
+        .owner-preview.success { border-color: rgba(34, 197, 94, 0.4); }
+        .owner-preview.warning { border-color: rgba(245, 158, 11, 0.4); }
+        .owner-preview.danger { border-color: rgba(239, 68, 68, 0.4); }
+
+        .owner-preview strong {
+            display: block;
+            margin-bottom: 0.3rem;
+        }
+
+        .owner-file {
+            display: flex;
+            align-items: center;
+            gap: 0.7rem;
+            flex-wrap: wrap;
+        }
+
+        .owner-log {
+            border: 1px solid rgba(148, 163, 184, 0.16);
+            border-radius: 12px;
+            background: rgba(2, 6, 23, 0.42);
+            padding: 0.7rem;
+        }
+
+        .owner-log strong {
+            display: block;
+            margin-bottom: 0.18rem;
+        }
+
+        .owner-log code {
+            display: block;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            color: #cbd5e1;
+            font-size: 0.78rem;
+            margin-top: 0.35rem;
+        }
+
+        .owner-cell {
+            display: flex;
+            flex-direction: column;
+            gap: 0.12rem;
+        }
+
+        .owner-actions-cell {
+            min-width: 220px;
+        }
+
+        .owner-foot {
+            color: var(--adm-muted);
+            font-size: 0.82rem;
+        }
+
+        @media (max-width: 1080px) {
+            .owner-login-layout,
+            .owner-info-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .owner-login-grid,
+            .owner-two-col,
+            .owner-form-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .owner-login-row,
+            .owner-toolbar,
+            .owner-toolbar.products,
+            .owner-toolbar.payments,
+            .owner-toolbar.orders,
+            .owner-toolbar.accounts,
+            .owner-toolbar.logs {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+    <script src="firebase-online-storage.js?v=20260224c"></script>
+</head>
+<body class="admin-page">
+    <div id="ownerLogin" class="owner-login">
+        <div class="owner-login-layout">
+            <section class="owner-login-panel">
+                <div class="owner-login-hero">
+                    <div class="owner-login-kicker">MatrixMarket Owner Access</div>
+                    <h1>Full command over the whole marketplace.</h1>
+                    <p>The owner console controls accounts, payments, orders, products, sessions, exports, live site locks, and audit operations. This entry screen now includes session timing, local lockout protection, and live platform pulse before unlock.</p>
+                </div>
+                <div class="owner-login-stats" id="ownerEntryStats"></div>
+                <div class="owner-login-grid">
+                    <article class="owner-security-box">
+                        <h3>Security posture</h3>
+                        <div class="owner-security-list" id="ownerSecurityList"></div>
+                    </article>
+                    <article class="owner-security-box">
+                        <h3>Live flags</h3>
+                        <div class="owner-status-strip" id="ownerStatusStrip"></div>
+                    </article>
+                </div>
+            </section>
+
+            <div class="owner-login-card">
+                <h1>Owner Console Access</h1>
+                <p>This page can control users, sellers, orders, products, payments, sessions, and exports. Real account passwords stay hidden here by design. Use reset controls instead.</p>
+                <label class="owner-muted" for="ownerPassword">Owner password</label>
+                <input class="adm" id="ownerPassword" type="password" placeholder="Enter owner password" autocomplete="current-password" />
+                <div id="ownerCaps" class="owner-hint owner-caps owner-hidden">Caps Lock is on.</div>
+                <div class="owner-login-meta">
+                    <div class="owner-login-row">
+                        <div>
+                            <label class="owner-muted" for="ownerSessionDuration">Session duration</label>
+                            <select class="adm" id="ownerSessionDuration">
+                                <option value="15">15 minutes</option>
+                                <option value="60" selected>1 hour</option>
+                                <option value="480">8 hours</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="owner-muted" for="ownerQuickAction">Quick action</label>
+                            <select class="adm" id="ownerQuickAction">
+                                <option value="normal">Open full console</option>
+                                <option value="payments">Jump to payments</option>
+                                <option value="orders">Jump to orders</option>
+                                <option value="accounts">Jump to accounts</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="owner-note-box">
+                        <strong>Access status</strong>
+                        <div id="ownerAttemptMeta" class="owner-muted">5 attempts available before temporary lockout.</div>
+                        <div id="ownerAccessMeta" class="owner-muted" style="margin-top:0.3rem;">No owner session recorded yet.</div>
+                    </div>
+                </div>
+                <div id="ownerError" class="owner-error"></div>
+                <div class="admin-actions">
+                    <div class="owner-actions-left">
+                        <button class="btn-adm" type="button" id="ownerShowBtn">Show</button>
+                        <button class="btn-adm" type="button" id="ownerClearBtn">Clear</button>
+                    </div>
+                    <button class="btn-adm primary" type="button" id="ownerUnlockBtn">Unlock Console</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="adminHeader" class="owner-hidden"></div>
+
+    <main id="ownerApp" class="admin-shell owner-shell owner-hidden">
+        <section class="admin-titlebar owner-titlebar">
+            <div>
+                <h1>Owner Console</h1>
+                <p>One-page control room for the whole MatrixMarket app. You can review accounts, payouts, orders, products, sessions, and the latest platform activity from here.</p>
+            </div>
+            <div class="admin-actions">
+                <button class="btn-adm" id="refreshBtn" type="button">Refresh</button>
+                <button class="btn-adm" id="exportSnapshotBtn" type="button">Export Full Snapshot</button>
+                <button class="btn-adm danger" id="ownerLogoutBtn" type="button">Lock</button>
+            </div>
+        </section>
+
+        <section class="admin-card">
+            <div class="owner-quicknav">
+                <a class="btn-adm" href="#ownerSummary">Overview</a>
+                <a class="btn-adm" href="#ownerSite">Site Control</a>
+                <a class="btn-adm" href="#ownerAccounts">Accounts</a>
+                <a class="btn-adm" href="#ownerOrders">Orders</a>
+                <a class="btn-adm" href="#ownerPayments">Payments</a>
+                <a class="btn-adm" href="#ownerProducts">Products</a>
+                <a class="btn-adm" href="#ownerOps">Ops</a>
+                <a class="btn-adm" href="#ownerLogs">Logs</a>
+            </div>
+        </section>
+
+        <section id="ownerSummary" class="owner-stacked">
+            <div class="admin-grid cols-3" id="summaryGrid"></div>
+            <div class="owner-info-grid">
+                <article class="admin-card">
+                    <div class="owner-section-title">
+                        <h2>Global Controls</h2>
+                    </div>
+                    <div class="owner-inline">
+                        <button class="btn-adm success" type="button" id="approvePendingPaymentsBtn">Approve Pending Payments</button>
+                        <button class="btn-adm" type="button" id="approveAllSellersBtn">Approve All Sellers</button>
+                        <button class="btn-adm warning" type="button" id="suspendAllSellersBtn">Suspend All Sellers</button>
+                        <button class="btn-adm danger" type="button" id="clearSessionsBtn">Clear Live Sessions</button>
+                    </div>
+                    <p class="adm-note" style="margin:0.7rem 0 0;">Bulk actions affect live app data immediately. Passwords are intentionally hidden on this page. Use reset actions to change them.</p>
+                </article>
+                <article class="admin-card">
+                    <div class="owner-section-title">
+                        <h2>System Pulse</h2>
+                    </div>
+                    <div class="owner-pulse" id="pulseGrid"></div>
+                </article>
+            </div>
+        </section>
+
+        <section id="ownerSite" class="owner-two-col">
+            <article class="admin-card">
+                <div class="owner-section-title">
+                    <h2>Site Control</h2>
+                </div>
+                <div class="owner-form-grid">
+                    <label class="owner-check">
+                        <input id="maintenanceMode" type="checkbox" />
+                        <span>Enable maintenance mode</span>
+                    </label>
+                    <label class="owner-check">
+                        <input id="checkoutLocked" type="checkbox" />
+                        <span>Lock checkout and payment flow</span>
+                    </label>
+                    <select class="adm" id="announcementTone">
+                        <option value="info">Announcement Tone: Info</option>
+                        <option value="success">Announcement Tone: Success</option>
+                        <option value="warning">Announcement Tone: Warning</option>
+                        <option value="danger">Announcement Tone: Danger</option>
+                    </select>
+                    <input class="adm" id="supportContact" type="text" placeholder="Support contact e.g. WhatsApp or email" />
+                    <input class="adm full" id="announcementTitle" type="text" placeholder="Announcement title" />
+                    <textarea class="adm full" id="announcementMessage" placeholder="Public announcement message"></textarea>
+                    <label class="owner-check full">
+                        <input id="announcementEnabled" type="checkbox" />
+                        <span>Show public announcement banner</span>
+                    </label>
+                </div>
+                <div class="admin-actions" style="margin-top:0.8rem;">
+                    <button class="btn-adm primary" id="saveSiteControlBtn" type="button">Save Live Site Controls</button>
+                    <button class="btn-adm" id="disableAnnouncementBtn" type="button">Disable Announcement</button>
+                    <button class="btn-adm warning" id="clearLocksBtn" type="button">Clear Locks</button>
+                </div>
+            </article>
+            <article class="admin-card">
+                <div class="owner-section-title">
+                    <h2>Live Preview</h2>
+                </div>
+                <div id="siteControlPreview" class="owner-preview info"></div>
+            </article>
+        </section>
+
+        <section class="owner-two-col">
+            <article class="admin-card">
+                <div class="owner-section-title">
+                    <h2>Marketplace Intelligence</h2>
+                </div>
+                <div class="owner-summary-list" id="topSellersList"></div>
+            </article>
+            <article class="admin-card">
+                <div class="owner-section-title">
+                    <h2>Buyer And Support Watch</h2>
+                </div>
+                <div class="owner-summary-list" id="supportWatchList"></div>
+            </article>
+        </section>
+
+        <section id="ownerAccounts" class="admin-card">
+            <div class="owner-section-title">
+                <h2>Accounts</h2>
+                <div class="admin-actions">
+                    <button class="btn-adm" id="exportAccountsBtn" type="button">Export Accounts CSV</button>
+                </div>
+            </div>
+            <div class="owner-toolbar accounts">
+                <input class="adm" id="accountSearch" type="search" placeholder="Search name, email, store, phone, country" />
+                <select class="adm" id="accountRoleFilter">
+                    <option value="">All Roles</option>
+                    <option value="user">Users</option>
+                    <option value="seller">Sellers</option>
+                </select>
+                <select class="adm" id="accountStatusFilter">
+                    <option value="">All Statuses</option>
+                    <option value="approved">Approved</option>
+                    <option value="pending">Pending</option>
+                    <option value="suspended">Suspended</option>
+                    <option value="declined">Declined</option>
+                </select>
+                <button class="btn-adm" id="resetAccountsFilterBtn" type="button">Reset</button>
+            </div>
+            <div class="adm-table-wrap" style="margin-top:0.75rem;">
+                <table class="adm-table" id="accountsTable"></table>
+            </div>
+        </section>
+
+        <section id="ownerOrders" class="admin-card">
+            <div class="owner-section-title">
+                <h2>Orders</h2>
+                <div class="admin-actions">
+                    <button class="btn-adm" id="exportOrdersBtn" type="button">Export Orders CSV</button>
+                </div>
+            </div>
+            <div class="owner-toolbar orders">
+                <input class="adm" id="orderSearch" type="search" placeholder="Search order ID, buyer, email, phone, address" />
+                <select class="adm" id="orderStatusFilter">
+                    <option value="">All Statuses</option>
+                    <option value="pending">Pending</option>
+                    <option value="approved">Approved</option>
+                    <option value="in-transit">In Transit</option>
+                    <option value="delivered">Delivered</option>
+                    <option value="declined">Declined</option>
+                </select>
+                <select class="adm" id="orderSortFilter">
+                    <option value="newest">Newest</option>
+                    <option value="oldest">Oldest</option>
+                    <option value="amountDesc">Highest Amount</option>
+                    <option value="amountAsc">Lowest Amount</option>
+                </select>
+                <button class="btn-adm" id="resetOrdersFilterBtn" type="button">Reset</button>
+            </div>
+            <div class="adm-table-wrap" style="margin-top:0.75rem;">
+                <table class="adm-table" id="ordersTable"></table>
+            </div>
+        </section>
+
+        <section id="ownerPayments" class="admin-card">
+            <div class="owner-section-title">
+                <h2>Payments</h2>
+                <div class="admin-actions">
+                    <button class="btn-adm" id="exportPaymentsBtn" type="button">Export Payments CSV</button>
+                </div>
+            </div>
+            <div class="owner-toolbar payments">
+                <input class="adm" id="paymentSearch" type="search" placeholder="Search email, sender number, reference, type" />
+                <select class="adm" id="paymentStatusFilter">
+                    <option value="">All Statuses</option>
+                    <option value="pending">Pending</option>
+                    <option value="approved">Approved</option>
+                    <option value="declined">Declined</option>
+                </select>
+                <select class="adm" id="paymentTypeFilter">
+                    <option value="">All Types</option>
+                    <option value="subscription">Subscription</option>
+                    <option value="top">Topup</option>
+                    <option value="withdraw">Withdrawal</option>
+                </select>
+                <button class="btn-adm" id="resetPaymentsFilterBtn" type="button">Reset</button>
+            </div>
+            <div class="adm-table-wrap" style="margin-top:0.75rem;">
+                <table class="adm-table" id="paymentsTable"></table>
+            </div>
+        </section>
+
+        <section id="ownerProducts" class="admin-card">
+            <div class="owner-section-title">
+                <h2>Products</h2>
+                <div class="admin-actions">
+                    <button class="btn-adm" id="exportProductsBtn" type="button">Export Products CSV</button>
+                </div>
+            </div>
+            <div class="owner-toolbar products">
+                <input class="adm" id="productSearch" type="search" placeholder="Search product, seller, category, status" />
+                <select class="adm" id="productStatusFilter">
+                    <option value="">All Statuses</option>
+                    <option value="active">Active</option>
+                    <option value="hidden">Hidden</option>
+                    <option value="soldout">Sold Out</option>
+                </select>
+                <select class="adm" id="productSortFilter">
+                    <option value="newest">Newest</option>
+                    <option value="oldest">Oldest</option>
+                    <option value="priceDesc">Highest Price</option>
+                    <option value="priceAsc">Lowest Price</option>
+                </select>
+                <button class="btn-adm" id="resetProductsFilterBtn" type="button">Reset</button>
+            </div>
+            <div class="adm-table-wrap" style="margin-top:0.75rem;">
+                <table class="adm-table" id="productsTable"></table>
+            </div>
+        </section>
+
+        <section id="ownerOps" class="owner-two-col">
+            <article class="admin-card">
+                <div class="owner-section-title">
+                    <h2>Backup And Restore</h2>
+                </div>
+                <div class="owner-stacked">
+                    <div class="owner-file">
+                        <input class="adm" id="restoreSnapshotFile" type="file" accept=".json,application/json" />
+                        <button class="btn-adm" id="loadSnapshotBtn" type="button">Load Snapshot</button>
+                        <button class="btn-adm danger" id="restoreSnapshotBtn" type="button">Restore Loaded Snapshot</button>
+                    </div>
+                    <div class="owner-note-box">
+                        <strong>Loaded backup</strong>
+                        <div id="restoreSnapshotMeta" class="owner-muted">No backup loaded yet.</div>
+                    </div>
+                </div>
+            </article>
+            <article class="admin-card">
+                <div class="owner-section-title">
+                    <h2>Operations Shortcuts</h2>
+                </div>
+                <div class="owner-inline">
+                    <a class="btn-adm" href="admin-communications.html">Open Communications</a>
+                    <a class="btn-adm" href="dashboard-admin.html">Open Admin Dashboard</a>
+                    <a class="btn-adm" href="delivery.html">Open Delivery Board</a>
+                    <a class="btn-adm" href="seller-orders.html">Open Seller Orders</a>
+                </div>
+                <p class="adm-note" style="margin-top:0.8rem;">The restore action writes directly into current storage datasets. Export a full snapshot first if you want a rollback point.</p>
+            </article>
+        </section>
+
+        <section id="ownerLogs" class="admin-card">
+            <div class="owner-section-title">
+                <h2>Audit Logs</h2>
+                <div class="admin-actions">
+                    <button class="btn-adm" id="exportLogsBtn" type="button">Export Logs CSV</button>
+                </div>
+            </div>
+            <div class="owner-toolbar logs">
+                <input class="adm" id="logSearch" type="search" placeholder="Search action, email, note, details" />
+                <button class="btn-adm" id="resetLogsFilterBtn" type="button">Reset</button>
+            </div>
+            <div class="owner-list" id="logsList" style="margin-top:0.75rem;"></div>
+        </section>
+
+        <div class="owner-foot">Owner console changes data in this app storage immediately. For production, move this behind a real backend, hashed credentials, and role-based server auth.</div>
+    </main>
+
+    <script src="admin-core.js?v=20260509q"></script>
+    <script>
+        const OWNER_HASH = "05274e9d5aef3d48e27bac0b49a68f59863e0146fb96ed2f516d6d34137601a5";
+        const OWNER_SESSION_KEY = "mmOwnerConsoleSession";
+        const OWNER_GUARD_KEY = "mmOwnerConsoleGuard";
+        const OWNER_ACCESS_META_KEY = "mmOwnerConsoleAccessMeta";
+        const OWNER_MAX_ATTEMPTS = 5;
+        const OWNER_LOCKOUT_MS = 5 * 60 * 1000;
+        const OWNER_DEFAULT_SESSION_MINUTES = 60;
+        const OWNER_TOUCH_THROTTLE_MS = 15000;
+        const state = {
+            accounts: [],
+            orders: [],
+            payments: [],
+            products: [],
+            productsRaw: [],
+            logs: [],
+            supportTickets: [],
+            notifications: [],
+            complaints: [],
+            lastLoginMeta: null,
+            siteControl: null,
+            restoreSnapshot: null
+        };
+        let ownerSessionMonitor = null;
+        let ownerLastTouchAt = 0;
+
+        function byId(id) { return document.getElementById(id); }
+        function str(v) { return AdminCore.str(v); }
+        function num(v) { return AdminCore.num(v); }
+
+        function esc(value) {
+            return String(value == null ? "" : value)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#39;");
+        }
+
+        async function sha256(text) {
+            const buffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(text || "")));
+            return Array.from(new Uint8Array(buffer)).map(function (b) {
+                return b.toString(16).padStart(2, "0");
+            }).join("");
+        }
+
+        function clampSessionMinutes(value) {
+            const minutes = Math.floor(num(value || OWNER_DEFAULT_SESSION_MINUTES));
+            return Math.max(15, Math.min(480, minutes || OWNER_DEFAULT_SESSION_MINUTES));
+        }
+
+        function describeDuration(minutes) {
+            const total = clampSessionMinutes(minutes);
+            if (total >= 60) {
+                const hours = total / 60;
+                return hours === 1 ? "1 hour" : (hours + " hours");
+            }
+            return total + " minutes";
+        }
+
+        function parseDateMs(value) {
+            const stamp = new Date(value || "").getTime();
+            return Number.isFinite(stamp) ? stamp : 0;
+        }
+
+        function readOwnerGuard() {
+            const guard = AdminCore.readJSON(OWNER_GUARD_KEY, null);
+            const source = guard && typeof guard === "object" ? guard : {};
+            const lockedUntilMs = parseDateMs(source.lockedUntil);
+            if (lockedUntilMs && lockedUntilMs <= Date.now()) {
+                const reset = { failCount: 0, lockedUntil: "", lastFailedAt: source.lastFailedAt || "" };
+                AdminCore.writeJSON(OWNER_GUARD_KEY, reset);
+                return reset;
+            }
+            return {
+                failCount: Math.max(0, Math.floor(num(source.failCount || 0))),
+                lockedUntil: source.lockedUntil || "",
+                lastFailedAt: source.lastFailedAt || ""
+            };
+        }
+
+        function writeOwnerGuard(patch) {
+            const next = {
+                failCount: Math.max(0, Math.floor(num(patch && patch.failCount || 0))),
+                lockedUntil: str(patch && patch.lockedUntil || ""),
+                lastFailedAt: str(patch && patch.lastFailedAt || "")
+            };
+            AdminCore.writeJSON(OWNER_GUARD_KEY, next);
+            return next;
+        }
+
+        function readOwnerAccessMeta() {
+            const meta = AdminCore.readJSON(OWNER_ACCESS_META_KEY, null);
+            return meta && typeof meta === "object" ? meta : {};
+        }
+
+        function writeOwnerAccessMeta(patch) {
+            const next = { ...readOwnerAccessMeta(), ...(patch && typeof patch === "object" ? patch : {}) };
+            AdminCore.writeJSON(OWNER_ACCESS_META_KEY, next);
+            return next;
+        }
+
+        function ownerLockRemainingMs() {
+            const guard = readOwnerGuard();
+            const lockedUntilMs = parseDateMs(guard.lockedUntil);
+            return lockedUntilMs > Date.now() ? (lockedUntilMs - Date.now()) : 0;
+        }
+
+        function ownerAttemptsRemaining() {
+            return Math.max(0, OWNER_MAX_ATTEMPTS - readOwnerGuard().failCount);
+        }
+
+        function ownerSessionMinutesFromUI() {
+            return clampSessionMinutes(byId("ownerSessionDuration") && byId("ownerSessionDuration").value);
+        }
+
+        function formatDurationMs(ms) {
+            const totalSeconds = Math.max(0, Math.ceil(num(ms) / 1000));
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            if (!minutes) return seconds + "s";
+            return minutes + "m " + seconds + "s";
+        }
+
+        function normalizeOwnerSession(session) {
+            const source = session && typeof session === "object" ? session : null;
+            if (!source || !source.active) return null;
+            const durationMinutes = clampSessionMinutes(source.durationMinutes || OWNER_DEFAULT_SESSION_MINUTES);
+            const at = source.at || source.lastTouchAt || new Date().toISOString();
+            const lastTouchAt = source.lastTouchAt || at;
+            const expiresAt = source.expiresAt || new Date(parseDateMs(lastTouchAt) + (durationMinutes * 60000)).toISOString();
+            return {
+                active: true,
+                at: at,
+                lastTouchAt: lastTouchAt,
+                durationMinutes: durationMinutes,
+                expiresAt: expiresAt,
+                quickAction: str(source.quickAction || "normal") || "normal"
+            };
+        }
+
+        function readOwnerSession() {
+            const session = normalizeOwnerSession(AdminCore.readJSON(OWNER_SESSION_KEY, null));
+            if (!session) return null;
+            if (parseDateMs(session.expiresAt) <= Date.now()) {
+                writeOwnerSession(false);
+                return null;
+            }
+            return session;
+        }
+
+        function writeOwnerSession(active, options) {
+            if (active) {
+                const settings = options && typeof options === "object" ? options : {};
+                const durationMinutes = clampSessionMinutes(settings.durationMinutes || OWNER_DEFAULT_SESSION_MINUTES);
+                const at = settings.at || new Date().toISOString();
+                const lastTouchAt = settings.lastTouchAt || at;
+                const expiresAt = settings.expiresAt || new Date(parseDateMs(lastTouchAt) + (durationMinutes * 60000)).toISOString();
+                const payload = {
+                    active: true,
+                    at: at,
+                    lastTouchAt: lastTouchAt,
+                    durationMinutes: durationMinutes,
+                    expiresAt: expiresAt,
+                    quickAction: str(settings.quickAction || "normal") || "normal"
+                };
+                AdminCore.writeJSON(OWNER_SESSION_KEY, payload);
+                return payload;
+            } else {
+                AdminCore.writeJSON(OWNER_SESSION_KEY, null);
+                try { localStorage.removeItem(OWNER_SESSION_KEY); } catch (_) {}
+            }
+            return null;
+        }
+
+        function touchOwnerSession(force) {
+            const session = readOwnerSession();
+            if (!session) return null;
+            const now = Date.now();
+            if (!force && ownerLastTouchAt && (now - ownerLastTouchAt) < OWNER_TOUCH_THROTTLE_MS) return session;
+            ownerLastTouchAt = now;
+            return writeOwnerSession(true, {
+                at: session.at,
+                durationMinutes: session.durationMinutes,
+                quickAction: session.quickAction,
+                lastTouchAt: new Date(now).toISOString()
+            });
+        }
+
+        function recordOwnerUnlockFailure() {
+            const guard = readOwnerGuard();
+            const failCount = guard.failCount + 1;
+            const next = {
+                failCount: failCount,
+                lastFailedAt: new Date().toISOString(),
+                lockedUntil: failCount >= OWNER_MAX_ATTEMPTS ? new Date(Date.now() + OWNER_LOCKOUT_MS).toISOString() : ""
+            };
+            writeOwnerGuard(next);
+            writeOwnerAccessMeta({
+                lastFailedAt: next.lastFailedAt,
+                lastFailedReason: "Wrong owner password",
+                lastLockoutAt: next.lockedUntil || ""
+            });
+            if (next.lockedUntil) {
+                AdminCore.log("owner_login_locked", { lockedUntil: next.lockedUntil });
+            }
+            renderOwnerLoginOverview();
+        }
+
+        function clearOwnerUnlockFailures() {
+            writeOwnerGuard({ failCount: 0, lockedUntil: "", lastFailedAt: "" });
+        }
+
+        function updateOwnerCapsState(event) {
+            const hasCaps = Boolean(event && typeof event.getModifierState === "function" && event.getModifierState("CapsLock"));
+            byId("ownerCaps").classList.toggle("owner-hidden", !hasCaps);
+        }
+
+        function renderOwnerLoginOverview() {
+            const dashboard = AdminCore.computeDashboard();
+            const site = AdminCore.getSiteControl();
+            const session = readOwnerSession();
+            const guard = readOwnerGuard();
+            const meta = readOwnerAccessMeta();
+            const lockRemaining = ownerLockRemainingMs();
+            const attemptsRemaining = ownerAttemptsRemaining();
+
+            byId("ownerEntryStats").innerHTML = [
+                { value: dashboard.orders, label: "Orders tracked", meta: dashboard.orderPending + " pending right now" },
+                { value: dashboard.payments, label: "Payment requests", meta: dashboard.pendingPayments + " still pending" },
+                { value: dashboard.products, label: "Products live", meta: dashboard.sellers + " seller accounts" },
+                { value: AdminCore.fmtMoney(dashboard.totalBalance), label: "Tracked balances", meta: dashboard.auditLogs + " audit logs captured" }
+            ].map(function (item) {
+                return '<article class="owner-stat-card"><strong>' + esc(item.value) + '</strong><span>' + esc(item.label) + '</span><small>' + esc(item.meta) + '</small></article>';
+            }).join("");
+
+            byId("ownerSecurityList").innerHTML = [
+                ["Attempts remaining", lockRemaining ? "Locked" : String(attemptsRemaining) + " of " + OWNER_MAX_ATTEMPTS],
+                ["Session window", session ? describeDuration(session.durationMinutes) : describeDuration(ownerSessionMinutesFromUI())],
+                ["Last unlock", meta.lastUnlockAt ? AdminCore.fmtDate(meta.lastUnlockAt) : "No unlock recorded"],
+                ["Last lock", meta.lastLockAt ? (AdminCore.fmtDate(meta.lastLockAt) + (meta.lastLockReason ? " (" + meta.lastLockReason + ")" : "")) : "No lock recorded"]
+            ].map(function (row) {
+                return '<div><span>' + esc(row[0]) + '</span><strong>' + esc(row[1]) + '</strong></div>';
+            }).join("");
+
+            byId("ownerStatusStrip").innerHTML = [
+                site.maintenanceMode ? "Maintenance On" : "Maintenance Off",
+                site.checkoutLocked ? "Checkout Locked" : "Checkout Open",
+                site.announcementEnabled ? "Announcement Live" : "No Banner",
+                dashboard.pendingPayments ? (dashboard.pendingPayments + " Pending Payments") : "No Pending Payments"
+            ].map(function (item) {
+                return '<span class="owner-pill">' + esc(item) + '</span>';
+            }).join("");
+
+            byId("ownerAttemptMeta").textContent = lockRemaining
+                ? ("Owner access is temporarily locked. Try again in " + formatDurationMs(lockRemaining) + ".")
+                : (attemptsRemaining + " attempt(s) available before a 5-minute local lockout.");
+
+            const accessDetails = [];
+            if (meta.lastUnlockAt) accessDetails.push("Last unlock: " + AdminCore.fmtDate(meta.lastUnlockAt));
+            if (meta.lastFailedAt) accessDetails.push("Last failed attempt: " + AdminCore.fmtDate(meta.lastFailedAt));
+            if (session) accessDetails.push("Active session expires: " + AdminCore.fmtDate(session.expiresAt));
+            byId("ownerAccessMeta").textContent = accessDetails.join(" | ") || "No owner session recorded yet.";
+
+            const isLocked = lockRemaining > 0;
+            byId("ownerPassword").disabled = isLocked;
+            byId("ownerUnlockBtn").disabled = isLocked;
+            byId("ownerSessionDuration").disabled = isLocked;
+            byId("ownerQuickAction").disabled = isLocked;
+            if (isLocked) {
+                byId("ownerError").textContent = "Owner access is locked for a short cooldown.";
+            } else if (byId("ownerError").textContent === "Owner access is locked for a short cooldown.") {
+                byId("ownerError").textContent = "";
+            }
+        }
+
+        function setAuthState(unlocked) {
+            byId("ownerLogin").classList.toggle("owner-hidden", unlocked);
+            byId("ownerApp").classList.toggle("owner-hidden", !unlocked);
+            byId("adminHeader").classList.toggle("owner-hidden", !unlocked);
+            if (unlocked) {
+                byId("adminHeader").innerHTML = AdminCore.renderAdminHeader("owner-console.html");
+            } else {
+                byId("ownerPassword").focus();
+            }
+        }
+
+        async function unlockOwnerConsole() {
+            if (ownerLockRemainingMs() > 0) {
+                renderOwnerLoginOverview();
+                return;
+            }
+            const password = byId("ownerPassword").value;
+            if (!password) {
+                byId("ownerError").textContent = "Enter the owner password first.";
+                return;
+            }
+            const digest = await sha256(password);
+            if (digest !== OWNER_HASH) {
+                byId("ownerError").textContent = "Wrong owner password.";
+                recordOwnerUnlockFailure();
+                return;
+            }
+            clearOwnerUnlockFailures();
+            byId("ownerError").textContent = "";
+            const session = writeOwnerSession(true, {
+                durationMinutes: ownerSessionMinutesFromUI(),
+                quickAction: str(byId("ownerQuickAction").value || "normal") || "normal"
+            });
+            writeOwnerAccessMeta({
+                lastUnlockAt: session && session.at || new Date().toISOString(),
+                lastSessionDuration: session && session.durationMinutes || OWNER_DEFAULT_SESSION_MINUTES,
+                lastQuickAction: session && session.quickAction || "normal"
+            });
+            AdminCore.log("owner_console_unlocked", {
+                durationMinutes: session && session.durationMinutes || OWNER_DEFAULT_SESSION_MINUTES,
+                quickAction: session && session.quickAction || "normal"
+            });
+            setAuthState(true);
+            refreshAll();
+            jumpToOwnerQuickAction();
+        }
+
+        function lockOwnerConsole(reason) {
+            const normalizedReason = str(reason || "manual") || "manual";
+            writeOwnerSession(false);
+            writeOwnerAccessMeta({
+                lastLockAt: new Date().toISOString(),
+                lastLockReason: normalizedReason
+            });
+            setAuthState(false);
+            byId("ownerPassword").value = "";
+            byId("ownerError").textContent = normalizedReason === "expired"
+                ? "Owner session expired. Unlock again."
+                : "";
+            renderOwnerLoginOverview();
+        }
+
+        function jumpToOwnerQuickAction() {
+            const action = str(byId("ownerQuickAction").value || "");
+            const map = {
+                payments: "#ownerPayments",
+                orders: "#ownerOrders",
+                accounts: "#ownerAccounts"
+            };
+            if (map[action]) {
+                window.location.hash = map[action];
+            } else if (!window.location.hash) {
+                window.location.hash = "#ownerSummary";
+            }
+        }
+
+        function ensureOwnerSessionStillValid() {
+            const session = readOwnerSession();
+            if (session) return true;
+            if (!byId("ownerApp").classList.contains("owner-hidden")) {
+                lockOwnerConsole("expired");
+            }
+            return false;
+        }
+
+        function startOwnerSessionMonitor() {
+            if (ownerSessionMonitor) return;
+            ownerSessionMonitor = window.setInterval(function () {
+                ensureOwnerSessionStillValid();
+                renderOwnerLoginOverview();
+            }, 5000);
+        }
+
+        function bindOwnerSessionActivity() {
+            ["click", "keydown", "mousemove", "scroll", "touchstart"].forEach(function (eventName) {
+                window.addEventListener(eventName, function () {
+                    if (byId("ownerApp").classList.contains("owner-hidden")) return;
+                    touchOwnerSession(false);
+                }, { passive: true });
+            });
+            document.addEventListener("visibilitychange", function () {
+                if (!document.hidden && !byId("ownerApp").classList.contains("owner-hidden")) {
+                    touchOwnerSession(true);
+                }
+            });
+        }
+
+        function normalizeAccounts() {
+            return AdminCore.getUsers().concat(AdminCore.getSellers()).sort(function (a, b) {
+                return String(b.createdAt || "").localeCompare(String(a.createdAt || ""));
+            });
+        }
+
+        function normalizeOrders() {
+            return AdminCore.getOrders().map(function (row, index) {
+                const cart = Array.isArray(row.cart) ? row.cart : [];
+                const amount = num(row.amount || row.total || row.totalAmount || 0) || cart.reduce(function (sum, item) {
+                    const qty = Math.max(1, Math.floor(num(item && (item.quantity || item.qty || 1))));
+                    const unit = num(item && (item.price || item.unitPrice || 0));
+                    return sum + (qty * unit);
+                }, 0);
+                return {
+                    id: str(row.id || row.orderId || row.orderNumber || ("ORDER-" + index)),
+                    buyer: str(row.fullName || row.buyerName || row.name || row.email || row.buyerEmail || "-"),
+                    email: str(row.email || row.buyerEmail || ""),
+                    phone: str(row.phone || row.buyerPhone || ""),
+                    address: str(row.address || ""),
+                    amount: amount,
+                    status: str(row.status || "pending"),
+                    paymentMethod: str(row.paymentMethod || ""),
+                    deliveryOption: str(row.deliveryOption || ""),
+                    items: cart.map(function (item) { return str(item && (item.name || item.productName || item.id || "")); }).filter(Boolean).join(", "),
+                    itemsCount: cart.length,
+                    date: row.updatedAt || row.placedAt || row.createdAt || row.date || "",
+                    raw: row
+                };
+            });
+        }
+
+        function normalizePayments() {
+            return AdminCore.getPayments().map(function (row, index) {
+                return {
+                    id: str(row.id || index),
+                    email: str(row.email || ""),
+                    type: str(row.type || row.requestType || row.plan || "payment"),
+                    amount: num(row.amount || 0),
+                    sender: str(row.senderNumber || row.phone || row.sender || ""),
+                    reference: str(row.reference || row.transactionReference || row.txn || ""),
+                    status: str(row.status || row.paymentStatus || "Pending"),
+                    note: str(row.adminNote || row.note || ""),
+                    date: row.updatedAt || row.createdAt || row.date || "",
+                    raw: row
+                };
+            }).sort(function (a, b) {
+                return String(b.date).localeCompare(String(a.date));
+            });
+        }
+
+        function normalizeProducts() {
+            state.productsRaw = AdminCore.getProducts();
+            return state.productsRaw.map(function (row, index) {
+                return {
+                    idx: index,
+                    id: str(row.id || row.productId || ""),
+                    name: str(row.name || row.productName || "Product"),
+                    seller: str(row.seller || row.sellerName || row.sellerEmail || ""),
+                    category: str(row.category || row.shopCategory || "general"),
+                    price: num(row.price || row.amount || 0),
+                    stock: Math.max(0, Math.floor(num(row.stock == null ? 0 : row.stock))),
+                    status: str(row.status || (num(row.stock) > 0 ? "active" : "soldout")),
+                    createdAt: row.updatedAt || row.createdAt || row.date || "",
+                    raw: row
+                };
+            });
+        }
+
+        function normalizeLogs() {
+            return AdminCore.getAuditLogs().sort(function (a, b) {
+                return String(b.at || "").localeCompare(String(a.at || ""));
+            });
+        }
+
+        function normalizeOpsState() {
+            state.supportTickets = AdminCore.readJSON("supportTickets", []);
+            state.notifications = AdminCore.readJSON("adminNotifications", []);
+            state.complaints = AdminCore.readJSON("sellerComplaints", []);
+            state.lastLoginMeta = AdminCore.readJSON("lastLoginMeta", null);
+            state.siteControl = AdminCore.getSiteControl();
+        }
+
+        function refreshAll() {
+            state.accounts = normalizeAccounts();
+            state.orders = normalizeOrders();
+            state.payments = normalizePayments();
+            state.products = normalizeProducts();
+            state.logs = normalizeLogs();
+            normalizeOpsState();
+            renderSummary();
+            populateSiteControlForm();
+            renderSiteControlPreview(state.siteControl);
+            renderIntelligence();
+            renderAccounts();
+            renderOrders();
+            renderPayments();
+            renderProducts();
+            renderLogs();
+            renderOwnerLoginOverview();
+        }
+
+        function renderSummary() {
+            const m = AdminCore.computeDashboard();
+            const cards = [
+                ["Users", m.users],
+                ["Sellers", m.sellers],
+                ["Orders", m.orders],
+                ["Pending Orders", m.orderPending],
+                ["Payments", m.payments],
+                ["Pending Payments", m.pendingPayments],
+                ["Products", m.products],
+                ["Approved Payments", m.approvedPayments],
+                ["Tracked Balance", AdminCore.fmtMoney(m.totalBalance)]
+            ];
+            byId("summaryGrid").innerHTML = cards.map(function (item) {
+                return '<article class="kpi"><div class="label">' + esc(item[0]) + '</div><div class="value">' + esc(item[1]) + '</div></article>';
+            }).join("");
+
+            const currentUser = AdminCore.readJSON("currentUser", null);
+            const currentSeller = AdminCore.readJSON("currentSeller", null);
+            const ownerSession = readOwnerSession();
+            byId("pulseGrid").innerHTML = [
+                ["Owner session", ownerSession && ownerSession.active ? AdminCore.fmtDate(ownerSession.at) : "Locked"],
+                ["Top seller", m.topSeller || "N/A"],
+                ["Audit logs", String(m.auditLogs || 0)],
+                ["Current user", str(currentUser && currentUser.email || "-")],
+                ["Current seller", str(currentSeller && currentSeller.email || "-")],
+                ["Support tickets", String((state.supportTickets || []).length)],
+                ["Public notifications", String((state.notifications || []).length)]
+            ].map(function (item) {
+                return '<div><span>' + esc(item[0]) + '</span><strong>' + esc(item[1]) + '</strong></div>';
+            }).join("");
+        }
+
+        function populateSiteControlForm() {
+            const site = state.siteControl || AdminCore.getSiteControl();
+            byId("maintenanceMode").checked = Boolean(site.maintenanceMode);
+            byId("checkoutLocked").checked = Boolean(site.checkoutLocked);
+            byId("announcementEnabled").checked = Boolean(site.announcementEnabled);
+            byId("announcementTone").value = site.announcementTone || "info";
+            byId("announcementTitle").value = site.announcementTitle || "";
+            byId("announcementMessage").value = site.announcementMessage || "";
+            byId("supportContact").value = site.supportContact || "";
+        }
+
+        function renderSiteControlPreview(site) {
+            const next = site || readSiteControlForm();
+            const preview = byId("siteControlPreview");
+            preview.className = "owner-preview " + (next.announcementTone || "info");
+            preview.innerHTML =
+                '<strong>' + esc(next.announcementTitle || "No title set") + '</strong>' +
+                '<div>' + esc(next.announcementMessage || "No announcement message yet.") + '</div>' +
+                '<small>Announcement: ' + esc(next.announcementEnabled ? "Enabled" : "Disabled") +
+                ' | Maintenance: ' + esc(next.maintenanceMode ? "On" : "Off") +
+                ' | Checkout lock: ' + esc(next.checkoutLocked ? "On" : "Off") + '</small>' +
+                (next.supportContact ? '<small>Support: ' + esc(next.supportContact) + '</small>' : '') +
+                '<small>Updated: ' + esc(AdminCore.fmtDate(next.updatedAt || "")) + '</small>';
+        }
+
+        function renderIntelligence() {
+            const productCounts = {};
+            state.products.forEach(function (row) {
+                const key = row.seller || "Unknown seller";
+                if (!productCounts[key]) productCounts[key] = { name: key, products: 0, stock: 0 };
+                productCounts[key].products += 1;
+                productCounts[key].stock += Math.max(0, num(row.stock || 0));
+            });
+            const topSellers = Object.keys(productCounts).map(function (key) {
+                return productCounts[key];
+            }).sort(function (a, b) {
+                return b.products - a.products || b.stock - a.stock;
+            }).slice(0, 5);
+
+            const buyerTotals = {};
+            state.orders.forEach(function (row) {
+                const key = row.email || row.buyer || "Unknown buyer";
+                if (!buyerTotals[key]) buyerTotals[key] = { name: row.buyer || key, email: row.email || "", total: 0, orders: 0 };
+                buyerTotals[key].total += num(row.amount || 0);
+                buyerTotals[key].orders += 1;
+            });
+            const topBuyers = Object.keys(buyerTotals).map(function (key) {
+                return buyerTotals[key];
+            }).sort(function (a, b) {
+                return b.total - a.total || b.orders - a.orders;
+            }).slice(0, 4);
+
+            byId("topSellersList").innerHTML = topSellers.map(function (row) {
+                return '<div class="owner-summary-item"><strong>' + esc(row.name) + '</strong><span>' + esc(row.products + " products") + '</span><small>' + esc(row.stock + " units in stock") + '</small></div>';
+            }).join("") + topBuyers.map(function (row) {
+                return '<div class="owner-summary-item"><strong>' + esc(row.name) + '</strong><span>' + esc(row.email || "No email") + '</span><small>' + esc(AdminCore.fmtMoney(row.total) + " across " + row.orders + " orders") + '</small></div>';
+            }).join("");
+
+            const unresolvedComplaints = (Array.isArray(state.complaints) ? state.complaints : []).filter(function (row) {
+                const status = str(row && row.status || "new").toLowerCase();
+                return status !== "resolved" && status !== "rejected";
+            }).length;
+            const activeNotifications = (Array.isArray(state.notifications) ? state.notifications : []).filter(function (row) {
+                return str(row && row.status || "active").toLowerCase() !== "inactive";
+            }).length;
+            const latestLogin = state.lastLoginMeta && state.lastLoginMeta.at
+                ? (state.lastLoginMeta.email || "unknown") + " at " + AdminCore.fmtDate(state.lastLoginMeta.at)
+                : "No login metadata yet";
+            byId("supportWatchList").innerHTML = [
+                { title: "Support Tickets", meta: String((state.supportTickets || []).length), sub: "Buyer complaint queue and support cases" },
+                { title: "Open Complaints", meta: String(unresolvedComplaints), sub: "Seller complaints still under review" },
+                { title: "Active Notifications", meta: String(activeNotifications), sub: "Public or direct admin notices" },
+                { title: "Last Login", meta: latestLogin, sub: state.lastLoginMeta ? (state.lastLoginMeta.role || "Account") : "Unknown" }
+            ].map(function (row) {
+                return '<div class="owner-summary-item"><strong>' + esc(row.title) + '</strong><span>' + esc(row.meta) + '</span><small>' + esc(row.sub) + '</small></div>';
+            }).join("");
+        }
+
+        function accountRows() {
+            const query = str(byId("accountSearch").value).toLowerCase();
+            const role = str(byId("accountRoleFilter").value).toLowerCase();
+            const status = str(byId("accountStatusFilter").value).toLowerCase();
+            return state.accounts.filter(function (row) {
+                const hay = [row.fullName, row.email, row.phone, row.store, row.country].join(" ").toLowerCase();
+                const rowStatus = str(row.status).toLowerCase();
+                const rowRole = str(row.role).toLowerCase();
+                return (!query || hay.includes(query)) &&
+                    (!role || rowRole === role) &&
+                    (!status || rowStatus === status);
+            });
+        }
+
+        function renderAccounts() {
+            const rows = accountRows();
+            const table = byId("accountsTable");
+            const head = '<thead><tr><th>Account</th><th>Contact</th><th>Store / Country</th><th>Status</th><th>Wallet</th><th>Password</th><th>Created</th><th>Actions</th></tr></thead>';
+            if (!rows.length) {
+                table.innerHTML = head + '<tbody><tr><td colspan="8" class="adm-empty">No accounts found.</td></tr></tbody>';
+                return;
+            }
+            table.innerHTML = head + '<tbody>' + rows.map(function (row) {
+                const email = encodeURIComponent(row.email);
+                return '<tr>' +
+                    '<td><div class="owner-cell"><strong>' + esc(row.fullName || row.name || row.email) + '</strong><span class="owner-muted">' + esc(row.role.toUpperCase()) + '</span></div></td>' +
+                    '<td><div class="owner-cell"><span>' + esc(row.email || "-") + '</span><span class="owner-muted">' + esc(row.phone || "-") + '</span></div></td>' +
+                    '<td><div class="owner-cell"><span>' + esc(row.store || "-") + '</span><span class="owner-muted">' + esc(row.country || "-") + '</span></div></td>' +
+                    '<td><div class="owner-cell">' + AdminCore.badge(row.status || "Pending") + AdminCore.badge(row.paymentStatus || "Pending") + AdminCore.badge(row.subscription || "Inactive") + '</div></td>' +
+                    '<td><div class="owner-cell"><strong>' + esc(AdminCore.fmtMoney(row.balance || 0)) + '</strong><span class="owner-muted">' + esc(row.plan || "-") + '</span></div></td>' +
+                    '<td><div class="owner-cell"><strong>' + esc(row.password ? "Hidden" : "Not Set") + '</strong><span class="owner-muted">Reset only</span></div></td>' +
+                    '<td>' + esc(AdminCore.fmtDate(row.createdAt)) + '</td>' +
+                    '<td class="owner-actions-cell"><div class="owner-inline">' +
+                    '<button class="btn-adm success" data-account-action="approve" data-email="' + email + '">Approve</button>' +
+                    '<button class="btn-adm warning" data-account-action="suspend" data-email="' + email + '">Suspend</button>' +
+                    '<button class="btn-adm" data-account-action="topup" data-email="' + email + '">Balance</button>' +
+                    '<button class="btn-adm" data-account-action="resetpass" data-email="' + email + '">Reset Pass</button>' +
+                    (row.role === "seller" ? '<button class="btn-adm" data-account-action="code" data-email="' + email + '">Assign Code</button>' : '') +
+                    '<button class="btn-adm danger" data-account-action="delete" data-email="' + email + '">Delete</button>' +
+                    '</div></td>' +
+                    '</tr>';
+            }).join("") + '</tbody>';
+        }
+
+        function orderRows() {
+            const query = str(byId("orderSearch").value).toLowerCase();
+            const status = str(byId("orderStatusFilter").value).toLowerCase();
+            const sort = str(byId("orderSortFilter").value);
+            const rows = state.orders.filter(function (row) {
+                const hay = [row.id, row.buyer, row.email, row.phone, row.address, row.items, row.paymentMethod, row.deliveryOption].join(" ").toLowerCase();
+                return (!query || hay.includes(query)) && (!status || str(row.status).toLowerCase() === status);
+            });
+            rows.sort(function (a, b) {
+                if (sort === "oldest") return String(a.date).localeCompare(String(b.date));
+                if (sort === "amountDesc") return b.amount - a.amount;
+                if (sort === "amountAsc") return a.amount - b.amount;
+                return String(b.date).localeCompare(String(a.date));
+            });
+            return rows;
+        }
+
+        function renderOrders() {
+            const rows = orderRows();
+            const table = byId("ordersTable");
+            const head = '<thead><tr><th>Order</th><th>Buyer</th><th>Delivery</th><th>Items</th><th>Amount</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>';
+            if (!rows.length) {
+                table.innerHTML = head + '<tbody><tr><td colspan="8" class="adm-empty">No orders found.</td></tr></tbody>';
+                return;
+            }
+            table.innerHTML = head + '<tbody>' + rows.map(function (row) {
+                return '<tr>' +
+                    '<td><div class="owner-cell"><strong>' + esc(row.id || "-") + '</strong><span class="owner-muted">' + esc(row.paymentMethod || "-") + '</span></div></td>' +
+                    '<td><div class="owner-cell"><strong>' + esc(row.buyer || "-") + '</strong><span>' + esc(row.email || "-") + '</span><span class="owner-muted">' + esc(row.phone || "-") + '</span></div></td>' +
+                    '<td><div class="owner-cell"><span>' + esc(row.address || "-") + '</span><span class="owner-muted">' + esc(row.deliveryOption || "-") + '</span></div></td>' +
+                    '<td><div class="owner-cell"><span>' + esc(row.items || "-") + '</span><span class="owner-muted">' + esc(row.itemsCount + " item(s)") + '</span></div></td>' +
+                    '<td>' + esc(AdminCore.fmtMoney(row.amount)) + '</td>' +
+                    '<td>' + AdminCore.badge(row.status || "pending") + '</td>' +
+                    '<td>' + esc(AdminCore.fmtDate(row.date)) + '</td>' +
+                    '<td class="owner-actions-cell"><div class="owner-inline">' +
+                    '<button class="btn-adm" data-order-action="pending" data-id="' + esc(row.id) + '">Pending</button>' +
+                    '<button class="btn-adm success" data-order-action="approved" data-id="' + esc(row.id) + '">Approve</button>' +
+                    '<button class="btn-adm warning" data-order-action="in-transit" data-id="' + esc(row.id) + '">Transit</button>' +
+                    '<button class="btn-adm success" data-order-action="delivered" data-id="' + esc(row.id) + '">Deliver</button>' +
+                    '<button class="btn-adm danger" data-order-action="declined" data-id="' + esc(row.id) + '">Decline</button>' +
+                    '</div></td>' +
+                    '</tr>';
+            }).join("") + '</tbody>';
+        }
+
+        function paymentRows() {
+            const query = str(byId("paymentSearch").value).toLowerCase();
+            const status = str(byId("paymentStatusFilter").value).toLowerCase();
+            const type = str(byId("paymentTypeFilter").value).toLowerCase();
+            return state.payments.filter(function (row) {
+                const hay = [row.email, row.sender, row.reference, row.type, row.note].join(" ").toLowerCase();
+                const rowStatus = str(row.status).toLowerCase();
+                const rowType = str(row.type).toLowerCase();
+                return (!query || hay.includes(query)) &&
+                    (!status || rowStatus === status) &&
+                    (!type || rowType.includes(type));
+            });
+        }
+
+        function renderPayments() {
+            const rows = paymentRows();
+            const table = byId("paymentsTable");
+            const head = '<thead><tr><th>Email</th><th>Type</th><th>Amount</th><th>Proof</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>';
+            if (!rows.length) {
+                table.innerHTML = head + '<tbody><tr><td colspan="7" class="adm-empty">No payment requests found.</td></tr></tbody>';
+                return;
+            }
+            table.innerHTML = head + '<tbody>' + rows.map(function (row) {
+                return '<tr>' +
+                    '<td><div class="owner-cell"><strong>' + esc(row.email || "-") + '</strong><span class="owner-muted">' + esc(row.sender || "-") + '</span></div></td>' +
+                    '<td><div class="owner-cell"><strong>' + esc(row.type || "-") + '</strong><span class="owner-muted">' + esc(row.reference || "-") + '</span></div></td>' +
+                    '<td>' + esc(AdminCore.fmtMoney(row.amount)) + '</td>' +
+                    '<td><div class="owner-cell"><span>' + esc(row.note || "-") + '</span></div></td>' +
+                    '<td>' + AdminCore.badge(row.status || "Pending") + '</td>' +
+                    '<td>' + esc(AdminCore.fmtDate(row.date)) + '</td>' +
+                    '<td class="owner-actions-cell"><div class="owner-inline">' +
+                    '<button class="btn-adm success" data-payment-action="Approved" data-id="' + esc(row.id) + '">Approve</button>' +
+                    '<button class="btn-adm danger" data-payment-action="Declined" data-id="' + esc(row.id) + '">Decline</button>' +
+                    '</div></td>' +
+                    '</tr>';
+            }).join("") + '</tbody>';
+        }
+
+        function productRows() {
+            const query = str(byId("productSearch").value).toLowerCase();
+            const status = str(byId("productStatusFilter").value).toLowerCase();
+            const sort = str(byId("productSortFilter").value);
+            const rows = state.products.filter(function (row) {
+                const hay = [row.name, row.seller, row.category, row.status, row.id].join(" ").toLowerCase();
+                return (!query || hay.includes(query)) && (!status || str(row.status).toLowerCase() === status);
+            });
+            rows.sort(function (a, b) {
+                if (sort === "oldest") return String(a.createdAt).localeCompare(String(b.createdAt));
+                if (sort === "priceDesc") return b.price - a.price;
+                if (sort === "priceAsc") return a.price - b.price;
+                return String(b.createdAt).localeCompare(String(a.createdAt));
+            });
+            return rows;
+        }
+
+        function renderProducts() {
+            const rows = productRows();
+            const table = byId("productsTable");
+            const head = '<thead><tr><th>Product</th><th>Seller</th><th>Category</th><th>Price</th><th>Stock</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>';
+            if (!rows.length) {
+                table.innerHTML = head + '<tbody><tr><td colspan="8" class="adm-empty">No products found.</td></tr></tbody>';
+                return;
+            }
+            table.innerHTML = head + '<tbody>' + rows.map(function (row) {
+                return '<tr>' +
+                    '<td><div class="owner-cell"><strong>' + esc(row.name) + '</strong><span class="owner-muted">' + esc(row.id || "-") + '</span></div></td>' +
+                    '<td>' + esc(row.seller || "-") + '</td>' +
+                    '<td>' + esc(row.category || "-") + '</td>' +
+                    '<td>' + esc(AdminCore.fmtMoney(row.price)) + '</td>' +
+                    '<td>' + esc(row.stock) + '</td>' +
+                    '<td>' + AdminCore.badge(row.status || "active") + '</td>' +
+                    '<td>' + esc(AdminCore.fmtDate(row.createdAt)) + '</td>' +
+                    '<td class="owner-actions-cell"><div class="owner-inline">' +
+                    '<button class="btn-adm" data-product-action="active" data-idx="' + row.idx + '">Activate</button>' +
+                    '<button class="btn-adm warning" data-product-action="hidden" data-idx="' + row.idx + '">Hide</button>' +
+                    '<button class="btn-adm" data-product-action="soldout" data-idx="' + row.idx + '">Sold Out</button>' +
+                    '<button class="btn-adm danger" data-product-action="delete" data-idx="' + row.idx + '">Delete</button>' +
+                    '</div></td>' +
+                    '</tr>';
+            }).join("") + '</tbody>';
+        }
+
+        function logRows() {
+            const query = str(byId("logSearch").value).toLowerCase();
+            return state.logs.filter(function (row) {
+                const hay = [row.action, JSON.stringify(row.details || {}), row.at].join(" ").toLowerCase();
+                return !query || hay.includes(query);
+            }).slice(0, 80);
+        }
+
+        function renderLogs() {
+            const rows = logRows();
+            const list = byId("logsList");
+            if (!rows.length) {
+                list.innerHTML = '<div class="adm-empty">No logs found.</div>';
+                return;
+            }
+            list.innerHTML = rows.map(function (row) {
+                return '<article class="owner-log">' +
+                    '<strong>' + esc(row.action || "log") + '</strong>' +
+                    '<div class="owner-muted">' + esc(AdminCore.fmtDate(row.at)) + '</div>' +
+                    '<code>' + esc(JSON.stringify(row.details || {}, null, 2)) + '</code>' +
+                    '</article>';
+            }).join("");
+        }
+
+        function exportRows(rows, filename) {
+            if (!rows.length) {
+                alert("No rows to export.");
+                return;
+            }
+            AdminCore.exportCSV(rows, filename);
+        }
+
+        function readSiteControlForm() {
+            return {
+                maintenanceMode: byId("maintenanceMode").checked,
+                checkoutLocked: byId("checkoutLocked").checked,
+                announcementEnabled: byId("announcementEnabled").checked,
+                announcementTone: byId("announcementTone").value,
+                announcementTitle: byId("announcementTitle").value,
+                announcementMessage: byId("announcementMessage").value,
+                supportContact: byId("supportContact").value
+            };
+        }
+
+        function handleAccountAction(action, email) {
+            const target = decodeURIComponent(email || "");
+            if (!target) return;
+            if (action === "approve") {
+                AdminCore.updateAccountByEmail(target, { status: "Approved" });
+                AdminCore.log("owner_account_approved", { email: target });
+            } else if (action === "suspend") {
+                AdminCore.updateAccountByEmail(target, { status: "Suspended" });
+                AdminCore.log("owner_account_suspended", { email: target });
+            } else if (action === "topup") {
+                const amount = prompt("Enter balance adjustment amount", "50");
+                if (amount == null) return;
+                if (!AdminCore.adjustBalance(target, num(amount))) {
+                    alert("Could not adjust balance.");
+                    return;
+                }
+                AdminCore.log("owner_balance_adjusted", { email: target, amount: num(amount) });
+            } else if (action === "resetpass") {
+                const next = prompt("Enter new password for " + target);
+                if (!next) return;
+                if (!AdminCore.resetAccountPassword(target, next)) {
+                    alert("Password reset failed.");
+                    return;
+                }
+            } else if (action === "code") {
+                const code = (prompt("Enter seller subscription code", AdminCore.createCode(8)) || "").trim().toUpperCase();
+                if (!code) return;
+                const expiryDays = Math.max(1, Math.floor(num(prompt("Expiry in days", "30")) || 30));
+                const expiry = new Date(Date.now() + (expiryDays * 86400000)).toISOString();
+                AdminCore.upsertCode(target, { value: code, expiry: expiry, status: "active" });
+                AdminCore.log("owner_code_assigned", { email: target, code: code, expiry: expiry });
+            } else if (action === "delete") {
+                if (!confirm("Delete account " + target + "?")) return;
+                if (!AdminCore.deleteAccount(target)) {
+                    alert("Could not delete account.");
+                    return;
+                }
+                AdminCore.log("owner_account_deleted", { email: target });
+            }
+            refreshAll();
+        }
+
+        function handleOrderAction(action, id) {
+            if (!id) return;
+            if (!AdminCore.updateOrderStatus(id, action)) {
+                alert("Order update failed.");
+                return;
+            }
+            refreshAll();
+        }
+
+        function handlePaymentAction(action, id) {
+            if (!AdminCore.applyPaymentDecision(id, action)) {
+                alert("Payment update failed.");
+                return;
+            }
+            refreshAll();
+        }
+
+        function handleProductAction(action, index) {
+            const idx = Number(index);
+            if (!Number.isInteger(idx) || idx < 0 || !state.productsRaw[idx]) return;
+            const nextProducts = state.productsRaw.slice();
+            if (action === "delete") {
+                if (!confirm("Delete this product?")) return;
+                nextProducts.splice(idx, 1);
+                AdminCore.log("owner_product_deleted", { index: idx });
+            } else {
+                const current = nextProducts[idx] || {};
+                nextProducts[idx] = { ...current, status: action, updatedAt: new Date().toISOString() };
+                if (action === "soldout") nextProducts[idx].stock = 0;
+                AdminCore.log("owner_product_status_changed", { index: idx, status: action, product: current.name || current.productName || "" });
+            }
+            AdminCore.setProducts(nextProducts);
+            refreshAll();
+        }
+
+        function approvePendingPaymentsBulk() {
+            const pending = state.payments.filter(function (row) {
+                return str(row.status).toLowerCase() === "pending";
+            });
+            if (!pending.length) {
+                alert("No pending payments found.");
+                return;
+            }
+            pending.forEach(function (row) {
+                AdminCore.applyPaymentDecision(row.id, "Approved");
+            });
+            AdminCore.log("owner_bulk_payments_approved", { count: pending.length });
+            refreshAll();
+        }
+
+        function setAllSellerStatus(nextStatus) {
+            const sellers = AdminCore.getSellers();
+            sellers.forEach(function (row) {
+                AdminCore.updateAccountByEmail(row.email, { status: nextStatus });
+            });
+            AdminCore.log("owner_bulk_seller_status", { status: nextStatus, count: sellers.length });
+            refreshAll();
+        }
+
+        function loadRestoreSnapshot() {
+            const input = byId("restoreSnapshotFile");
+            const file = input.files && input.files[0];
+            if (!file) {
+                alert("Select a snapshot JSON file first.");
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = function () {
+                try {
+                    const parsed = JSON.parse(String(reader.result || ""));
+                    state.restoreSnapshot = parsed;
+                    const summary = parsed && typeof parsed === "object" ? parsed : {};
+                    byId("restoreSnapshotMeta").textContent =
+                        "Loaded snapshot from " + (summary.generatedAt ? AdminCore.fmtDate(summary.generatedAt) : "unknown date") +
+                        " | users: " + ((summary.users || []).length || 0) +
+                        " | sellers: " + ((summary.sellers || []).length || 0) +
+                        " | orders: " + ((summary.orders || []).length || 0) +
+                        " | products: " + ((summary.products || []).length || 0);
+                } catch (_) {
+                    state.restoreSnapshot = null;
+                    byId("restoreSnapshotMeta").textContent = "Could not parse that JSON file.";
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function restoreLoadedSnapshot() {
+            if (!state.restoreSnapshot) {
+                alert("Load a snapshot first.");
+                return;
+            }
+            if (!confirm("Restore the loaded snapshot into live storage?")) return;
+            if (!AdminCore.restoreSiteSnapshot(state.restoreSnapshot)) {
+                alert("Snapshot restore failed.");
+                return;
+            }
+            refreshAll();
+        }
+
+        function bindEvents() {
+            byId("ownerUnlockBtn").addEventListener("click", function () {
+                unlockOwnerConsole().catch(function () {
+                    byId("ownerError").textContent = "Could not unlock the owner console.";
+                });
+            });
+            byId("ownerPassword").addEventListener("keydown", function (event) {
+                if (event.key === "Enter") byId("ownerUnlockBtn").click();
+            });
+            byId("ownerPassword").addEventListener("keydown", updateOwnerCapsState);
+            byId("ownerPassword").addEventListener("keyup", updateOwnerCapsState);
+            byId("ownerPassword").addEventListener("blur", function () {
+                byId("ownerCaps").classList.add("owner-hidden");
+            });
+            byId("ownerShowBtn").addEventListener("click", function () {
+                const input = byId("ownerPassword");
+                input.type = input.type === "password" ? "text" : "password";
+                this.textContent = input.type === "password" ? "Show" : "Hide";
+            });
+            byId("ownerClearBtn").addEventListener("click", function () {
+                byId("ownerPassword").value = "";
+                byId("ownerError").textContent = "";
+                byId("ownerCaps").classList.add("owner-hidden");
+                byId("ownerPassword").focus();
+            });
+            byId("ownerSessionDuration").addEventListener("change", renderOwnerLoginOverview);
+            byId("ownerQuickAction").addEventListener("change", renderOwnerLoginOverview);
+            byId("ownerLogoutBtn").addEventListener("click", function () {
+                lockOwnerConsole("manual");
+            });
+            byId("refreshBtn").addEventListener("click", refreshAll);
+            byId("exportSnapshotBtn").addEventListener("click", function () {
+                AdminCore.exportJSON(AdminCore.getSiteSnapshot(), "owner-site-snapshot.json");
+            });
+            byId("approvePendingPaymentsBtn").addEventListener("click", function () {
+                if (confirm("Approve all pending payment requests?")) approvePendingPaymentsBulk();
+            });
+            byId("approveAllSellersBtn").addEventListener("click", function () {
+                if (confirm("Approve all sellers?")) setAllSellerStatus("Approved");
+            });
+            byId("suspendAllSellersBtn").addEventListener("click", function () {
+                if (confirm("Suspend all sellers?")) setAllSellerStatus("Suspended");
+            });
+            byId("clearSessionsBtn").addEventListener("click", function () {
+                if (!confirm("Clear current user and seller sessions?")) return;
+                AdminCore.clearLiveSessions();
+                refreshAll();
+            });
+            byId("saveSiteControlBtn").addEventListener("click", function () {
+                AdminCore.setSiteControl(readSiteControlForm());
+                refreshAll();
+            });
+            byId("disableAnnouncementBtn").addEventListener("click", function () {
+                AdminCore.setSiteControl({
+                    ...readSiteControlForm(),
+                    announcementEnabled: false
+                });
+                refreshAll();
+            });
+            byId("clearLocksBtn").addEventListener("click", function () {
+                AdminCore.setSiteControl({
+                    ...readSiteControlForm(),
+                    maintenanceMode: false,
+                    checkoutLocked: false
+                });
+                refreshAll();
+            });
+            byId("loadSnapshotBtn").addEventListener("click", loadRestoreSnapshot);
+            byId("restoreSnapshotBtn").addEventListener("click", restoreLoadedSnapshot);
+
+            [
+                "maintenanceMode", "checkoutLocked", "announcementEnabled", "announcementTone", "announcementTitle", "announcementMessage", "supportContact",
+                "accountSearch", "accountRoleFilter", "accountStatusFilter",
+                "orderSearch", "orderStatusFilter", "orderSortFilter",
+                "paymentSearch", "paymentStatusFilter", "paymentTypeFilter",
+                "productSearch", "productStatusFilter", "productSortFilter",
+                "logSearch"
+            ].forEach(function (id) {
+                byId(id).addEventListener("input", function () {
+                    renderSiteControlPreview(readSiteControlForm());
+                    renderAccounts();
+                    renderOrders();
+                    renderPayments();
+                    renderProducts();
+                    renderLogs();
+                });
+                byId(id).addEventListener("change", function () {
+                    renderSiteControlPreview(readSiteControlForm());
+                    renderAccounts();
+                    renderOrders();
+                    renderPayments();
+                    renderProducts();
+                    renderLogs();
+                });
+            });
+
+            byId("resetAccountsFilterBtn").addEventListener("click", function () {
+                byId("accountSearch").value = "";
+                byId("accountRoleFilter").value = "";
+                byId("accountStatusFilter").value = "";
+                renderAccounts();
+            });
+            byId("resetOrdersFilterBtn").addEventListener("click", function () {
+                byId("orderSearch").value = "";
+                byId("orderStatusFilter").value = "";
+                byId("orderSortFilter").value = "newest";
+                renderOrders();
+            });
+            byId("resetPaymentsFilterBtn").addEventListener("click", function () {
+                byId("paymentSearch").value = "";
+                byId("paymentStatusFilter").value = "";
+                byId("paymentTypeFilter").value = "";
+                renderPayments();
+            });
+            byId("resetProductsFilterBtn").addEventListener("click", function () {
+                byId("productSearch").value = "";
+                byId("productStatusFilter").value = "";
+                byId("productSortFilter").value = "newest";
+                renderProducts();
+            });
+            byId("resetLogsFilterBtn").addEventListener("click", function () {
+                byId("logSearch").value = "";
+                renderLogs();
+            });
+
+            byId("accountsTable").addEventListener("click", function (event) {
+                const btn = event.target.closest("button[data-account-action]");
+                if (!btn) return;
+                handleAccountAction(btn.dataset.accountAction, btn.dataset.email);
+            });
+            byId("ordersTable").addEventListener("click", function (event) {
+                const btn = event.target.closest("button[data-order-action]");
+                if (!btn) return;
+                handleOrderAction(btn.dataset.orderAction, btn.dataset.id);
+            });
+            byId("paymentsTable").addEventListener("click", function (event) {
+                const btn = event.target.closest("button[data-payment-action]");
+                if (!btn) return;
+                handlePaymentAction(btn.dataset.paymentAction, btn.dataset.id);
+            });
+            byId("productsTable").addEventListener("click", function (event) {
+                const btn = event.target.closest("button[data-product-action]");
+                if (!btn) return;
+                handleProductAction(btn.dataset.productAction, btn.dataset.idx);
+            });
+
+            byId("exportAccountsBtn").addEventListener("click", function () {
+                exportRows(accountRows().map(function (row) {
+                    return {
+                        role: row.role,
+                        fullName: row.fullName,
+                        email: row.email,
+                        phone: row.phone,
+                        store: row.store,
+                        country: row.country,
+                        status: row.status,
+                        paymentStatus: row.paymentStatus,
+                        subscription: row.subscription,
+                        balance: row.balance,
+                        passwordState: row.password ? "hidden" : "not_set",
+                        createdAt: row.createdAt
+                    };
+                }), "owner-accounts.csv");
+            });
+            byId("exportOrdersBtn").addEventListener("click", function () {
+                exportRows(orderRows(), "owner-orders.csv");
+            });
+            byId("exportPaymentsBtn").addEventListener("click", function () {
+                exportRows(paymentRows(), "owner-payments.csv");
+            });
+            byId("exportProductsBtn").addEventListener("click", function () {
+                exportRows(productRows(), "owner-products.csv");
+            });
+            byId("exportLogsBtn").addEventListener("click", function () {
+                exportRows(logRows().map(function (row) {
+                    return {
+                        action: row.action,
+                        at: row.at,
+                        details: JSON.stringify(row.details || {})
+                    };
+                }), "owner-logs.csv");
+            });
+
+            window.addEventListener("storage", function () {
+                if (!byId("ownerApp").classList.contains("owner-hidden")) refreshAll();
+                else renderOwnerLoginOverview();
+            });
+        }
+
+        function initOwnerConsole() {
+            bindEvents();
+            bindOwnerSessionActivity();
+            startOwnerSessionMonitor();
+            const session = readOwnerSession();
+            const meta = readOwnerAccessMeta();
+            if (session && byId("ownerSessionDuration")) {
+                byId("ownerSessionDuration").value = String(clampSessionMinutes(session.durationMinutes));
+                byId("ownerQuickAction").value = session.quickAction || "normal";
+            } else {
+                if (meta.lastSessionDuration && byId("ownerSessionDuration")) {
+                    byId("ownerSessionDuration").value = String(clampSessionMinutes(meta.lastSessionDuration));
+                }
+                if (meta.lastQuickAction && byId("ownerQuickAction")) {
+                    byId("ownerQuickAction").value = meta.lastQuickAction;
+                }
+            }
+            renderOwnerLoginOverview();
+            const unlocked = Boolean(session && session.active);
+            setAuthState(unlocked);
+            if (unlocked) {
+                touchOwnerSession(true);
+                refreshAll();
+            }
+        }
+
+        function startOwnerConsole() {
+            const ready = window.MMStorage && window.MMStorage.ready;
+            if (ready && typeof ready.then === "function") {
+                ready.finally(initOwnerConsole);
+                return;
+            }
+            initOwnerConsole();
+        }
+
+        if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", startOwnerConsole);
+        else startOwnerConsole();
+    </script>
+      <script defer src="site-admin-controls.js?v=20260510b"></script>
+
+</body>
+</html>

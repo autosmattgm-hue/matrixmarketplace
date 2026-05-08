@@ -628,6 +628,51 @@
     return changed;
   }
 
+  function updateSessionAccount(email, patch) {
+    const target = cleanEmail(email);
+    if (!target || !patch || typeof patch !== "object") return false;
+    let changed = false;
+    ["currentUser", "currentSeller", "loggedInUser"].forEach(function (key) {
+      const row = readJSON(key, null);
+      if (!row || typeof row !== "object") return;
+      if (cleanEmail(row.email || row.mail || "") !== target) return;
+      writeJSON(key, { ...row, ...patch, email: target });
+      changed = true;
+    });
+    return changed;
+  }
+
+  function resetAccountPassword(email, nextPassword) {
+    const target = cleanEmail(email);
+    const password = str(nextPassword);
+    if (!target || !password) return false;
+    const changed = updateAccountByEmail(target, {
+      password: password,
+      updatedAt: new Date().toISOString()
+    });
+    if (!changed) return false;
+    updateSessionAccount(target, {
+      password: password,
+      updatedAt: new Date().toISOString()
+    });
+    log("account_password_reset", { email: target });
+    return true;
+  }
+
+  function clearLiveSessions() {
+    let changed = false;
+    ["currentUser", "currentSeller", "loggedInUser"].forEach(function (key) {
+      const existing = readRaw(key);
+      if (existing == null) return;
+      try {
+        storageRef().removeItem(key);
+        changed = true;
+      } catch (_) {}
+    });
+    if (changed) log("live_sessions_cleared", {});
+    return changed;
+  }
+
   function findAccount(email) {
     const target = cleanEmail(email);
     return getAllAccounts().find(function (a) { return cleanEmail(a.email) === target; }) || null;
@@ -915,6 +960,91 @@
     };
   }
 
+  function getSiteSnapshot() {
+    return {
+      generatedAt: new Date().toISOString(),
+      dashboard: computeDashboard(),
+      users: getUsers(),
+      sellers: getSellers(),
+      products: getProducts(),
+      payments: getPayments(),
+      orders: getOrders(),
+      purchases: getPurchases(),
+      codes: getCodes(),
+      logs: getAuditLogs(),
+      notifications: readJSON("adminNotifications", []),
+      supportTickets: readJSON("supportTickets", []),
+      sellerComplaints: readJSON("sellerComplaints", []),
+      chatThreads: readJSON("chatThreads", {}),
+      siteControl: readJSON("siteControlState", null),
+      lastLoginMeta: readJSON("lastLoginMeta", null)
+    };
+  }
+
+  function getSiteControl() {
+    const state = readJSON("siteControlState", null);
+    const source = state && typeof state === "object" ? state : {};
+    return {
+      maintenanceMode: Boolean(source.maintenanceMode),
+      checkoutLocked: Boolean(source.checkoutLocked),
+      announcementEnabled: Boolean(source.announcementEnabled),
+      announcementTone: str(source.announcementTone || "info") || "info",
+      announcementTitle: str(source.announcementTitle || ""),
+      announcementMessage: str(source.announcementMessage || ""),
+      supportContact: str(source.supportContact || ""),
+      updatedAt: source.updatedAt || ""
+    };
+  }
+
+  function setSiteControl(patch) {
+    const prev = getSiteControl();
+    const next = {
+      ...prev,
+      ...(patch && typeof patch === "object" ? patch : {}),
+      maintenanceMode: Boolean(patch && patch.maintenanceMode),
+      checkoutLocked: Boolean(patch && patch.checkoutLocked),
+      announcementEnabled: Boolean(patch && patch.announcementEnabled),
+      announcementTone: str(patch && patch.announcementTone || prev.announcementTone || "info") || "info",
+      announcementTitle: str(patch && patch.announcementTitle || ""),
+      announcementMessage: str(patch && patch.announcementMessage || ""),
+      supportContact: str(patch && patch.supportContact || ""),
+      updatedAt: new Date().toISOString()
+    };
+    writeJSON("siteControlState", next);
+    log("site_control_updated", next);
+    return next;
+  }
+
+  function restoreSiteSnapshot(snapshot) {
+    const data = snapshot && typeof snapshot === "object" ? snapshot : null;
+    if (!data) return false;
+
+    if (Array.isArray(data.users)) setUsers(data.users.map(function (row, idx) {
+      return normalizeEntity(row, "user", idx);
+    }));
+    if (Array.isArray(data.sellers)) setSellers(data.sellers.map(function (row, idx) {
+      return normalizeEntity(row, "seller", idx);
+    }));
+    if (Array.isArray(data.products)) setProducts(data.products);
+    if (Array.isArray(data.payments)) setPayments(data.payments);
+    if (Array.isArray(data.orders)) setOrders(data.orders);
+    if (Array.isArray(data.purchases)) writeJSON("purchases", data.purchases);
+    if (data.codes && typeof data.codes === "object") setCodes(data.codes);
+    if (Array.isArray(data.logs)) writeJSON("adminAuditLogs", data.logs);
+    if (Array.isArray(data.notifications)) writeJSON("adminNotifications", data.notifications);
+    if (Array.isArray(data.supportTickets)) writeJSON("supportTickets", data.supportTickets);
+    if (Array.isArray(data.sellerComplaints)) writeJSON("sellerComplaints", data.sellerComplaints);
+    if (data.chatThreads && typeof data.chatThreads === "object") writeJSON("chatThreads", data.chatThreads);
+    if (data.siteControl && typeof data.siteControl === "object") writeJSON("siteControlState", data.siteControl);
+    if (data.lastLoginMeta && typeof data.lastLoginMeta === "object") writeJSON("lastLoginMeta", data.lastLoginMeta);
+
+    log("site_snapshot_restored", {
+      generatedAt: str(data.generatedAt || ""),
+      restoredAt: new Date().toISOString()
+    });
+    return true;
+  }
+
   function exportCSV(rows, filename) {
     const safeRows = Array.isArray(rows) ? rows : [];
     if (!safeRows.length) return false;
@@ -960,6 +1090,7 @@
 
   function renderAdminHeader(activePage) {
     const map = [
+      ["owner-console.html", "Owner"],
       ["dashboard-admin.html", "Dashboard"],
       ["admin-users.html", "Users"],
       ["admin-sellers.html", "Sellers"],
@@ -1011,6 +1142,8 @@
     deleteAccount: deleteAccount,
     findAccount: findAccount,
     adjustBalance: adjustBalance,
+    resetAccountPassword: resetAccountPassword,
+    clearLiveSessions: clearLiveSessions,
     approveLatestTopupRequest: approveLatestTopupRequest,
     getProducts: getProducts,
     setProducts: setProducts,
@@ -1027,6 +1160,10 @@
     removeCode: removeCode,
     getAuditLogs: getAuditLogs,
     computeDashboard: computeDashboard,
+    getSiteSnapshot: getSiteSnapshot,
+    getSiteControl: getSiteControl,
+    setSiteControl: setSiteControl,
+    restoreSiteSnapshot: restoreSiteSnapshot,
     exportCSV: exportCSV,
     exportJSON: exportJSON,
     createCode: createCode,

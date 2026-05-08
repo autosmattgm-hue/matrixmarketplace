@@ -698,8 +698,12 @@
                 const userStatus = str(user && (user.paymentStatus || user.status)).toLowerCase();
                 const subscription = str(user && user.subscription).toLowerCase();
 
-                if (requestStatus === "approved" || requestStatus === "paid") return "approved";
-                if (requestStatus === "declined") return "declined";
+                if (request) {
+                    if (requestStatus === "approved" || requestStatus === "paid") return "approved";
+                    if (requestStatus === "declined") return "declined";
+                    return "pending";
+                }
+
                 if (userStatus === "paid" || userStatus === "approved" || subscription === "active") return "approved";
                 if (userStatus === "declined") return "declined";
                 if (request || user) return "pending";
@@ -727,7 +731,7 @@
                 if (kind === "approved") {
                     badge.textContent = "Approved";
                     title.textContent = "Payment approved";
-                    subtitle.textContent = "Your latest payment was approved or your account is already marked as paid.";
+                    subtitle.textContent = "Your latest payment request has been approved by the admin team.";
                     banner.textContent = "Your payment has been accepted. You can continue using the related marketplace flow now.";
                     primary.textContent = "Continue to Home";
                     primary.href = "index.html";
@@ -871,7 +875,8 @@
         }());
     </script>
     <script defer src="upgrade.js"></script>
-    <script defer src="sw-register.js?v=20260226a"></script>
-    <script defer src="site-performance.js?v=20260226a"></script>
+      <script defer src="site-admin-controls.js?v=20260510b"></script>
+
+    <script defer src="site-performance.js?v=20260510b"></script>
 </body>
 </html>

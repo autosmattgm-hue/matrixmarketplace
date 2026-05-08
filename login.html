@@ -8,12 +8,16 @@
     <link rel="stylesheet" href="">
     <style>
         :root {
-            --bg1: #ffffff;
-            --bg2: #f4f8fb;
-            --accent: #0f766e;
-            --accent2: #2563eb;
-            --text: #122033;
-            --muted: #5f6c7b;
+            --bg-deep: #09111f;
+            --bg-mid: #132033;
+            --panel: rgba(10, 18, 33, 0.78);
+            --panel-soft: rgba(255, 255, 255, 0.08);
+            --line: rgba(148, 163, 184, 0.22);
+            --text: #eff6ff;
+            --muted: #93a4bb;
+            --brand: #f97316;
+            --brand-2: #14b8a6;
+            --brand-3: #facc15;
         }
 
         * { box-sizing: border-box; }
@@ -21,18 +25,15 @@
         body {
             margin: 0;
             min-height: 100vh;
-            display: grid;
-            place-items: center;
-            padding: 1rem;
-            gap: 0.8rem;
-            font-family: "Poppins", sans-serif;
+            padding: 1.1rem;
+            font-family: "Poppins", "Segoe UI", sans-serif;
             color: var(--text);
             position: relative;
-            overflow: hidden;
+            overflow-x: hidden;
             background:
-                radial-gradient(900px 460px at -12% -8%, rgba(37, 99, 235, 0.10), transparent 58%),
-                radial-gradient(740px 360px at 110% 10%, rgba(15, 118, 110, 0.10), transparent 62%),
-                linear-gradient(180deg, var(--bg1), var(--bg2) 52%, #eef4f8 100%);
+                radial-gradient(900px 480px at -10% -10%, rgba(249, 115, 22, 0.22), transparent 58%),
+                radial-gradient(760px 420px at 110% 0%, rgba(20, 184, 166, 0.18), transparent 60%),
+                linear-gradient(135deg, #07111e 0%, #0f1b2d 45%, #162338 100%);
         }
 
         body::before,
@@ -40,27 +41,27 @@
             content: "";
             position: fixed;
             pointer-events: none;
-            filter: blur(42px);
-            opacity: 0.48;
+            filter: blur(50px);
+            opacity: 0.52;
             z-index: 0;
         }
 
         body::before {
-            width: 280px;
-            height: 280px;
-            border-radius: 50%;
-            left: -80px;
-            bottom: -70px;
-            background: rgba(37, 99, 235, 0.10);
+            width: 340px;
+            height: 340px;
+            border-radius: 999px;
+            left: -120px;
+            bottom: -90px;
+            background: rgba(249, 115, 22, 0.24);
         }
 
         body::after {
-            width: 240px;
-            height: 240px;
-            border-radius: 50%;
-            right: -80px;
-            top: -60px;
-            background: rgba(15, 118, 110, 0.08);
+            width: 320px;
+            height: 320px;
+            border-radius: 999px;
+            right: -120px;
+            top: -120px;
+            background: rgba(20, 184, 166, 0.20);
         }
 
         .bg-grid {
@@ -68,70 +69,229 @@
             inset: 0;
             pointer-events: none;
             z-index: 0;
-            opacity: 0.42;
+            opacity: 0.22;
             background:
-                linear-gradient(rgba(148, 163, 184, 0.16) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(148, 163, 184, 0.16) 1px, transparent 1px);
-            background-size: 26px 26px;
-            mask-image: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.75) 0%, transparent 82%);
+                linear-gradient(rgba(148, 163, 184, 0.22) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(148, 163, 184, 0.22) 1px, transparent 1px);
+            background-size: 32px 32px;
+            mask-image: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.9) 15%, transparent 82%);
         }
 
-        @keyframes gradientBG {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
-        }
-
-        .panel {
-            width: min(420px, 100%);
-            border: 1px solid rgba(219, 227, 239, 0.95);
-            border-radius: 20px;
-            background: rgba(255, 255, 255, 0.94);
-            backdrop-filter: blur(12px);
-            box-shadow: 0 18px 40px rgba(15, 23, 42, 0.10);
-            padding: 1.2rem;
+        .auth-shell {
+            width: min(1160px, 100%);
+            margin: 0 auto;
+            min-height: calc(100vh - 2.2rem);
+            display: grid;
+            grid-template-columns: minmax(0, 1.05fr) minmax(380px, 430px);
+            gap: 1rem;
+            align-items: stretch;
             position: relative;
             z-index: 1;
         }
 
-        h1 {
-            margin: 0 0 0.2rem;
-            font-size: 1.9rem;
-            color: #0f172a;
-            text-shadow: none;
+        .brand-panel,
+        .panel,
+        .support {
+            border: 1px solid var(--line);
+            background: var(--panel);
+            box-shadow: 0 24px 64px rgba(2, 6, 23, 0.34);
+            backdrop-filter: blur(18px);
         }
 
-        .sub {
-            margin: 0 0 0.8rem;
-            color: var(--muted);
-            font-size: 0.9rem;
+        .brand-panel {
+            border-radius: 30px;
+            padding: 1.2rem;
+            display: grid;
+            gap: 1rem;
+            overflow: hidden;
+            position: relative;
+            background:
+                radial-gradient(420px 240px at 15% 10%, rgba(249, 115, 22, 0.16), transparent 65%),
+                radial-gradient(340px 220px at 100% 20%, rgba(20, 184, 166, 0.16), transparent 62%),
+                var(--panel);
         }
 
+        .brand-panel::after {
+            content: "";
+            position: absolute;
+            inset: auto 18px 18px auto;
+            width: 140px;
+            height: 140px;
+            border-radius: 24px;
+            border: 1px solid rgba(250, 204, 21, 0.16);
+            background: linear-gradient(135deg, rgba(250, 204, 21, 0.12), rgba(20, 184, 166, 0.04));
+            transform: rotate(12deg);
+        }
+
+        .brand-top {
+            display: flex;
+            justify-content: space-between;
+            gap: 1rem;
+            align-items: flex-start;
+            flex-wrap: wrap;
+        }
+
+        .brand-chip,
+        .eyebrow,
         .net-pill {
             display: inline-flex;
             align-items: center;
-            gap: 0.4rem;
+            gap: 0.45rem;
             border-radius: 999px;
-            border: 1px solid rgba(37, 99, 235, 0.14);
-            background: rgba(37, 99, 235, 0.08);
-            color: #1d4ed8;
-            padding: 0.26rem 0.56rem;
-            font-size: 0.75rem;
+            padding: 0.32rem 0.72rem;
+            font-size: 0.76rem;
             font-weight: 700;
-            margin-bottom: 0.45rem;
+            letter-spacing: 0.03em;
+        }
+
+        .brand-chip {
+            border: 1px solid rgba(249, 115, 22, 0.26);
+            background: rgba(249, 115, 22, 0.12);
+            color: #fed7aa;
+        }
+
+        .brand-kicker {
+            margin: 0;
+            color: var(--muted);
+            font-size: 0.88rem;
+            max-width: 280px;
+            line-height: 1.55;
+        }
+
+        .brand-copy h2 {
+            margin: 0;
+            font-size: clamp(2rem, 4vw, 3.7rem);
+            line-height: 0.96;
+            letter-spacing: -0.04em;
+        }
+
+        .brand-copy p {
+            margin: 0.8rem 0 0;
+            max-width: 560px;
+            color: #d6e4f5;
+            line-height: 1.65;
+            font-size: 1rem;
+        }
+
+        .trust-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.75rem;
+        }
+
+        .trust-card {
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 0.9rem;
+        }
+
+        .trust-card strong {
+            display: block;
+            font-size: 1.2rem;
+            margin-bottom: 0.18rem;
+            color: #fff7ed;
+        }
+
+        .trust-card span {
+            display: block;
+            color: var(--muted);
+            font-size: 0.82rem;
+            line-height: 1.5;
+        }
+
+        .brand-list {
+            display: grid;
+            gap: 0.62rem;
+        }
+
+        .brand-point {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 0.7rem;
+            align-items: start;
+            padding: 0.74rem 0.78rem;
+            border-radius: 16px;
+            border: 1px solid rgba(148, 163, 184, 0.14);
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .brand-point b {
+            width: 34px;
+            height: 34px;
+            display: inline-grid;
+            place-items: center;
+            border-radius: 12px;
+            background: rgba(20, 184, 166, 0.14);
+            color: #99f6e4;
+            font-size: 0.88rem;
+        }
+
+        .brand-point strong {
+            display: block;
+            margin-bottom: 0.16rem;
+            color: #f8fafc;
+        }
+
+        .brand-point span {
+            color: var(--muted);
+            font-size: 0.84rem;
+            line-height: 1.5;
+        }
+
+        .auth-stack {
+            display: grid;
+            gap: 0.95rem;
+            align-self: center;
+        }
+
+        .panel {
+            width: 100%;
+            border-radius: 28px;
+            padding: 1.15rem;
+            position: relative;
+        }
+
+        .eyebrow {
+            border: 1px solid rgba(20, 184, 166, 0.22);
+            background: rgba(20, 184, 166, 0.10);
+            color: #99f6e4;
+            margin-bottom: 0.75rem;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 2.2rem;
+            color: #f8fafc;
+            line-height: 1;
+            letter-spacing: -0.04em;
+        }
+
+        .sub {
+            margin: 0.55rem 0 0.9rem;
+            color: var(--muted);
+            font-size: 0.95rem;
+            line-height: 1.55;
+        }
+
+        .net-pill {
+            border: 1px solid rgba(59, 130, 246, 0.18);
+            background: rgba(59, 130, 246, 0.12);
+            color: #bfdbfe;
+            margin-bottom: 0.7rem;
         }
 
         .net-pill.offline {
-            border-color: rgba(248, 113, 113, 0.58);
-            background: rgba(239, 68, 68, 0.18);
+            border-color: rgba(248, 113, 113, 0.38);
+            background: rgba(127, 29, 29, 0.34);
             color: #fecaca;
         }
 
         .label {
             display: block;
-            margin-top: 0.5rem;
-            margin-bottom: 0.26rem;
-            color: #1e293b;
+            margin-top: 0.62rem;
+            margin-bottom: 0.3rem;
+            color: #e2e8f0;
             font-size: 0.84rem;
             font-weight: 600;
         }
@@ -140,40 +300,42 @@
         input[type="password"],
         input[type="text"] {
             width: 100%;
-            border: 1px solid #dbe3ef;
-            border-radius: 11px;
-            padding: 0.72rem;
-            background: #f8fafc;
-            color: #000000;
+            border: 1px solid rgba(148, 163, 184, 0.22);
+            border-radius: 14px;
+            padding: 0.82rem 0.9rem;
+            background: rgba(255, 255, 255, 0.07);
+            color: #f8fafc;
             outline: none;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
         }
 
         input[type="email"]::placeholder,
         input[type="password"]::placeholder,
         input[type="text"]::placeholder {
-            color: #111111;
+            color: #94a3b8;
             opacity: 1;
         }
 
         input:focus {
-            border-color: #22c55e;
-            box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.12);
+            border-color: rgba(249, 115, 22, 0.7);
+            box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.12);
+            background: rgba(255, 255, 255, 0.10);
         }
 
         .password-row {
             display: grid;
             grid-template-columns: 1fr auto;
-            gap: 0.45rem;
+            gap: 0.5rem;
             align-items: center;
         }
 
         .mini-btn {
-            border: 1px solid rgba(203, 213, 225, 0.5);
-            border-radius: 10px;
-            background: #ffffff;
-            color: #0f172a;
-            height: 40px;
-            padding: 0 0.7rem;
+            border: 1px solid rgba(148, 163, 184, 0.22);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.08);
+            color: #e2e8f0;
+            height: 46px;
+            padding: 0 0.85rem;
             font-weight: 700;
             cursor: pointer;
         }
@@ -182,140 +344,163 @@
             display: none;
             margin-top: 0.34rem;
             font-size: 0.8rem;
-            color: #facc15;
+            color: #fde68a;
             font-weight: 600;
         }
 
         .actions {
-            margin-top: 0.58rem;
+            margin-top: 0.7rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
             gap: 0.6rem;
             color: var(--muted);
             font-size: 0.82rem;
+            flex-wrap: wrap;
         }
 
         .check {
             display: inline-flex;
             align-items: center;
-            gap: 0.35rem;
+            gap: 0.45rem;
         }
 
         .check input {
             width: 15px;
             height: 15px;
             margin: 0;
-            accent-color: var(--accent);
+            accent-color: var(--brand);
         }
 
         .link {
             border: none;
             background: none;
-            color: #2563eb;
+            color: #fdba74;
             cursor: pointer;
-            text-decoration: underline;
-            text-underline-offset: 2px;
+            text-decoration: none;
             font-weight: 600;
             padding: 0;
         }
 
         .submit {
             width: 100%;
-            margin-top: 0.8rem;
+            margin-top: 0.95rem;
             border: none;
-            border-radius: 11px;
-            padding: 0.75rem;
-            font-weight: 700;
+            border-radius: 15px;
+            padding: 0.88rem 0.95rem;
+            font-weight: 800;
             color: #fff;
-            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            background: linear-gradient(135deg, var(--brand), var(--brand-2));
             cursor: pointer;
+            box-shadow: 0 18px 30px rgba(249, 115, 22, 0.20);
         }
 
         .submit[disabled] { opacity: 0.7; cursor: not-allowed; }
 
         .state {
             display: none;
-            margin-top: 0.52rem;
-            color: #1d4ed8;
+            margin-top: 0.56rem;
+            color: #7dd3fc;
             font-size: 0.86rem;
             font-weight: 600;
         }
 
         .msg {
             display: none;
-            margin-top: 0.6rem;
-            padding: 0.55rem 0.62rem;
-            border-radius: 10px;
+            margin-top: 0.68rem;
+            padding: 0.65rem 0.74rem;
+            border-radius: 14px;
             font-size: 0.84rem;
             border: 1px solid transparent;
         }
 
-        .msg.success { color: #212523; background: rgba(34, 197, 94, 0.18); border-color: rgba(74, 222, 128, 0.5); }
-        .msg.error { color: #b91c1c; background: rgba(239, 68, 68, 0.10); border-color: rgba(248, 113, 113, 0.35); }
-        .msg.info { color: #1d4ed8; background: rgba(56, 189, 248, 0.10); border-color: rgba(56, 189, 248, 0.28); }
+        .msg.success { color: #dcfce7; background: rgba(20, 83, 45, 0.34); border-color: rgba(74, 222, 128, 0.28); }
+        .msg.error { color: #fecaca; background: rgba(127, 29, 29, 0.34); border-color: rgba(248, 113, 113, 0.28); }
+        .msg.info { color: #dbeafe; background: rgba(30, 58, 138, 0.28); border-color: rgba(96, 165, 250, 0.24); }
 
         .quick-actions {
-            margin-top: 0.7rem;
+            margin-top: 0.8rem;
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 0.42rem;
+            gap: 0.48rem;
         }
 
         .ghost-action {
-            border: 1px solid rgba(148, 163, 184, 0.54);
-            border-radius: 10px;
-            background: #ffffff;
-            color: #0f172a;
-            font-size: 0.74rem;
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.05);
+            color: #e2e8f0;
+            font-size: 0.76rem;
             font-weight: 700;
-            padding: 0.5rem 0.35rem;
+            padding: 0.68rem 0.42rem;
             cursor: pointer;
             transition: 0.2s ease;
         }
 
-        .ghost-action:hover {
-            border-color: rgba(34, 211, 238, 0.8);
-            color: #a5f3fc;
+        .ghost-action:hover,
+        .mini-btn:hover,
+        .support-links a:hover {
+            transform: translateY(-1px);
+            filter: brightness(1.05);
         }
 
         .meta-line {
-            margin-top: 0.58rem;
+            margin-top: 0.7rem;
             color: var(--muted);
             font-size: 0.78rem;
-            opacity: 0.85;
+            opacity: 0.94;
+            line-height: 1.5;
         }
 
         .foot {
-            margin: 0.9rem 0 0;
+            margin: 0.95rem 0 0;
             font-size: 0.9rem;
             color: var(--muted);
         }
 
-        .foot a { color: #2563eb; text-decoration: none; font-weight: 700; }
-
-        .support {
-            width: min(420px, 100%);
-            border: 1px solid rgba(219, 227, 239, 0.95);
-            border-radius: 14px;
-            background: rgba(255, 255, 255, 0.94);
-            backdrop-filter: blur(12px);
-            box-shadow: 0 14px 28px rgba(15, 23, 42, 0.10);
-            padding: 0.9rem;
-            text-align: center;
-            position: relative;
-            z-index: 1;
+        .foot a {
+            color: #fdba74;
+            text-decoration: none;
+            font-weight: 700;
         }
 
-        .support h2 { margin: 0 0 0.45rem; font-size: 1.1rem; }
-        .support p { margin: 0 0 0.45rem; color: var(--muted); font-size: 0.88rem; }
-        .support-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.45rem; }
+        .support {
+            width: 100%;
+            border-radius: 22px;
+            padding: 0.95rem 1rem;
+            position: relative;
+            overflow: hidden;
+            background:
+                linear-gradient(135deg, rgba(249, 115, 22, 0.10), rgba(20, 184, 166, 0.08)),
+                var(--panel);
+        }
+
+        .support h2 {
+            margin: 0 0 0.45rem;
+            font-size: 1.1rem;
+            color: #f8fafc;
+        }
+
+        .support p {
+            margin: 0 0 0.6rem;
+            color: var(--muted);
+            font-size: 0.88rem;
+            line-height: 1.55;
+        }
+
+        .support-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
         .support-links a {
             text-decoration: none;
             color: #fff;
-            background: linear-gradient(135deg, var(--accent), var(--accent2));
-            border-radius: 10px;
-            padding: 0.45rem 0.62rem;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            border-radius: 12px;
+            padding: 0.55rem 0.72rem;
             font-size: 0.78rem;
             font-weight: 700;
         }
@@ -323,23 +508,25 @@
         .modal {
             position: fixed;
             inset: 0;
-            background: rgba(15, 23, 42, 0.22);
+            background: rgba(2, 6, 23, 0.58);
             display: none;
             align-items: center;
             justify-content: center;
             z-index: 1200;
             padding: 1rem;
+            backdrop-filter: blur(10px);
         }
 
         .modal.open { display: flex; }
 
         .modal-card {
-            width: min(420px, 100%);
-            border-radius: 14px;
-            border: 1px solid rgba(219, 227, 239, 0.95);
-            background: #ffffff;
-            padding: 0.9rem;
-            box-shadow: 0 18px 34px rgba(15, 23, 42, 0.12);
+            width: min(440px, 100%);
+            border-radius: 22px;
+            border: 1px solid rgba(148, 163, 184, 0.22);
+            background: rgba(10, 18, 33, 0.96);
+            color: var(--text);
+            padding: 1rem;
+            box-shadow: 0 18px 34px rgba(15, 23, 42, 0.32);
         }
 
         .modal-head {
@@ -350,14 +537,51 @@
             margin-bottom: 0.42rem;
         }
 
-        .modal-head h3 { margin: 0; font-size: 0.98rem; }
-        .modal-note { margin: 0 0 0.54rem; color: var(--muted); font-size: 0.82rem; }
+        .modal-head h3 { margin: 0; font-size: 1rem; }
+        .modal-note { margin: 0 0 0.6rem; color: var(--muted); font-size: 0.82rem; line-height: 1.5; }
+        .modal form { display: grid; gap: 0.5rem; }
 
-        .modal form { display: grid; gap: 0.45rem; }
+        @media (max-width: 980px) {
+            .auth-shell {
+                grid-template-columns: 1fr;
+                min-height: auto;
+            }
 
-        @media (max-width: 520px) {
+            .brand-panel {
+                order: 2;
+            }
+
+            .auth-stack {
+                order: 1;
+            }
+        }
+
+        @media (max-width: 640px) {
+            body {
+                padding: 0.8rem;
+            }
+
+            .brand-panel,
+            .panel,
+            .support {
+                border-radius: 22px;
+            }
+
+            .trust-grid,
             .quick-actions {
                 grid-template-columns: 1fr;
+            }
+
+            .brand-copy h2 {
+                font-size: 2rem;
+            }
+
+            .password-row {
+                grid-template-columns: 1fr;
+            }
+
+            .mini-btn {
+                width: 100%;
             }
         }
     </style>
@@ -366,53 +590,110 @@
 </head>
 <body>
     <div class="bg-grid" aria-hidden="true"></div>
-    <div class="panel">
-        <h1>Login</h1>
-        <p class="sub" style="color: white;">Sign in to continue as buyer or seller.</p>
-        <div id="onlineState" class="net-pill">Checking network...</div>
 
-        <form onsubmit="return loginUser(event)">
-            <label class="label" for="email" style="color: rgb(248, 237, 237);">Email Address</label>
-            <input type="email" id="email" placeholder="you@example.com" autocomplete="email" required>
-
-            <label class="label" for="password" style="color: rgb(248, 237, 237);">Password</label>
-            <div class="password-row">
-                <input type="password" id="password" placeholder="Enter your password" autocomplete="current-password" required>
-                <button id="togglePassword" class="mini-btn" type="button" aria-label="Show password" style="color: rgb(124, 123, 123);">Show</button>
-            </div>
-            <div id="capsWarn" class="caps">Caps Lock appears to be on.</div>
-
-            <div class="actions">
-                <label class="check" for="rememberMe">
-                    <input type="checkbox" id="rememberMe">
-                    <span>Remember email</span>
-                </label>
-                <button id="forgotBtn" class="link" type="button">Forgot password?</button>
+    <main class="auth-shell">
+        <section class="brand-panel" aria-label="Marketplace login highlights">
+            <div class="brand-top">
+                <div class="brand-chip">MatrixMarket Access</div>
+                <p class="brand-kicker">Buyer and seller sign-in now lives in one cleaner, faster, easier gateway.</p>
             </div>
 
-            <button id="loginBtn" class="submit" type="submit">Login</button>
-        </form>
+            <div class="brand-copy">
+                <h2>Sign In.<br>Sell Faster.<br>Shop Smarter.</h2>
+                <p>Access your orders, seller tools, chat, payment status, and live marketplace flow from one focused login page designed to reduce friction and get you back into the platform quickly.</p>
+            </div>
 
-        <div id="loginState" class="state">Signing in...</div>
-        <div id="loginMessage" class="msg" role="status" aria-live="polite"></div>
-        <div class="quick-actions">
-            <button id="lastBuyerBtn" class="ghost-action" type="button">Use Last Buyer</button>
-            <button id="lastSellerBtn" class="ghost-action" type="button">Use Last Seller</button>
-            <button id="guestBtn" class="ghost-action" type="button">Continue as Guest</button>
-        </div>
-        <div id="lastLoginMeta" class="meta-line">Last login: none</div>
-        <p class="foot">Do not have an account? <a href="register.html">Register here</a></p>
-    </div>
+            <div class="trust-grid">
+                <article class="trust-card">
+                    <strong>1 Page</strong>
+                    <span>Buyers and sellers share one clear access point.</span>
+                </article>
+                <article class="trust-card">
+                    <strong>Live Sync</strong>
+                    <span>Account data refreshes against the current marketplace store.</span>
+                </article>
+                <article class="trust-card">
+                    <strong>Fast Recovery</strong>
+                    <span>Built-in password reset and last-account shortcuts.</span>
+                </article>
+            </div>
 
-    <div class="support">
-        <h2>Need Help?</h2>
-        <p>Customer care is available 24/7.</p>
-        <div class="support-links">
-            <a href="mailto:support@neo-marketplace.com">Email Support</a>
-            <a href="tel:+2206785316">Call Us</a>
-            <a href="https://wa.me/qr/FDKDUI5V625OE1">Live Chat</a>
-        </div>
-    </div>
+            <div class="brand-list">
+                <article class="brand-point">
+                    <b>01</b>
+                    <div>
+                        <strong>Seller-ready entry flow</strong>
+                        <span>Approved sellers go straight to their dashboard, while unapproved sellers are guided into payment and approval steps.</span>
+                    </div>
+                </article>
+                <article class="brand-point">
+                    <b>02</b>
+                    <div>
+                        <strong>Safer, clearer access</strong>
+                        <span>Attempt throttling, remembered email, caps lock warning, and account-type aware redirects stay active behind the new design.</span>
+                    </div>
+                </article>
+                <article class="brand-point">
+                    <b>03</b>
+                    <div>
+                        <strong>Instant recovery support</strong>
+                        <span>Users can recover their password quickly or move ahead as a guest while still having support contacts close by.</span>
+                    </div>
+                </article>
+            </div>
+        </section>
+
+        <section class="auth-stack">
+            <div class="panel">
+                <div class="eyebrow">Secure Login</div>
+                <h1>Welcome Back</h1>
+                <p class="sub">Sign in to continue as a buyer or seller and jump straight into your live MatrixMarket workflow.</p>
+                <div id="onlineState" class="net-pill">Checking network...</div>
+
+                <form onsubmit="return loginUser(event)">
+                    <label class="label" for="email">Email Address</label>
+                    <input type="email" id="email" placeholder="you@example.com" autocomplete="email" required>
+
+                    <label class="label" for="password">Password</label>
+                    <div class="password-row">
+                        <input type="password" id="password" placeholder="Enter your password" autocomplete="current-password" required>
+                        <button id="togglePassword" class="mini-btn" type="button" aria-label="Show password">Show</button>
+                    </div>
+                    <div id="capsWarn" class="caps">Caps Lock appears to be on.</div>
+
+                    <div class="actions">
+                        <label class="check" for="rememberMe">
+                            <input type="checkbox" id="rememberMe">
+                            <span>Remember email</span>
+                        </label>
+                        <button id="forgotBtn" class="link" type="button">Forgot password?</button>
+                    </div>
+
+                    <button id="loginBtn" class="submit" type="submit">Login</button>
+                </form>
+
+                <div id="loginState" class="state">Signing in...</div>
+                <div id="loginMessage" class="msg" role="status" aria-live="polite"></div>
+                <div class="quick-actions">
+                    <button id="lastBuyerBtn" class="ghost-action" type="button">Use Last Buyer</button>
+                    <button id="lastSellerBtn" class="ghost-action" type="button">Use Last Seller</button>
+                    <button id="guestBtn" class="ghost-action" type="button">Continue as Guest</button>
+                </div>
+                <div id="lastLoginMeta" class="meta-line">Last login: none</div>
+                <p class="foot">Do not have an account? <a href="register.html">Register here</a></p>
+            </div>
+
+            <div class="support">
+                <h2>Need Help Fast?</h2>
+                <p>Customer care is available around the clock if you are locked out, waiting on seller approval, or need payment guidance.</p>
+                <div class="support-links">
+                    <a href="mailto:support@neo-marketplace.com">Email Support</a>
+                    <a href="tel:+2206785316">Call Us</a>
+                    <a href="https://wa.me/qr/FDKDUI5V625OE1">Live Chat</a>
+                </div>
+            </div>
+        </section>
+    </main>
 
     <div id="resetModal" class="modal" aria-hidden="true">
         <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="resetTitle">
@@ -928,7 +1209,8 @@
     </script>
 
     <script defer src="upgrade.js"></script>
-    <script defer src="sw-register.js?v=20260226a"></script>
-    <script defer src="site-performance.js?v=20260226a"></script>
+      <script defer src="site-admin-controls.js?v=20260510b"></script>
+
+    <script defer src="site-performance.js?v=20260510b"></script>
 </body>
 </html>
