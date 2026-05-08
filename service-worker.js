@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v20260510w";
+const CACHE_VERSION = "v20260510zc";
 const STATIC_CACHE = `matrixmarket-static-${CACHE_VERSION}`;
 const PAGE_CACHE = `matrixmarket-pages-${CACHE_VERSION}`;
 const DATA_CACHE = `matrixmarket-data-${CACHE_VERSION}`;
@@ -23,7 +23,7 @@ const PRECACHE_URLS = [
   "./index-home.js?v=20260510b",
   "./firebase-online-storage.js?v=20260224c",
   "./seller-core.js?v=20260510i",
-  "./admin-core.js?v=20260510aa",
+  "./admin-core.js?v=20260510ae",
   "./admin-login.html",
   "./app.webmanifest",
   "./mobile-app.js?v=20260510a",

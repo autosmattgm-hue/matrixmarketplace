@@ -473,6 +473,14 @@
                 return window.localStorage;
             }
 
+            function localStorageRef() {
+                try {
+                    return window.localStorage;
+                } catch (_) {
+                    return null;
+                }
+            }
+
             function normalizeEmail(value) {
                 return String(value || "").trim().toLowerCase();
             }
@@ -501,6 +509,34 @@
                     });
                 }
                 return [];
+            }
+
+            function writeValue(key, value) {
+                const payload = typeof value === "string" ? value : JSON.stringify(value);
+                const primary = storage();
+                let wrote = false;
+                try {
+                    primary.setItem(key, payload);
+                    wrote = true;
+                } catch (_) {}
+                const local = localStorageRef();
+                if (local && local !== primary) {
+                    try {
+                        local.setItem(key, payload);
+                        wrote = true;
+                    } catch (_) {}
+                }
+                if (!wrote) throw new Error("Could not save your account in browser storage.");
+                return true;
+            }
+
+            function removeValue(key) {
+                const primary = storage();
+                try { primary.removeItem(key); } catch (_) {}
+                const local = localStorageRef();
+                if (local && local !== primary) {
+                    try { local.removeItem(key); } catch (_) {}
+                }
             }
 
             function setBusy(isBusy) {
@@ -546,6 +582,17 @@
                 }) || sellers.some(function (row) {
                     return normalizeEmail(row && (row.email || row.mail)) === email;
                 });
+            }
+
+            function makeStableId(prefix, email, createdAt) {
+                const normalizedPrefix = String(prefix || "acct").toUpperCase();
+                const seed = String(email || "")
+                    .trim()
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]+/g, "-")
+                    .replace(/^-+|-+$/g, "") || "account";
+                const stamp = new Date(createdAt || Date.now()).getTime().toString(36).toUpperCase();
+                return normalizedPrefix + "-" + seed.toUpperCase() + "-" + stamp;
             }
 
             function updateEmailHints() {
@@ -756,6 +803,10 @@
                 } catch (_) {}
             }
 
+            function clearGuestSessions() {
+                ["currentUser", "loggedInUser", "currentSeller"].forEach(removeValue);
+            }
+
             window.registerUser = async function registerUser(event) {
                 event.preventDefault();
                 if (registerBusy) return false;
@@ -806,7 +857,9 @@
                 try {
                     const createdAt = new Date().toISOString();
                     const isSeller = values.accountType === "seller";
+                    const userId = makeStableId(isSeller ? "SELLERUSER" : "BUYER", values.email, createdAt);
                     const userRecord = {
+                        id: userId,
                         fullName: values.fullName,
                         name: values.fullName,
                         email: values.email,
@@ -823,14 +876,18 @@
                         paymentStatus: isSeller ? "Pending" : "Paid",
                         status: isSeller ? "Pending Approval" : "Active",
                         isSeller: isSeller,
-                        createdAt: createdAt
+                        createdAt: createdAt,
+                        updatedAt: createdAt,
+                        lastLoginAt: "",
+                        walletBalance: 0
                     };
 
                     users.push(userRecord);
-                    storage().setItem("users", JSON.stringify(users));
+                    writeValue("users", users);
 
                     if (isSeller) {
                         sellers.push({
+                            id: makeStableId("SELLER", values.email, createdAt),
                             fullName: values.fullName,
                             name: values.fullName,
                             email: values.email,
@@ -849,16 +906,26 @@
                             isSeller: true,
                             referralCode: values.referralCode,
                             marketingOptIn: values.marketingOptIn,
-                            createdAt: createdAt
+                            createdAt: createdAt,
+                            updatedAt: createdAt,
+                            role: "seller",
+                            accountType: "seller"
                         });
-                        storage().setItem("sellers", JSON.stringify(sellers));
+                        writeValue("sellers", sellers);
                     }
 
-                    storage().setItem("lastRegisteredEmail", values.email);
-                    storage().setItem("lastRegisteredAccountType", values.accountType);
+                    clearGuestSessions();
+                    writeValue("lastRegisteredEmail", values.email);
+                    writeValue("lastRegisteredAccountType", values.accountType);
+                    writeValue("lastRegisteredName", values.fullName);
                     await syncOnlineStorage(4000);
-                    setSuccess("Registration successful. Redirecting to login...");
-                    window.location.href = "login.html?registered=1&email=" + encodeURIComponent(values.email);
+                    setSuccess(isSeller
+                        ? "Seller account created. Redirecting to login for approval and payment setup..."
+                        : "Registration successful. Redirecting to login...");
+                    window.location.href = "login.html?registered=1&email=" + encodeURIComponent(values.email) + "&type=" + encodeURIComponent(values.accountType);
+                    return false;
+                } catch (error) {
+                    setError(error && error.message ? error.message : "Registration failed. Please try again.");
                     return false;
                 } finally {
                     setBusy(false);

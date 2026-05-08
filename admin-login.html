@@ -174,7 +174,7 @@
         </section>
     </main>
 
-<script src="admin-core.js?v=20260510aa"></script>
+<script src="admin-core.js?v=20260510ae"></script>
     <script>
         function byId(id) { return document.getElementById(id); }
 
@@ -230,14 +230,12 @@
 
             if (AdminCore.isOwnerSessionActive()) {
                 byId("adminLoginStatus").textContent = "Owner session detected";
-                redirectAfterLogin();
-                return;
+                byId("adminRedirectHint").textContent = "Owner access is active on this browser. Use this form only when you want a worker admin to log in manually.";
             }
             const current = AdminCore.getCurrentAdminSession();
             if (current) {
                 byId("adminLoginStatus").textContent = "Active admin session detected";
-                redirectAfterLogin();
-                return;
+                byId("adminRedirectHint").textContent = "An admin session already exists on this browser. This page will not auto-login. Enter credentials to continue manually.";
             }
 
             byId("adminShowBtn").addEventListener("click", function () {

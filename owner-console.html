@@ -879,7 +879,7 @@
         <div class="owner-foot">Owner console changes data in this app storage immediately. For production, move this behind a real backend, hashed credentials, and role-based server auth.</div>
     </main>
 
-<script src="admin-core.js?v=20260510aa"></script>
+<script src="admin-core.js?v=20260510ae"></script>
     <script>
         const OWNER_HASH = "05274e9d5aef3d48e27bac0b49a68f59863e0146fb96ed2f516d6d34137601a5";
         const OWNER_SESSION_KEY = "mmOwnerConsoleSession";
@@ -985,9 +985,11 @@
         function updateOwnerRoleNotice() {
             const ownerSession = readOwnerSession();
             const adminSession = typeof AdminCore.getCurrentAdminSession === "function" ? AdminCore.getCurrentAdminSession() : null;
-            byId("ownerRoleNotice").textContent = !ownerSession && adminSession
-                ? "Owner login required. Worker admin sessions cannot open this console."
-                : "";
+            byId("ownerRoleNotice").textContent = ownerSession
+                ? "Owner session detected. Enter the owner password to unlock this console on this page."
+                : (!ownerSession && adminSession
+                    ? "Owner login required. Worker admin sessions cannot open this console."
+                    : "");
         }
 
         function writeOwnerAccessMeta(patch) {
@@ -2232,12 +2234,7 @@
                 }
             }
             renderOwnerLoginOverview();
-            const unlocked = Boolean(session && session.active);
-            setAuthState(unlocked);
-            if (unlocked) {
-                touchOwnerSession(true);
-                refreshAll();
-            }
+            setAuthState(false);
         }
 
         function startOwnerConsole() {

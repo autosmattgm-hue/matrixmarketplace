@@ -1129,8 +1129,12 @@
   function normalizeAdminOperator(raw, idx) {
     const source = raw && typeof raw === "object" ? raw : {};
     const email = cleanEmail(source.email || source.mail || "");
+    const fallbackSeed = str(source.fullName || source.name || email || ("admin-" + idx))
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
     return {
-      id: str(source.id || ("ADM-" + idx + "-" + Math.random().toString(36).slice(2, 6))).toUpperCase(),
+      id: str(source.id || ("ADM-" + (fallbackSeed || ("admin-" + idx)))).toUpperCase(),
       fullName: str(source.fullName || source.name || email || "Admin"),
       name: str(source.name || source.fullName || email || "Admin"),
       email: email,
@@ -1147,9 +1151,23 @@
 
   function getAdminOperators() {
     const rows = readJSON(ADMIN_OPERATORS_KEY, []);
-    return toArray(rows, { injectEmail: true, injectId: true }).map(function (row, idx) {
-      return normalizeAdminOperator(row, idx);
+    let changed = false;
+    const normalized = toArray(rows, { injectEmail: true, injectId: true }).map(function (row, idx) {
+      const admin = normalizeAdminOperator(row, idx);
+      if (!row || typeof row !== "object") {
+        changed = true;
+      } else if (
+        str(row.id || "").toUpperCase() !== admin.id ||
+        cleanEmail(row.email || row.mail || "") !== admin.email ||
+        str(row.password || "") !== admin.password ||
+        str(row.status || "active") !== admin.status
+      ) {
+        changed = true;
+      }
+      return admin;
     });
+    if (changed) setAdminOperators(normalized);
+    return normalized;
   }
 
   function setAdminOperators(rows) {
@@ -1294,6 +1312,9 @@
     const validIds = new Set(admins.filter(function (row) {
       return str(row.status).toLowerCase() === "active";
     }).map(function (row) { return row.id; }));
+    const validEmails = new Set(admins.filter(function (row) {
+      return str(row.status).toLowerCase() === "active";
+    }).map(function (row) { return cleanEmail(row.email); }).filter(Boolean));
     const now = Date.now();
     let changed = false;
     const filtered = sessions.filter(function (session) {
@@ -1301,7 +1322,7 @@
       const active = session.token &&
         session.loginSource === "admin-login.html" &&
         session.status === "active" &&
-        validIds.has(session.adminId) &&
+        (validIds.has(session.adminId) || validEmails.has(cleanEmail(session.email))) &&
         (!Number.isFinite(expiresAt) || expiresAt > now);
       if (!active) changed = true;
       return active;
@@ -1330,7 +1351,7 @@
       recordCurrentAdminToken("");
       return null;
     }
-    const admin = findAdminOperator(session.adminId || session.email);
+    const admin = findAdminOperator(session.adminId) || findAdminOperator(session.email);
     if (!admin || str(admin.status).toLowerCase() !== "active") {
       recordCurrentAdminToken("");
       return null;
@@ -1360,8 +1381,8 @@
   }
 
   function authenticateAdmin(identifier, password, page) {
-    const needle = str(identifier).toLowerCase();
-    const pass = str(password);
+    const needle = str(identifier).trim().toLowerCase();
+    const pass = str(password).trim();
     if (!needle || !pass) return { ok: false, error: "Admin email and password are required." };
     const admin = getAdminOperators().find(function (row) {
       return row.email === cleanEmail(needle) ||
@@ -1398,8 +1419,12 @@
       lastSeenAt: nowIso,
       lastLoginPage: str(page || "")
     });
+    const confirmedSession = getCurrentAdminSession();
+    if (!confirmedSession) {
+      return { ok: false, error: "Admin session could not be started. Please try again." };
+    }
     log("admin_login", { adminId: admin.id, email: admin.email, page: str(page || "") });
-    return { ok: true, admin: findAdminOperator(admin.id), session: session };
+    return { ok: true, admin: findAdminOperator(admin.id), session: confirmedSession };
   }
 
   function revokeAdminSession(token, reason, options) {
@@ -1463,18 +1488,11 @@
   }
 
   function logoutAdminAndGo() {
-    if (isOwnerSessionActive()) {
-      window.location.href = "owner-console.html";
-      return;
-    }
     logoutCurrentAdmin("manual");
     window.location.href = "admin-login.html";
   }
 
   function ensureAdminSession(redirectPath) {
-    if (isOwnerSessionActive()) {
-      return { role: "owner", isOwner: true, fullName: "Owner", email: "owner-console" };
-    }
     const session = touchCurrentAdminSession(currentPageName()) || getCurrentAdminSession();
     if (session) return session;
     if (redirectPath && str(redirectPath) !== currentPageName()) {
@@ -1527,7 +1545,7 @@
       if (adminGuardBound) return;
       adminGuardBound = true;
       window.addEventListener("storage", function () {
-        if (!isOwnerSessionActive() && !getCurrentAdminSession()) {
+        if (!getCurrentAdminSession()) {
           setAdminPageVisibility(false);
           window.location.replace("admin-login.html?next=" + encodeURIComponent(currentPageName()));
         }
