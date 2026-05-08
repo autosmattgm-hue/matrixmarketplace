@@ -1,6 +1,13 @@
 (function () {
   const WITHDRAWAL_CHARGE_PER_10 = 2;
   const BUYER_SCOPE_PREFIX = "__mm_buyer__";
+  const ADMIN_OPERATORS_KEY = "adminOperators";
+  const ADMIN_LIVE_SESSIONS_KEY = "adminLiveSessions";
+  const CURRENT_ADMIN_SESSION_KEY = "currentAdminSession";
+  const OWNER_SESSION_KEY = "mmOwnerConsoleSession";
+  const ADMIN_SESSION_MS = 12 * 60 * 60 * 1000;
+  const ADMIN_GUARD_STYLE_ID = "mm-admin-guard-style";
+  let adminGuardBound = false;
 
   function storageRef() {
     if (window.MMStorage && typeof window.MMStorage.getItem === "function") return window.MMStorage;
@@ -661,6 +668,26 @@
 
   function clearLiveSessions() {
     let changed = false;
+    ["currentUser", "currentSeller", "loggedInUser", CURRENT_ADMIN_SESSION_KEY].forEach(function (key) {
+      const existing = readRaw(key);
+      if (existing == null) return;
+      try {
+        storageRef().removeItem(key);
+        changed = true;
+      } catch (_) {}
+    });
+    if (readRaw(ADMIN_LIVE_SESSIONS_KEY) != null) {
+      try {
+        storageRef().removeItem(ADMIN_LIVE_SESSIONS_KEY);
+        changed = true;
+      } catch (_) {}
+    }
+    if (changed) log("live_sessions_cleared", {});
+    return changed;
+  }
+
+  function clearNonAdminVisitorSessions() {
+    let changed = false;
     ["currentUser", "currentSeller", "loggedInUser"].forEach(function (key) {
       const existing = readRaw(key);
       if (existing == null) return;
@@ -669,7 +696,9 @@
         changed = true;
       } catch (_) {}
     });
-    if (changed) log("live_sessions_cleared", {});
+    if (changed) {
+      log("non_admin_session_cleared_for_admin_gate", { page: currentPageName() });
+    }
     return changed;
   }
 
@@ -966,6 +995,8 @@
       dashboard: computeDashboard(),
       users: getUsers(),
       sellers: getSellers(),
+      adminOperators: getAdminOperators(),
+      adminSessions: getAdminLiveSessions(),
       products: getProducts(),
       payments: getPayments(),
       orders: getOrders(),
@@ -1025,6 +1056,8 @@
     if (Array.isArray(data.sellers)) setSellers(data.sellers.map(function (row, idx) {
       return normalizeEntity(row, "seller", idx);
     }));
+    if (Array.isArray(data.adminOperators)) setAdminOperators(data.adminOperators);
+    if (Array.isArray(data.adminSessions)) setAdminLiveSessions(data.adminSessions);
     if (Array.isArray(data.products)) setProducts(data.products);
     if (Array.isArray(data.payments)) setPayments(data.payments);
     if (Array.isArray(data.orders)) setOrders(data.orders);
@@ -1088,9 +1121,450 @@
     return output;
   }
 
+  function currentPageName() {
+    const path = String(location.pathname || "").split(/[\\/]/).pop();
+    return path || "index.html";
+  }
+
+  function normalizeAdminOperator(raw, idx) {
+    const source = raw && typeof raw === "object" ? raw : {};
+    const email = cleanEmail(source.email || source.mail || "");
+    return {
+      id: str(source.id || ("ADM-" + idx + "-" + Math.random().toString(36).slice(2, 6))).toUpperCase(),
+      fullName: str(source.fullName || source.name || email || "Admin"),
+      name: str(source.name || source.fullName || email || "Admin"),
+      email: email,
+      password: str(source.password || ""),
+      status: str(source.status || "active") || "active",
+      createdAt: source.createdAt || new Date().toISOString(),
+      updatedAt: source.updatedAt || "",
+      lastLoginAt: source.lastLoginAt || "",
+      lastLoginPage: str(source.lastLoginPage || ""),
+      lastSeenAt: source.lastSeenAt || "",
+      notes: str(source.notes || "")
+    };
+  }
+
+  function getAdminOperators() {
+    const rows = readJSON(ADMIN_OPERATORS_KEY, []);
+    return toArray(rows, { injectEmail: true, injectId: true }).map(function (row, idx) {
+      return normalizeAdminOperator(row, idx);
+    });
+  }
+
+  function setAdminOperators(rows) {
+    const list = (Array.isArray(rows) ? rows : []).map(function (row, idx) {
+      const admin = normalizeAdminOperator(row, idx);
+      return {
+        id: admin.id,
+        fullName: admin.fullName,
+        name: admin.name,
+        email: admin.email,
+        password: admin.password,
+        status: admin.status,
+        createdAt: admin.createdAt,
+        updatedAt: admin.updatedAt,
+        lastLoginAt: admin.lastLoginAt,
+        lastLoginPage: admin.lastLoginPage,
+        lastSeenAt: admin.lastSeenAt,
+        notes: admin.notes
+      };
+    });
+    writeJSON(ADMIN_OPERATORS_KEY, list);
+    return list;
+  }
+
+  function findAdminOperator(target) {
+    const needle = str(target);
+    const emailNeedle = cleanEmail(target);
+    return getAdminOperators().find(function (row) {
+      return row.id === needle ||
+        (emailNeedle && row.email === emailNeedle) ||
+        str(row.fullName).toLowerCase() === needle.toLowerCase() ||
+        str(row.name).toLowerCase() === needle.toLowerCase();
+    }) || null;
+  }
+
+  function generateAdminPassword(length) {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789abcdefghijkmnpqrstuvwxyz";
+    const total = Math.max(10, Math.floor(num(length || 12)));
+    let output = "";
+    for (let i = 0; i < total; i += 1) {
+      output += chars[Math.floor(Math.random() * chars.length)];
+    }
+    return output;
+  }
+
+  function createAdminOperator(input) {
+    const data = input && typeof input === "object" ? input : {};
+    const email = cleanEmail(data.email || "");
+    const fullName = str(data.fullName || data.name || email || "");
+    if (!email || !fullName) return { ok: false, error: "Admin name and email are required." };
+    const existing = getAdminOperators();
+    if (existing.some(function (row) { return row.email === email; })) {
+      return { ok: false, error: "That admin email already exists." };
+    }
+    const now = new Date().toISOString();
+    const password = str(data.password || generateAdminPassword(12));
+    const next = normalizeAdminOperator({
+      id: "ADM-" + Date.now().toString(36).toUpperCase(),
+      fullName: fullName,
+      name: fullName,
+      email: email,
+      password: password,
+      status: "active",
+      createdAt: now,
+      updatedAt: now,
+      notes: str(data.notes || "")
+    }, existing.length);
+    existing.push(next);
+    setAdminOperators(existing);
+    log("admin_operator_created", { email: email, adminId: next.id });
+    return { ok: true, admin: next };
+  }
+
+  function updateAdminOperator(target, patch) {
+    const list = getAdminOperators();
+    const needle = str(target);
+    const emailNeedle = cleanEmail(target);
+    const idx = list.findIndex(function (row) {
+      return row.id === needle || (emailNeedle && row.email === emailNeedle);
+    });
+    if (idx < 0) return false;
+    const current = list[idx];
+    const nextEmail = cleanEmail((patch && patch.email) || current.email);
+    if (nextEmail && list.some(function (row, rowIdx) { return rowIdx !== idx && row.email === nextEmail; })) {
+      return false;
+    }
+    list[idx] = normalizeAdminOperator({
+      ...current,
+      ...(patch && typeof patch === "object" ? patch : {}),
+      email: nextEmail || current.email,
+      updatedAt: new Date().toISOString()
+    }, idx);
+    setAdminOperators(list);
+    return list[idx];
+  }
+
+  function deleteAdminOperator(target) {
+    const needle = str(target);
+    const emailNeedle = cleanEmail(target);
+    const list = getAdminOperators();
+    const next = list.filter(function (row) {
+      return !(row.id === needle || (emailNeedle && row.email === emailNeedle));
+    });
+    if (next.length === list.length) return false;
+    setAdminOperators(next);
+    revokeAdminSessionsForAdmin(target, "admin_deleted");
+    log("admin_operator_deleted", { target: target });
+    return true;
+  }
+
+  function normalizeAdminSession(raw) {
+    const source = raw && typeof raw === "object" ? raw : {};
+    return {
+      token: str(source.token || ""),
+      adminId: str(source.adminId || ""),
+      email: cleanEmail(source.email || ""),
+      fullName: str(source.fullName || source.name || source.email || "Admin"),
+      loginSource: str(source.loginSource || source.source || ""),
+      loginAt: source.loginAt || source.createdAt || new Date().toISOString(),
+      lastSeenAt: source.lastSeenAt || source.loginAt || new Date().toISOString(),
+      lastPage: str(source.lastPage || source.page || ""),
+      expiresAt: source.expiresAt || new Date(Date.now() + ADMIN_SESSION_MS).toISOString(),
+      status: str(source.status || "active") || "active"
+    };
+  }
+
+  function isOwnerSessionActive() {
+    const session = readJSON(OWNER_SESSION_KEY, null);
+    if (!session || !session.active) return false;
+    const expiresAt = new Date(session.expiresAt || "").getTime();
+    return !Number.isFinite(expiresAt) || expiresAt <= 0 || expiresAt > Date.now();
+  }
+
+  function setAdminLiveSessions(rows) {
+    writeJSON(ADMIN_LIVE_SESSIONS_KEY, (Array.isArray(rows) ? rows : []).map(normalizeAdminSession));
+  }
+
+  function getAdminLiveSessions() {
+    const source = readJSON(ADMIN_LIVE_SESSIONS_KEY, []);
+    const sessions = toArray(source, { injectId: false }).map(normalizeAdminSession);
+    const admins = getAdminOperators();
+    const validIds = new Set(admins.filter(function (row) {
+      return str(row.status).toLowerCase() === "active";
+    }).map(function (row) { return row.id; }));
+    const now = Date.now();
+    let changed = false;
+    const filtered = sessions.filter(function (session) {
+      const expiresAt = new Date(session.expiresAt || "").getTime();
+      const active = session.token &&
+        session.loginSource === "admin-login.html" &&
+        session.status === "active" &&
+        validIds.has(session.adminId) &&
+        (!Number.isFinite(expiresAt) || expiresAt > now);
+      if (!active) changed = true;
+      return active;
+    });
+    if (changed) setAdminLiveSessions(filtered);
+    return filtered.sort(function (a, b) {
+      return String(b.lastSeenAt || b.loginAt || "").localeCompare(String(a.lastSeenAt || a.loginAt || ""));
+    });
+  }
+
+  function recordCurrentAdminToken(token) {
+    if (!token) {
+      writeJSON(CURRENT_ADMIN_SESSION_KEY, null);
+      try { storageRef().removeItem(CURRENT_ADMIN_SESSION_KEY); } catch (_) {}
+      return;
+    }
+    writeJSON(CURRENT_ADMIN_SESSION_KEY, { token: token });
+  }
+
+  function getCurrentAdminSession() {
+    const current = readJSON(CURRENT_ADMIN_SESSION_KEY, null);
+    const token = str(current && current.token || "");
+    if (!token) return null;
+    const session = getAdminLiveSessions().find(function (row) { return row.token === token; }) || null;
+    if (!session) {
+      recordCurrentAdminToken("");
+      return null;
+    }
+    const admin = findAdminOperator(session.adminId || session.email);
+    if (!admin || str(admin.status).toLowerCase() !== "active") {
+      recordCurrentAdminToken("");
+      return null;
+    }
+    return { ...session, admin: admin };
+  }
+
+  function touchCurrentAdminSession(page) {
+    const current = getCurrentAdminSession();
+    if (!current) return null;
+    const sessions = getAdminLiveSessions();
+    const idx = sessions.findIndex(function (row) { return row.token === current.token; });
+    if (idx < 0) return current;
+    const nowIso = new Date().toISOString();
+    sessions[idx] = normalizeAdminSession({
+      ...sessions[idx],
+      lastSeenAt: nowIso,
+      lastPage: str(page || sessions[idx].lastPage || ""),
+      expiresAt: new Date(Date.now() + ADMIN_SESSION_MS).toISOString()
+    });
+    setAdminLiveSessions(sessions);
+    updateAdminOperator(current.admin.id, {
+      lastSeenAt: nowIso,
+      lastLoginPage: sessions[idx].lastPage
+    });
+    return { ...sessions[idx], admin: findAdminOperator(current.admin.id) };
+  }
+
+  function authenticateAdmin(identifier, password, page) {
+    const needle = str(identifier).toLowerCase();
+    const pass = str(password);
+    if (!needle || !pass) return { ok: false, error: "Admin email and password are required." };
+    const admin = getAdminOperators().find(function (row) {
+      return row.email === cleanEmail(needle) ||
+        str(row.fullName).toLowerCase() === needle ||
+        str(row.name).toLowerCase() === needle;
+    }) || null;
+    if (!admin) return { ok: false, error: "Admin account not found." };
+    if (str(admin.status).toLowerCase() !== "active") return { ok: false, error: "This admin account is disabled." };
+    if (admin.password !== pass) return { ok: false, error: "Wrong admin password." };
+
+    const nowIso = new Date().toISOString();
+    const session = normalizeAdminSession({
+      token: "ADMSESS-" + Date.now().toString(36).toUpperCase() + "-" + Math.random().toString(36).slice(2, 8).toUpperCase(),
+      adminId: admin.id,
+      email: admin.email,
+      fullName: admin.fullName || admin.name || admin.email,
+      loginSource: "admin-login.html",
+      loginAt: nowIso,
+      lastSeenAt: nowIso,
+      lastPage: str(page || ""),
+      expiresAt: new Date(Date.now() + ADMIN_SESSION_MS).toISOString(),
+      status: "active"
+    });
+    const sessions = getAdminLiveSessions().filter(function (row) {
+      return row.adminId !== admin.id;
+    });
+    sessions.unshift(session);
+    setAdminLiveSessions(sessions);
+    recordCurrentAdminToken(session.token);
+    writeJSON(OWNER_SESSION_KEY, null);
+    try { storageRef().removeItem(OWNER_SESSION_KEY); } catch (_) {}
+    updateAdminOperator(admin.id, {
+      lastLoginAt: nowIso,
+      lastSeenAt: nowIso,
+      lastLoginPage: str(page || "")
+    });
+    log("admin_login", { adminId: admin.id, email: admin.email, page: str(page || "") });
+    return { ok: true, admin: findAdminOperator(admin.id), session: session };
+  }
+
+  function revokeAdminSession(token, reason, options) {
+    const target = str(token);
+    if (!target) return false;
+    const opts = options || {};
+    const sessions = getAdminLiveSessions();
+    const hit = sessions.find(function (row) { return row.token === target; }) || null;
+    if (!hit) return false;
+    setAdminLiveSessions(sessions.filter(function (row) { return row.token !== target; }));
+    const current = readJSON(CURRENT_ADMIN_SESSION_KEY, null);
+    if (str(current && current.token || "") === target) recordCurrentAdminToken("");
+    if (!opts.silent) {
+      log("admin_session_revoked", {
+        adminId: hit.adminId,
+        email: hit.email,
+        reason: str(reason || "manual") || "manual"
+      });
+    }
+    return true;
+  }
+
+  function revokeAdminSessionsForAdmin(target, reason) {
+    const admin = findAdminOperator(target);
+    const adminId = str(admin && admin.id || target);
+    const email = cleanEmail(admin && admin.email || target);
+    const sessions = getAdminLiveSessions();
+    const hits = sessions.filter(function (row) {
+      return row.adminId === adminId || (email && row.email === email);
+    });
+    if (!hits.length) return false;
+    setAdminLiveSessions(sessions.filter(function (row) {
+      return !(row.adminId === adminId || (email && row.email === email));
+    }));
+    const current = readJSON(CURRENT_ADMIN_SESSION_KEY, null);
+    if (hits.some(function (row) { return row.token === str(current && current.token || ""); })) {
+      recordCurrentAdminToken("");
+    }
+    log("admin_sessions_revoked", {
+      adminId: adminId,
+      email: email,
+      count: hits.length,
+      reason: str(reason || "manual") || "manual"
+    });
+    return true;
+  }
+
+  function logoutCurrentAdmin(reason) {
+    const current = readJSON(CURRENT_ADMIN_SESSION_KEY, null);
+    const token = str(current && current.token || "");
+    if (!token) return false;
+    const session = getCurrentAdminSession();
+    revokeAdminSession(token, reason || "logout", { silent: true });
+    recordCurrentAdminToken("");
+    log("admin_logout", {
+      adminId: session && session.adminId || "",
+      email: session && session.email || "",
+      reason: str(reason || "logout") || "logout"
+    });
+    return true;
+  }
+
+  function logoutAdminAndGo() {
+    if (isOwnerSessionActive()) {
+      window.location.href = "owner-console.html";
+      return;
+    }
+    logoutCurrentAdmin("manual");
+    window.location.href = "admin-login.html";
+  }
+
+  function ensureAdminSession(redirectPath) {
+    if (isOwnerSessionActive()) {
+      return { role: "owner", isOwner: true, fullName: "Owner", email: "owner-console" };
+    }
+    const session = touchCurrentAdminSession(currentPageName()) || getCurrentAdminSession();
+    if (session) return session;
+    if (redirectPath && str(redirectPath) !== currentPageName()) {
+      clearNonAdminVisitorSessions();
+      const next = encodeURIComponent(currentPageName() + location.search + location.hash);
+      window.location.replace(redirectPath + "?next=" + next);
+    }
+    return null;
+  }
+
+  function isProtectedAdminPage(page) {
+    const target = str(page || currentPageName());
+    return [
+      "dashboard-admin.html",
+      "admin-users.html",
+      "admin-sellers.html",
+      "admin-accept-payment.html",
+      "admin-edit-user-seller.html",
+      "admin-code.html",
+      "admin-orders.html",
+      "admin-products.html",
+      "admin-logs.html",
+      "admin-communications.html"
+    ].includes(target);
+  }
+
+  function ensureAdminGuardStyles() {
+    if (!document || !document.head) return;
+    if (document.getElementById(ADMIN_GUARD_STYLE_ID)) return;
+    const style = document.createElement("style");
+    style.id = ADMIN_GUARD_STYLE_ID;
+    style.textContent = ".mm-admin-auth-pending body.admin-page{visibility:hidden}.mm-admin-auth-ready body.admin-page{visibility:visible}";
+    document.head.appendChild(style);
+  }
+
+  function setAdminPageVisibility(ready) {
+    if (!document || !document.documentElement) return;
+    document.documentElement.classList.toggle("mm-admin-auth-pending", !ready);
+    document.documentElement.classList.toggle("mm-admin-auth-ready", !!ready);
+  }
+
+  function startAdminPageGuard() {
+    if (!isProtectedAdminPage()) return;
+    ensureAdminGuardStyles();
+    setAdminPageVisibility(false);
+
+    function bindGuard() {
+      if (!ensureAdminSession("admin-login.html")) return;
+      setAdminPageVisibility(true);
+      if (adminGuardBound) return;
+      adminGuardBound = true;
+      window.addEventListener("storage", function () {
+        if (!isOwnerSessionActive() && !getCurrentAdminSession()) {
+          setAdminPageVisibility(false);
+          window.location.replace("admin-login.html?next=" + encodeURIComponent(currentPageName()));
+        }
+      });
+      document.addEventListener("visibilitychange", function () {
+        if (!document.hidden) {
+          if (ensureAdminSession("admin-login.html")) setAdminPageVisibility(true);
+        }
+      });
+    }
+
+    const ready = window.MMStorage && window.MMStorage.ready;
+    if (ready && typeof ready.then === "function") {
+      ready.finally(bindGuard);
+      return;
+    }
+    bindGuard();
+  }
+
   function renderAdminHeader(activePage) {
-    const map = [
-      ["owner-console.html", "Owner"],
+    const currentAdmin = getCurrentAdminSession();
+    const ownerActive = isOwnerSessionActive() && !currentAdmin;
+    const adminName = currentAdmin
+      ? (currentAdmin.admin && (currentAdmin.admin.fullName || currentAdmin.admin.name)) ||
+        currentAdmin.fullName ||
+        currentAdmin.email ||
+        "Admin"
+      : "";
+    const actor = ownerActive
+      ? { label: "Owner", email: "owner-console" }
+      : (currentAdmin
+          ? {
+              label: "Admin: " + adminName,
+              email: currentAdmin.email || (currentAdmin.admin && currentAdmin.admin.email) || ""
+            }
+          : null);
+    const map = (ownerActive ? [["owner-console.html", "Owner"]] : []).concat([
       ["dashboard-admin.html", "Dashboard"],
       ["admin-users.html", "Users"],
       ["admin-sellers.html", "Sellers"],
@@ -1101,7 +1575,7 @@
       ["admin-products.html", "Products"],
       ["admin-logs.html", "Logs"],
       ["admin-communications.html", "Comms"]
-    ];
+    ]);
 
     return (
       '<header class="admin-header">' +
@@ -1112,6 +1586,8 @@
         const active = item[0] === activePage ? "active" : "";
         return '<a class="' + active + '" href="' + item[0] + '">' + item[1] + '</a>';
       }).join("") +
+      (actor ? '<span class="admin-session-chip" title="' + str(actor.email) + '">' + str(actor.label) + '</span>' : "") +
+      (activePage !== "owner-console.html" ? '<button type="button" onclick="AdminCore.logoutAdminAndGo()">Logout</button>' : "") +
       '<a href="index.html">Exit</a>' +
       '</nav>' +
       '</div>' +
@@ -1145,6 +1621,24 @@
     resetAccountPassword: resetAccountPassword,
     clearLiveSessions: clearLiveSessions,
     approveLatestTopupRequest: approveLatestTopupRequest,
+    getAdminOperators: getAdminOperators,
+    setAdminOperators: setAdminOperators,
+    findAdminOperator: findAdminOperator,
+    generateAdminPassword: generateAdminPassword,
+    createAdminOperator: createAdminOperator,
+    updateAdminOperator: updateAdminOperator,
+    deleteAdminOperator: deleteAdminOperator,
+    getAdminLiveSessions: getAdminLiveSessions,
+    setAdminLiveSessions: setAdminLiveSessions,
+    getCurrentAdminSession: getCurrentAdminSession,
+    touchCurrentAdminSession: touchCurrentAdminSession,
+    authenticateAdmin: authenticateAdmin,
+    revokeAdminSession: revokeAdminSession,
+    revokeAdminSessionsForAdmin: revokeAdminSessionsForAdmin,
+    logoutCurrentAdmin: logoutCurrentAdmin,
+    logoutAdminAndGo: logoutAdminAndGo,
+    ensureAdminSession: ensureAdminSession,
+    isOwnerSessionActive: isOwnerSessionActive,
     getProducts: getProducts,
     setProducts: setProducts,
     getPayments: getPayments,
@@ -1169,4 +1663,6 @@
     createCode: createCode,
     renderAdminHeader: renderAdminHeader
   };
+
+  startAdminPageGuard();
 })();

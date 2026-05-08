@@ -497,6 +497,14 @@
         }
     </style>
     <script src="firebase-online-storage.js?v=20260224c"></script>
+  <meta name="theme-color" content="#0f172a" />
+  <link rel="manifest" href="app.webmanifest" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="MatrixMarket" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="application-name" content="MatrixMarket" />
 </head>
 <body class="admin-page">
     <div id="ownerLogin" class="owner-login">
@@ -552,6 +560,7 @@
                         <div id="ownerAccessMeta" class="owner-muted" style="margin-top:0.3rem;">No owner session recorded yet.</div>
                     </div>
                 </div>
+                <div id="ownerRoleNotice" class="owner-hint"></div>
                 <div id="ownerError" class="owner-error"></div>
                 <div class="admin-actions">
                     <div class="owner-actions-left">
@@ -584,6 +593,7 @@
                 <a class="btn-adm" href="#ownerSummary">Overview</a>
                 <a class="btn-adm" href="#ownerSite">Site Control</a>
                 <a class="btn-adm" href="#ownerAccounts">Accounts</a>
+                <a class="btn-adm" href="#ownerAdmins">Admins</a>
                 <a class="btn-adm" href="#ownerOrders">Orders</a>
                 <a class="btn-adm" href="#ownerPayments">Payments</a>
                 <a class="btn-adm" href="#ownerProducts">Products</a>
@@ -699,6 +709,40 @@
             <div class="adm-table-wrap" style="margin-top:0.75rem;">
                 <table class="adm-table" id="accountsTable"></table>
             </div>
+        </section>
+
+        <section id="ownerAdmins" class="owner-two-col">
+            <article class="admin-card">
+                <div class="owner-section-title">
+                    <h2>Admin Access Control</h2>
+                    <div class="admin-actions">
+                        <button class="btn-adm" id="generateAdminPasswordBtn" type="button">Generate Password</button>
+                    </div>
+                </div>
+                <div class="owner-form-grid">
+                    <input class="adm" id="adminOperatorName" type="text" placeholder="Admin full name" />
+                    <input class="adm" id="adminOperatorEmail" type="email" placeholder="Admin email address" />
+                    <input class="adm full" id="adminOperatorPassword" type="text" placeholder="Generated admin password" />
+                </div>
+                <div class="admin-actions" style="margin-top:0.8rem;">
+                    <button class="btn-adm primary" id="saveAdminOperatorBtn" type="button">Create Admin Access</button>
+                    <button class="btn-adm" id="clearAdminOperatorBtn" type="button">Clear Form</button>
+                </div>
+                <div class="adm-table-wrap" style="margin-top:0.75rem;">
+                    <table class="adm-table" id="adminOperatorsTable"></table>
+                </div>
+            </article>
+
+            <article class="admin-card">
+                <div class="owner-section-title">
+                    <h2>Live Admin Sessions</h2>
+                    <div class="admin-actions">
+                        <button class="btn-adm danger" id="logoutAllAdminsBtn" type="button">Logout All Admins</button>
+                    </div>
+                </div>
+                <div class="owner-list" id="adminSessionsList"></div>
+                <p class="adm-note" style="margin-top:0.8rem;">When an admin signs in with an owner-generated password, the session appears here and can be removed immediately by the owner.</p>
+            </article>
         </section>
 
         <section id="ownerOrders" class="admin-card">
@@ -835,7 +879,7 @@
         <div class="owner-foot">Owner console changes data in this app storage immediately. For production, move this behind a real backend, hashed credentials, and role-based server auth.</div>
     </main>
 
-    <script src="admin-core.js?v=20260509q"></script>
+<script src="admin-core.js?v=20260510aa"></script>
     <script>
         const OWNER_HASH = "05274e9d5aef3d48e27bac0b49a68f59863e0146fb96ed2f516d6d34137601a5";
         const OWNER_SESSION_KEY = "mmOwnerConsoleSession";
@@ -847,6 +891,8 @@
         const OWNER_TOUCH_THROTTLE_MS = 15000;
         const state = {
             accounts: [],
+            adminOperators: [],
+            adminSessions: [],
             orders: [],
             payments: [],
             products: [],
@@ -930,6 +976,18 @@
         function readOwnerAccessMeta() {
             const meta = AdminCore.readJSON(OWNER_ACCESS_META_KEY, null);
             return meta && typeof meta === "object" ? meta : {};
+        }
+
+        function redirectAdminAwayFromOwner() {
+            return false;
+        }
+
+        function updateOwnerRoleNotice() {
+            const ownerSession = readOwnerSession();
+            const adminSession = typeof AdminCore.getCurrentAdminSession === "function" ? AdminCore.getCurrentAdminSession() : null;
+            byId("ownerRoleNotice").textContent = !ownerSession && adminSession
+                ? "Owner login required. Worker admin sessions cannot open this console."
+                : "";
         }
 
         function writeOwnerAccessMeta(patch) {
@@ -1110,6 +1168,7 @@
             } else if (byId("ownerError").textContent === "Owner access is locked for a short cooldown.") {
                 byId("ownerError").textContent = "";
             }
+            updateOwnerRoleNotice();
         }
 
         function setAuthState(unlocked) {
@@ -1139,7 +1198,11 @@
                 recordOwnerUnlockFailure();
                 return;
             }
+            if (typeof AdminCore.logoutCurrentAdmin === "function") {
+                AdminCore.logoutCurrentAdmin("owner_console_unlock");
+            }
             clearOwnerUnlockFailures();
+            byId("ownerRoleNotice").textContent = "";
             byId("ownerError").textContent = "";
             const session = writeOwnerSession(true, {
                 durationMinutes: ownerSessionMinutesFromUI(),
@@ -1300,6 +1363,8 @@
             state.complaints = AdminCore.readJSON("sellerComplaints", []);
             state.lastLoginMeta = AdminCore.readJSON("lastLoginMeta", null);
             state.siteControl = AdminCore.getSiteControl();
+            state.adminOperators = typeof AdminCore.getAdminOperators === "function" ? AdminCore.getAdminOperators() : [];
+            state.adminSessions = typeof AdminCore.getAdminLiveSessions === "function" ? AdminCore.getAdminLiveSessions() : [];
         }
 
         function refreshAll() {
@@ -1314,6 +1379,8 @@
             renderSiteControlPreview(state.siteControl);
             renderIntelligence();
             renderAccounts();
+            renderAdminOperators();
+            renderAdminSessions();
             renderOrders();
             renderPayments();
             renderProducts();
@@ -1326,12 +1393,14 @@
             const cards = [
                 ["Users", m.users],
                 ["Sellers", m.sellers],
+                ["Admins", (state.adminOperators || []).length],
                 ["Orders", m.orders],
                 ["Pending Orders", m.orderPending],
                 ["Payments", m.payments],
                 ["Pending Payments", m.pendingPayments],
                 ["Products", m.products],
                 ["Approved Payments", m.approvedPayments],
+                ["Live Admins", (state.adminSessions || []).length],
                 ["Tracked Balance", AdminCore.fmtMoney(m.totalBalance)]
             ];
             byId("summaryGrid").innerHTML = cards.map(function (item) {
@@ -1345,6 +1414,7 @@
                 ["Owner session", ownerSession && ownerSession.active ? AdminCore.fmtDate(ownerSession.at) : "Locked"],
                 ["Top seller", m.topSeller || "N/A"],
                 ["Audit logs", String(m.auditLogs || 0)],
+                ["Admin sessions", String((state.adminSessions || []).length)],
                 ["Current user", str(currentUser && currentUser.email || "-")],
                 ["Current seller", str(currentSeller && currentSeller.email || "-")],
                 ["Support tickets", String((state.supportTickets || []).length)],
@@ -1474,6 +1544,50 @@
                     '</div></td>' +
                     '</tr>';
             }).join("") + '</tbody>';
+        }
+
+        function renderAdminOperators() {
+            const rows = state.adminOperators || [];
+            const table = byId("adminOperatorsTable");
+            const head = '<thead><tr><th>Admin</th><th>Generated Password</th><th>Status</th><th>Last Login</th><th>Actions</th></tr></thead>';
+            if (!rows.length) {
+                table.innerHTML = head + '<tbody><tr><td colspan="5" class="adm-empty">No admin credentials created yet.</td></tr></tbody>';
+                return;
+            }
+            table.innerHTML = head + '<tbody>' + rows.map(function (row) {
+                const target = encodeURIComponent(row.id);
+                return '<tr>' +
+                    '<td><div class="owner-cell"><strong>' + esc(row.fullName || row.name || row.email) + '</strong><span class="owner-muted">' + esc(row.email || "-") + '</span></div></td>' +
+                    '<td><div class="owner-cell"><strong>' + esc(row.password || "-") + '</strong><span class="owner-muted">Give this to the admin</span></div></td>' +
+                    '<td><div class="owner-cell">' + AdminCore.badge(row.status || "active") + '</div></td>' +
+                    '<td><div class="owner-cell"><span>' + esc(AdminCore.fmtDate(row.lastLoginAt)) + '</span><span class="owner-muted">' + esc(row.lastLoginPage || "No login yet") + '</span></div></td>' +
+                    '<td class="owner-actions-cell"><div class="owner-inline">' +
+                    '<button class="btn-adm" data-admin-action="fill" data-admin-id="' + target + '">Load</button>' +
+                    '<button class="btn-adm" data-admin-action="regen" data-admin-id="' + target + '">Regenerate</button>' +
+                    '<button class="btn-adm warning" data-admin-action="toggle" data-admin-id="' + target + '">' + esc(str(row.status).toLowerCase() === "active" ? "Disable" : "Enable") + '</button>' +
+                    '<button class="btn-adm danger" data-admin-action="logoutall" data-admin-id="' + target + '">Logout</button>' +
+                    '</div></td>' +
+                    '</tr>';
+            }).join("") + '</tbody>';
+        }
+
+        function renderAdminSessions() {
+            const rows = state.adminSessions || [];
+            const list = byId("adminSessionsList");
+            if (!rows.length) {
+                list.innerHTML = '<div class="adm-empty">No admin sessions are active.</div>';
+                return;
+            }
+            list.innerHTML = rows.map(function (row) {
+                return '<article class="owner-summary-item">' +
+                    '<strong>' + esc(row.fullName || row.email || "Admin") + '</strong>' +
+                    '<span>' + esc(row.email || "-") + '</span>' +
+                    '<small>' + esc("Page: " + (row.lastPage || "-") + " | Seen: " + AdminCore.fmtDate(row.lastSeenAt || row.loginAt)) + '</small>' +
+                    '<div class="owner-inline" style="margin-top:0.55rem;">' +
+                    '<button class="btn-adm danger" data-admin-session-action="logout" data-session-token="' + esc(row.token) + '">Logout Session</button>' +
+                    '</div>' +
+                    '</article>';
+            }).join("");
         }
 
         function orderRows() {
@@ -1689,6 +1803,103 @@
             refreshAll();
         }
 
+        function fillAdminOperatorForm(row) {
+            if (!row) return;
+            byId("adminOperatorName").value = row.fullName || row.name || "";
+            byId("adminOperatorEmail").value = row.email || "";
+            byId("adminOperatorPassword").value = row.password || "";
+        }
+
+        function createOrUpdateAdminOperator() {
+            const name = str(byId("adminOperatorName").value || "");
+            const email = str(byId("adminOperatorEmail").value || "");
+            const password = str(byId("adminOperatorPassword").value || "");
+            if (!name || !email || !password) {
+                alert("Admin name, email, and generated password are required.");
+                return;
+            }
+            const existing = typeof AdminCore.findAdminOperator === "function" ? AdminCore.findAdminOperator(email) : null;
+            if (existing) {
+                if (!AdminCore.updateAdminOperator(existing.id, {
+                    fullName: name,
+                    name: name,
+                    email: email,
+                    password: password
+                })) {
+                    alert("Could not update admin access.");
+                    return;
+                }
+                AdminCore.log("owner_admin_updated", { adminId: existing.id, email: email });
+            } else {
+                const created = AdminCore.createAdminOperator({
+                    fullName: name,
+                    name: name,
+                    email: email,
+                    password: password
+                });
+                if (!created || !created.ok) {
+                    alert(created && created.error ? created.error : "Could not create admin access.");
+                    return;
+                }
+                AdminCore.log("owner_admin_created", { adminId: created.admin.id, email: email });
+            }
+            refreshAll();
+        }
+
+        function clearAdminOperatorForm() {
+            byId("adminOperatorName").value = "";
+            byId("adminOperatorEmail").value = "";
+            byId("adminOperatorPassword").value = "";
+        }
+
+        function handleAdminOperatorAction(action, adminId) {
+            const target = decodeURIComponent(adminId || "");
+            if (!target) return;
+            const admin = typeof AdminCore.findAdminOperator === "function" ? AdminCore.findAdminOperator(target) : null;
+            if (!admin) return;
+            if (action === "fill") {
+                fillAdminOperatorForm(admin);
+                return;
+            }
+            if (action === "regen") {
+                const nextPassword = typeof AdminCore.generateAdminPassword === "function" ? AdminCore.generateAdminPassword(12) : AdminCore.createCode(12);
+                if (!AdminCore.updateAdminOperator(admin.id, { password: nextPassword })) {
+                    alert("Could not regenerate admin password.");
+                    return;
+                }
+                AdminCore.log("owner_admin_password_regenerated", { adminId: admin.id, email: admin.email });
+                refreshAll();
+                fillAdminOperatorForm({ ...admin, password: nextPassword });
+                return;
+            }
+            if (action === "toggle") {
+                const nextStatus = str(admin.status).toLowerCase() === "active" ? "disabled" : "active";
+                if (!AdminCore.updateAdminOperator(admin.id, { status: nextStatus })) {
+                    alert("Could not update admin status.");
+                    return;
+                }
+                if (nextStatus !== "active") {
+                    AdminCore.revokeAdminSessionsForAdmin(admin.id, "disabled_by_owner");
+                }
+                AdminCore.log("owner_admin_status_changed", { adminId: admin.id, email: admin.email, status: nextStatus });
+                refreshAll();
+                return;
+            }
+            if (action === "logoutall") {
+                AdminCore.revokeAdminSessionsForAdmin(admin.id, "owner_forced_logout");
+                refreshAll();
+            }
+        }
+
+        function handleAdminSessionAction(action, token) {
+            const target = str(token || "");
+            if (!target) return;
+            if (action === "logout") {
+                AdminCore.revokeAdminSession(target, "owner_forced_logout");
+                refreshAll();
+            }
+        }
+
         function handleOrderAction(action, id) {
             if (!id) return;
             if (!AdminCore.updateOrderStatus(id, action)) {
@@ -1819,6 +2030,20 @@
                 lockOwnerConsole("manual");
             });
             byId("refreshBtn").addEventListener("click", refreshAll);
+            byId("generateAdminPasswordBtn").addEventListener("click", function () {
+                byId("adminOperatorPassword").value = typeof AdminCore.generateAdminPassword === "function"
+                    ? AdminCore.generateAdminPassword(12)
+                    : AdminCore.createCode(12);
+            });
+            byId("saveAdminOperatorBtn").addEventListener("click", createOrUpdateAdminOperator);
+            byId("clearAdminOperatorBtn").addEventListener("click", clearAdminOperatorForm);
+            byId("logoutAllAdminsBtn").addEventListener("click", function () {
+                const admins = Array.isArray(state.adminOperators) ? state.adminOperators : [];
+                admins.forEach(function (row) {
+                    AdminCore.revokeAdminSessionsForAdmin(row.id, "owner_forced_logout");
+                });
+                refreshAll();
+            });
             byId("exportSnapshotBtn").addEventListener("click", function () {
                 AdminCore.exportJSON(AdminCore.getSiteSnapshot(), "owner-site-snapshot.json");
             });
@@ -1918,6 +2143,16 @@
                 if (!btn) return;
                 handleAccountAction(btn.dataset.accountAction, btn.dataset.email);
             });
+            byId("adminOperatorsTable").addEventListener("click", function (event) {
+                const btn = event.target.closest("button[data-admin-action]");
+                if (!btn) return;
+                handleAdminOperatorAction(btn.dataset.adminAction, btn.dataset.adminId);
+            });
+            byId("adminSessionsList").addEventListener("click", function (event) {
+                const btn = event.target.closest("button[data-admin-session-action]");
+                if (!btn) return;
+                handleAdminSessionAction(btn.dataset.adminSessionAction, btn.dataset.sessionToken);
+            });
             byId("ordersTable").addEventListener("click", function (event) {
                 const btn = event.target.closest("button[data-order-action]");
                 if (!btn) return;
@@ -1972,12 +2207,14 @@
             });
 
             window.addEventListener("storage", function () {
+                if (redirectAdminAwayFromOwner()) return;
                 if (!byId("ownerApp").classList.contains("owner-hidden")) refreshAll();
                 else renderOwnerLoginOverview();
             });
         }
 
         function initOwnerConsole() {
+            if (redirectAdminAwayFromOwner()) return;
             bindEvents();
             bindOwnerSessionActivity();
             startOwnerSessionMonitor();
@@ -2017,5 +2254,6 @@
     </script>
       <script defer src="site-admin-controls.js?v=20260510b"></script>
 
+  <script defer src="mobile-app.js?v=20260510a"></script>
 </body>
 </html>

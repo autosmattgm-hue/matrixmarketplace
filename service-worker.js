@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v20260510k";
+const CACHE_VERSION = "v20260510w";
 const STATIC_CACHE = `matrixmarket-static-${CACHE_VERSION}`;
 const PAGE_CACHE = `matrixmarket-pages-${CACHE_VERSION}`;
 const DATA_CACHE = `matrixmarket-data-${CACHE_VERSION}`;
@@ -20,10 +20,13 @@ const PRECACHE_URLS = [
   "./style.css",
   "./upgrade.css",
   "./index-home.css?v=20260509m",
-  "./index-home.js?v=20260510a",
+  "./index-home.js?v=20260510b",
   "./firebase-online-storage.js?v=20260224c",
   "./seller-core.js?v=20260510i",
-  "./admin-core.js?v=20260509q",
+  "./admin-core.js?v=20260510aa",
+  "./admin-login.html",
+  "./app.webmanifest",
+  "./mobile-app.js?v=20260510a",
   "./owner-console.html",
   "./site-admin-controls.js?v=20260510b",
   "./site-performance.js",
@@ -31,6 +34,9 @@ const PRECACHE_URLS = [
   "./sw-register.js",
   "./sw-register.js?v=20260228a",
   "./matrixx.png",
+  "./icons/icon-192.png",
+  "./icons/icon-512.png",
+  "./icons/apple-touch-icon.png",
 ];
 
 const STATIC_DESTINATIONS = new Set(["style", "script", "image", "font", "worker"]);

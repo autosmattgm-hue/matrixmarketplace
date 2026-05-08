@@ -741,6 +741,12 @@
     const user = canonical ? (syncSessionAccount(canonical) || { ...activeUser, ...canonical }) : activeUser;
     const loggedIn = !isGuestSessionUser(user);
     byId('userChip').textContent = 'Hi, ' + str(loggedIn ? (user.fullName || user.name || user.email) : 'Guest');
+    const accountLink = byId('accountLink');
+    if (accountLink) {
+      accountLink.href = loggedIn ? 'settings.html' : 'login.html?next=index.html';
+      accountLink.setAttribute('aria-label', loggedIn ? 'Open account' : 'Open login');
+      accountLink.title = loggedIn ? 'Open account settings' : 'Login to your account';
+    }
     const wallet = byId('walletBalanceChip');
     if (wallet) wallet.textContent = money(readWalletBalance());
     const topup = byId('walletTopupLink');

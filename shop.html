@@ -670,6 +670,14 @@
             body { padding-bottom: 70px; }
         }
     </style>
+  <meta name="theme-color" content="#0f172a" />
+  <link rel="manifest" href="app.webmanifest" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="MatrixMarket" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="application-name" content="MatrixMarket" />
 </head>
 <body>
     <header id="mainHeader">
@@ -753,7 +761,7 @@
         <a href="chat.html">💬<span>Chat</span></a>
     </nav>
 
-    <script src="seller-core.js?v=20260510f"></script>
+    <script src="seller-core.js?v=20260510i"></script>
     <script>
         const state = { products: [], visible: [], latest: [], soldOutHidden: 0 };
         const BUYER_SCOPE_PREFIX = "__mm_buyer__";
@@ -1352,5 +1360,6 @@
             }
         })();
     </script>
+  <script defer src="mobile-app.js?v=20260510a"></script>
 </body>
 </html>

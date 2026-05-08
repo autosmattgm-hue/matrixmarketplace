@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin />
   <link rel="preload" as="image" href="matrixx.png" />
   <link rel="preload" as="style" href="index-home.css?v=20260509m" />
-  <link rel="preload" as="script" href="index-home.js?v=20260510a" />
+  <link rel="preload" as="script" href="index-home.js?v=20260510b" />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" />
   <link rel="stylesheet" href="index-home.css?v=20260509m" />
   <style>
@@ -47,7 +47,14 @@
     }
   </style>
   <script defer src="firebase-online-storage.js?v=20260224c"></script>
-  <script defer src="seller-core.js?v=20260510f"></script>
+  <script defer src="seller-core.js?v=20260510i"></script>
+  <link rel="manifest" href="app.webmanifest" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="MatrixMarket" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="application-name" content="MatrixMarket" />
 </head>
 <body>
   <a class="mm-skip-link" href="#mainContent">Skip to products</a>
@@ -104,7 +111,7 @@
       </div>
 
       <div class="mm-top-actions" aria-label="Primary customer actions">
-        <a class="mm-top-link mm-top-link-account" href="settings.html" aria-label="Open account">
+        <a class="mm-top-link mm-top-link-account" id="accountLink" href="login.html" aria-label="Open login">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
           <span class="mm-top-link-text">
             <span class="mm-top-link-sub">Hello,</span>
@@ -959,7 +966,7 @@
       }
     })();
   </script>
-  <script defer src="index-home.js?v=20260510a"></script>
+  <script defer src="index-home.js?v=20260510b"></script>
     <script defer src="site-admin-controls.js?v=20260510b"></script>
 
   <script defer src="site-performance.js?v=20260510b"></script>
@@ -1001,5 +1008,6 @@
       });
     }());
   </script>
+  <script defer src="mobile-app.js?v=20260510a"></script>
 </body>
 </html>

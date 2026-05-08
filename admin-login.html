@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Admin Login - MatrixMarket</title>
+    <link rel="stylesheet" href="admin-layout.css?v=20260227a">
+    <link rel="stylesheet" href="upgrade.css">
+    <script src="firebase-online-storage.js?v=20260224c"></script>
+    <meta name="theme-color" content="#0f172a" />
+    <link rel="manifest" href="app.webmanifest" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="MatrixMarket" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="application-name" content="MatrixMarket" />
+    <style>
+        .admin-login-shell {
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            padding: 1rem;
+            background:
+                radial-gradient(900px 420px at 0% 0%, rgba(14, 165, 233, 0.18), transparent),
+                radial-gradient(900px 420px at 100% 0%, rgba(34, 197, 94, 0.14), transparent),
+                #020617;
+        }
+        .admin-login-layout {
+            width: min(1080px, 100%);
+            display: grid;
+            gap: 1rem;
+            grid-template-columns: 1fr minmax(320px, 430px);
+        }
+        .admin-login-panel,
+        .admin-login-card {
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            border-radius: 24px;
+            background: rgba(15, 23, 42, 0.94);
+            box-shadow: 0 24px 80px rgba(2, 6, 23, 0.4);
+            padding: 1.15rem;
+        }
+        .admin-login-panel {
+            display: grid;
+            gap: 1rem;
+            align-content: start;
+        }
+        .admin-login-kicker {
+            width: fit-content;
+            border-radius: 999px;
+            background: rgba(14, 165, 233, 0.12);
+            border: 1px solid rgba(14, 165, 233, 0.26);
+            color: #dbeafe;
+            padding: 0.36rem 0.7rem;
+            font-size: 0.78rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+        .admin-login-panel h1,
+        .admin-login-card h2 {
+            margin: 0;
+        }
+        .admin-login-panel p,
+        .admin-login-note,
+        .admin-login-meta {
+            color: #cbd5e1;
+            line-height: 1.6;
+        }
+        .admin-login-metrics {
+            display: grid;
+            gap: 0.7rem;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .admin-login-metric {
+            border-radius: 18px;
+            border: 1px solid rgba(148, 163, 184, 0.14);
+            background: rgba(2, 6, 23, 0.4);
+            padding: 0.8rem;
+        }
+        .admin-login-metric strong,
+        .admin-login-metric span,
+        .admin-login-metric small {
+            display: block;
+        }
+        .admin-login-metric strong {
+            font-size: 1.25rem;
+            margin-bottom: 0.18rem;
+        }
+        .admin-login-metric span {
+            color: #f8fafc;
+            font-size: 0.9rem;
+        }
+        .admin-login-metric small {
+            margin-top: 0.24rem;
+            color: #94a3b8;
+        }
+        .admin-login-card {
+            display: grid;
+            gap: 0.8rem;
+            align-content: start;
+        }
+        .admin-login-card .adm {
+            width: 100%;
+        }
+        .admin-login-error {
+            min-height: 1.2rem;
+            color: #fca5a5;
+            font-size: 0.86rem;
+        }
+        .admin-login-inline {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .admin-login-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.4rem 0.7rem;
+            border-radius: 999px;
+            border: 1px solid rgba(148, 163, 184, 0.16);
+            background: rgba(2, 6, 23, 0.38);
+            color: #e2e8f0;
+            font-size: 0.8rem;
+        }
+        .admin-login-actions {
+            display: flex;
+            gap: 0.55rem;
+            justify-content: space-between;
+            flex-wrap: wrap;
+        }
+        @media (max-width: 900px) {
+            .admin-login-layout,
+            .admin-login-metrics {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="admin-login-shell">
+        <section class="admin-login-layout">
+            <article class="admin-login-panel">
+                <div class="admin-login-kicker">MatrixMarket Admin Access</div>
+                <h1>Owner-generated credentials only.</h1>
+                <p>Each admin password is generated from the owner console. When an admin signs in, the owner can see the login, monitor the live session, and force-log out that admin at any time.</p>
+                <div class="admin-login-metrics" id="adminMetrics"></div>
+                <div class="admin-login-inline">
+                    <span class="admin-login-chip" id="adminLoginStatus">Waiting for admin credentials</span>
+                    <a class="btn-adm" href="index.html">Back Home</a>
+                </div>
+            </article>
+
+            <article class="admin-login-card">
+                <h2>Admin Login</h2>
+                <p class="admin-login-note">Use the email or name and generated password provided by the owner.</p>
+                <div>
+                    <label class="adm-note" for="adminIdentifier">Admin email or name</label>
+                    <input class="adm" id="adminIdentifier" type="text" placeholder="admin@example.com" autocomplete="username" />
+                </div>
+                <div>
+                    <label class="adm-note" for="adminPassword">Generated password</label>
+                    <input class="adm" id="adminPassword" type="password" placeholder="Enter admin password" autocomplete="current-password" />
+                </div>
+                <div class="admin-login-meta" id="adminRedirectHint">After login you will be sent back to the requested admin page.</div>
+                <div class="admin-login-error" id="adminLoginError"></div>
+                <div class="admin-login-actions">
+                    <button class="btn-adm" type="button" id="adminShowBtn">Show</button>
+                    <button class="btn-adm primary" type="button" id="adminLoginBtn">Login</button>
+                </div>
+            </article>
+        </section>
+    </main>
+
+<script src="admin-core.js?v=20260510aa"></script>
+    <script>
+        function byId(id) { return document.getElementById(id); }
+
+        function requestedAdminPage() {
+            const params = new URLSearchParams(location.search);
+            const next = params.get("next");
+            const target = next ? decodeURIComponent(next) : "dashboard-admin.html";
+            if (!target || target === "admin-login.html" || target.indexOf("admin-login.html?") === 0) {
+                return "dashboard-admin.html";
+            }
+            return target;
+        }
+
+        function renderMetrics() {
+            const metrics = AdminCore.computeDashboard();
+            const admins = typeof AdminCore.getAdminOperators === "function" ? AdminCore.getAdminOperators() : [];
+            const sessions = typeof AdminCore.getAdminLiveSessions === "function" ? AdminCore.getAdminLiveSessions() : [];
+            byId("adminMetrics").innerHTML = [
+                ["Admin Accounts", admins.length, "Owner-managed admin credentials"],
+                ["Live Admin Sessions", sessions.length, "Visible to the owner console"],
+                ["Orders", metrics.orders, metrics.orderPending + " still pending"],
+                ["Payments", metrics.payments, metrics.pendingPayments + " awaiting review"]
+            ].map(function (item) {
+                return '<div class="admin-login-metric"><strong>' + item[0] + '</strong><span>' + item[1] + '</span><small>' + item[2] + '</small></div>';
+            }).join("");
+        }
+
+        function updateRedirectHint() {
+            byId("adminRedirectHint").textContent = "After login you will be sent to " + requestedAdminPage() + ".";
+        }
+
+        function redirectAfterLogin() {
+            location.replace(requestedAdminPage());
+        }
+
+        function submitAdminLogin() {
+            const identifier = byId("adminIdentifier").value;
+            const password = byId("adminPassword").value;
+            const result = AdminCore.authenticateAdmin(identifier, password, requestedAdminPage());
+            if (!result || !result.ok) {
+                byId("adminLoginError").textContent = result && result.error ? result.error : "Admin login failed.";
+                byId("adminLoginStatus").textContent = "Login failed";
+                return;
+            }
+            byId("adminLoginError").textContent = "";
+            byId("adminLoginStatus").textContent = "Signed in as " + (result.admin.fullName || result.admin.email);
+            redirectAfterLogin();
+        }
+
+        function initAdminLoginPage() {
+            renderMetrics();
+            updateRedirectHint();
+
+            if (AdminCore.isOwnerSessionActive()) {
+                byId("adminLoginStatus").textContent = "Owner session detected";
+                redirectAfterLogin();
+                return;
+            }
+            const current = AdminCore.getCurrentAdminSession();
+            if (current) {
+                byId("adminLoginStatus").textContent = "Active admin session detected";
+                redirectAfterLogin();
+                return;
+            }
+
+            byId("adminShowBtn").addEventListener("click", function () {
+                const input = byId("adminPassword");
+                input.type = input.type === "password" ? "text" : "password";
+                this.textContent = input.type === "password" ? "Show" : "Hide";
+            });
+            byId("adminLoginBtn").addEventListener("click", submitAdminLogin);
+            byId("adminPassword").addEventListener("keydown", function (event) {
+                if (event.key === "Enter") submitAdminLogin();
+            });
+            byId("adminIdentifier").addEventListener("keydown", function (event) {
+                if (event.key === "Enter") submitAdminLogin();
+            });
+        }
+
+        function startAdminLoginPage() {
+            const ready = window.MMStorage && window.MMStorage.ready;
+            if (ready && typeof ready.then === "function") {
+                ready.finally(initAdminLoginPage);
+                return;
+            }
+            initAdminLoginPage();
+        }
+
+        if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", startAdminLoginPage);
+        else startAdminLoginPage();
+    </script>
+    <script defer src="site-admin-controls.js?v=20260510b"></script>
+    <script defer src="site-performance.js?v=20260510b"></script>
+    <script defer src="mobile-app.js?v=20260510a"></script>
+</body>
+</html>
