@@ -1,9 +1,9 @@
 {
-  "id": "./seller-login.html",
+  "id": "./?app=matrixmarket-seller",
   "name": "MatrixMarket Seller",
   "short_name": "MM Seller",
   "description": "Seller app for product management, order approvals, delivery tasks, chat, and withdrawals.",
-  "start_url": "./seller-login.html",
+  "start_url": "./seller-login.html?app=seller",
   "scope": "./",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui", "browser"],

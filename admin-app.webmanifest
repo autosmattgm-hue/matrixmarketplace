@@ -1,9 +1,9 @@
 {
-  "id": "./admin-login.html",
+  "id": "./?app=matrixmarket-admin",
   "name": "MatrixMarket Admin",
   "short_name": "MM Admin",
   "description": "Admin app for worker operations, orders, payments, users, sellers, and site oversight.",
-  "start_url": "./admin-login.html",
+  "start_url": "./admin-login.html?app=admin",
   "scope": "./",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui", "browser"],

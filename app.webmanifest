@@ -1,9 +1,9 @@
 {
-  "id": "./index.html",
-  "name": "MatrixMarket",
-  "short_name": "MatrixMarket",
-  "description": "MatrixMarket marketplace app for shopping, orders, sellers, payments, and delivery tracking.",
-  "start_url": "./index.html",
+  "id": "./?app=matrixmarket-user",
+  "name": "MatrixMarket User",
+  "short_name": "MM User",
+  "description": "MatrixMarket user app for shopping, checkout, orders, payments, and customer account tracking.",
+  "start_url": "./index.html?app=user",
   "scope": "./",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui", "browser"],
@@ -50,9 +50,9 @@
       ]
     },
     {
-      "name": "Seller Dashboard",
-      "short_name": "Seller",
-      "url": "./seller-dashboard.html",
+      "name": "Settings",
+      "short_name": "Account",
+      "url": "./settings.html",
       "icons": [
         {
           "src": "./icons/icon-192.png",

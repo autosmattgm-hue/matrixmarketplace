@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Seller Register - MatrixMarket</title>
+  <link rel="icon" type="image/png" href="seller.png" />
   <link rel="stylesheet" href="seller-layout.css" />
   <link rel="stylesheet" href="upgrade.css" />
   <style>
@@ -98,6 +99,7 @@
   <script>
     const state = { plan: "Weekly - GMD1000/week" };
     let registerBusy = false;
+    let pageReady = false;
     function byId(id){ return document.getElementById(id); }
     function show(type, text){
       byId("okMsg").style.display = type === "ok" ? "block" : "none";
@@ -121,7 +123,12 @@
     async function syncStorage() {
       const sync = window.MMStorage && window.MMStorage.syncNow;
       if (sync && typeof sync === "function") {
-        try { await sync(); } catch (_) {}
+        try {
+          await Promise.race([
+            sync(),
+            new Promise(function (resolve) { setTimeout(resolve, 2200); })
+          ]);
+        } catch (_) {}
       }
     }
 
@@ -203,6 +210,8 @@
     }
 
     function initSellerRegisterPage() {
+      if (pageReady) return;
+      pageReady = true;
       byId("registerBtn").addEventListener("click", registerSeller);
 
       document.querySelectorAll(".plan").forEach(function(el){
@@ -221,11 +230,6 @@
     }
 
     function startSellerRegisterPage() {
-      const ready = window.MMStorage && window.MMStorage.ready;
-      if (ready && typeof ready.then === "function") {
-        ready.finally(initSellerRegisterPage);
-        return;
-      }
       initSellerRegisterPage();
     }
 

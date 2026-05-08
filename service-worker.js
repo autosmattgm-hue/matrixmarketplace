@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v20260510zf";
+const CACHE_VERSION = "v20260510zi";
 const STATIC_CACHE = `matrixmarket-static-${CACHE_VERSION}`;
 const PAGE_CACHE = `matrixmarket-pages-${CACHE_VERSION}`;
 const DATA_CACHE = `matrixmarket-data-${CACHE_VERSION}`;

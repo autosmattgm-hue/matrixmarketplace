@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Seller Login - MatrixMarket</title>
+  <link rel="icon" type="image/png" href="seller.png" />
   <link rel="stylesheet" href="seller-layout.css" />
   <link rel="stylesheet" href="upgrade.css" />
   <style>
@@ -64,6 +65,7 @@
   <script src="seller-core.js?v=20260510j"></script>
   <script>
     let loginBusy = false;
+    let pageReady = false;
     function byId(id){ return document.getElementById(id); }
     function show(type, text){
       byId("okMsg").style.display = type === "ok" ? "block" : "none";
@@ -90,7 +92,12 @@
     async function syncStorage() {
       const sync = window.MMStorage && window.MMStorage.syncNow;
       if (sync && typeof sync === "function") {
-        try { await sync(); } catch (_) {}
+        try {
+          await Promise.race([
+            sync(),
+            new Promise(function (resolve) { setTimeout(resolve, 2200); })
+          ]);
+        } catch (_) {}
       }
     }
 
@@ -140,6 +147,8 @@
     }
 
     function initSellerLoginPage() {
+      if (pageReady) return;
+      pageReady = true;
       const active = SellerCore.getCurrentSeller();
       if (active && SellerCore.hasActiveSubscription(active)) {
         show("ok", "You are already logged in. Redirecting...");
@@ -161,11 +170,6 @@
     }
 
     function startSellerLoginPage() {
-      const ready = window.MMStorage && window.MMStorage.ready;
-      if (ready && typeof ready.then === "function") {
-        ready.finally(initSellerLoginPage);
-        return;
-      }
       initSellerLoginPage();
     }
 

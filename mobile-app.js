@@ -1,6 +1,7 @@
 (function mobileAppBootstrap() {
-  var APP_NAME = "MatrixMarket";
+  var APP_NAME = "MatrixMarket User";
   var APP_ICON = "icons/apple-touch-icon.png";
+  var MANIFEST_HREF = "app.webmanifest";
   var DISMISS_KEY = "mmInstallPromptDismissedAt";
   var DISMISS_MS = 3 * 24 * 60 * 60 * 1000;
   var PROMPT_ID = "mmInstallPrompt";
@@ -50,22 +51,26 @@
     if (!head) return;
 
     function ensureMeta(name, content) {
-      if (head.querySelector('meta[name="' + name + '"]')) return;
-      var meta = document.createElement("meta");
-      meta.name = name;
+      var meta = head.querySelector('meta[name="' + name + '"]');
+      if (!meta) {
+        meta = document.createElement("meta");
+        meta.name = name;
+        head.appendChild(meta);
+      }
       meta.content = content;
-      head.appendChild(meta);
     }
 
     function ensureLink(rel, href) {
-      if (head.querySelector('link[rel="' + rel + '"]')) return;
-      var link = document.createElement("link");
-      link.rel = rel;
+      var link = head.querySelector('link[rel="' + rel + '"]');
+      if (!link) {
+        link = document.createElement("link");
+        link.rel = rel;
+        head.appendChild(link);
+      }
       link.href = href;
-      head.appendChild(link);
     }
 
-    ensureLink("manifest", "app.webmanifest");
+    ensureLink("manifest", MANIFEST_HREF);
     ensureLink("apple-touch-icon", APP_ICON);
     ensureMeta("theme-color", "#0f172a");
     ensureMeta("apple-mobile-web-app-capable", "yes");
@@ -120,15 +125,15 @@
   function promptMessage() {
     if (deferredPrompt) {
       return {
-        title: "Install MatrixMarket",
-        body: "Download this website as an app for faster access, full-screen browsing, and a home-screen shortcut on your phone.",
+        title: "Install User App",
+        body: "Download the user marketplace app for faster shopping, checkout, orders, and account access on your phone.",
         primary: "Install",
         secondary: "Later"
       };
     }
     return {
-      title: "Add MatrixMarket To Home Screen",
-      body: "On iPhone, tap Share in Safari, then choose Add to Home Screen to install the app with the MatrixMarket icon.",
+      title: "Add User App To Home Screen",
+      body: "On iPhone, tap Share in Safari, then choose Add to Home Screen to install the user app with the MatrixMarket icon.",
       primary: "Got It",
       secondary: "Later"
     };

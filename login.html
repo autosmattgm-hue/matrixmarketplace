@@ -733,6 +733,7 @@
             const LOCK_MS = 60 * 1000;
             let loginBusy = false;
             let resetBusy = false;
+            let pageStarted = false;
 
             function byId(id) { return document.getElementById(id); }
 
@@ -1007,8 +1008,23 @@
             async function syncNow() {
                 try {
                     if (window.MMStorage && typeof window.MMStorage.syncNow === "function") {
-                        await window.MMStorage.syncNow();
+                        await Promise.race([
+                            window.MMStorage.syncNow(),
+                            new Promise(function (resolve) { setTimeout(resolve, 2200); })
+                        ]);
                     }
+                } catch (_) {}
+            }
+
+            async function waitForStorageReady(timeoutMs) {
+                const ready = window.MMStorage && window.MMStorage.ready;
+                if (!ready || typeof ready.then !== "function") return;
+                const waitMs = Number(timeoutMs) > 0 ? Number(timeoutMs) : 2200;
+                try {
+                    await Promise.race([
+                        ready.catch(function () {}),
+                        new Promise(function (resolve) { setTimeout(resolve, waitMs); })
+                    ]);
                 } catch (_) {}
             }
 
@@ -1098,10 +1114,7 @@
                 event.preventDefault();
                 if (loginBusy) return false;
 
-                const ready = window.MMStorage && window.MMStorage.ready;
-                if (ready && typeof ready.then === "function") {
-                    await ready.catch(function () {});
-                }
+                await waitForStorageReady(2200);
 
                 const lockMs = lockRemainingMs();
                 if (lockMs > 0) {
@@ -1228,13 +1241,21 @@
             }
 
             function start() {
+                if (pageStarted) return;
+                pageStarted = true;
                 bindUi();
                 hydratePage();
             }
 
-            const ready = window.MMStorage && window.MMStorage.ready;
-            if (ready && typeof ready.then === "function") ready.finally(start);
+            if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start, { once: true });
             else start();
+
+            const ready = window.MMStorage && window.MMStorage.ready;
+            if (ready && typeof ready.then === "function") {
+                ready.finally(function () {
+                    try { hydratePage(); } catch (_) {}
+                });
+            }
         })();
     </script>
 
