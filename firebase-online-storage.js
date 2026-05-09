@@ -35,6 +35,7 @@
     "lastLoginMeta"
   ]);
   const NATIVE_MIRROR_PREFIX = "__mm_native__:";
+  const READY_TIMEOUT_MS = 2500;
   const pending = new Map();
   let pendingClear = false;
   let syncing = false;
@@ -42,6 +43,8 @@
   let remoteWritable = true;
   let remoteMode = "memory";
   let readyDone = false;
+  let readyTimedOut = false;
+  let readySettled = false;
   let db = null;
   let api = null;
 
@@ -280,7 +283,26 @@
 
   hydrateNativeMirror();
 
-  const ready = (async () => {
+  let resolveReady = function () {};
+  const ready = new Promise(function (resolve) {
+    resolveReady = resolve;
+  });
+
+  function finishReady() {
+    if (readySettled) return;
+    readySettled = true;
+    readyDone = true;
+    try { resolveReady(); } catch (_) {}
+    try { window.dispatchEvent(new Event("mm-storage-hydrated")); } catch (_) {}
+  }
+
+  window.setTimeout(function () {
+    if (readySettled) return;
+    readyTimedOut = true;
+    finishReady();
+  }, READY_TIMEOUT_MS);
+
+  (async () => {
     try {
       const [firebaseApp, firebaseDb, firebaseAuth] = await Promise.all([
         import("https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js"),
@@ -318,8 +340,6 @@
       );
 
       await flushPending();
-      readyDone = true;
-      window.dispatchEvent(new Event("mm-storage-hydrated"));
     } catch (_firebaseError) {
       try {
         await bootstrapRestMode();
@@ -327,10 +347,9 @@
       } catch (_restError) {
         remoteMode = "memory";
         remoteWritable = false;
-      } finally {
-        readyDone = true;
-        window.dispatchEvent(new Event("mm-storage-hydrated"));
       }
+    } finally {
+      finishReady();
     }
   })();
 
