@@ -155,6 +155,10 @@
             liveProducts: [],
             checkingOut: false
         };
+        let cartPersistTimer = 0;
+        let cartRenderFrame = 0;
+        let pageInitialized = false;
+        let postReadySynced = false;
 
         const couponMap = {
             SAVE10: function (subtotal) { return Math.min(subtotal * 0.10, 500); },
@@ -411,9 +415,25 @@
                 });
         }
 
-        function persistCart() {
+        function persistCartNow() {
             write("cart", state.cart);
             write("cartItems", state.cart);
+        }
+
+        function persistCart() {
+            if (cartPersistTimer) clearTimeout(cartPersistTimer);
+            cartPersistTimer = setTimeout(function () {
+                cartPersistTimer = 0;
+                persistCartNow();
+            }, 90);
+        }
+
+        function scheduleCartRender() {
+            if (cartRenderFrame) return;
+            cartRenderFrame = requestAnimationFrame(function () {
+                cartRenderFrame = 0;
+                renderCart();
+            });
         }
 
         function normalizeLiveProductRow(item, index) {
@@ -510,7 +530,7 @@
             });
 
             state.cart = next;
-            persistCart();
+            persistCartNow();
 
             const stockStatus = byId("stockStatus");
             if (stockStatus) stockStatus.textContent = notes.join(" ");
@@ -622,13 +642,13 @@
             else if (maxStock > 0) state.cart[index].quantity = Math.min(next, maxStock);
             else state.cart.splice(index, 1);
             persistCart();
-            renderCart();
+            scheduleCartRender();
         }
 
         function removeItem(index) {
             state.cart.splice(index, 1);
             persistCart();
-            renderCart();
+            scheduleCartRender();
         }
 
         function moveToWishlist(index) {
@@ -641,14 +661,14 @@
             write("marketplaceWishlist", list);
             state.cart.splice(index, 1);
             persistCart();
-            renderCart();
+            scheduleCartRender();
             byId("stockStatus").textContent = item.name + " moved to wishlist.";
         }
 
         function clearCart() {
             state.cart = [];
             persistCart();
-            renderCart();
+            scheduleCartRender();
             alert("Cart cleared");
         }
 
@@ -676,7 +696,7 @@
             byId("couponStatus").textContent = state.coupon ? ("Coupon restored: " + state.coupon) : "";
             byId("deliveryMode").value = state.deliveryMode;
             rawSet("cartDeliveryMode", state.deliveryMode);
-            persistCart();
+            persistCartNow();
             syncCartWithStock();
             renderCart();
         }
@@ -795,7 +815,30 @@
             window.location.href = "checkout.html";
         }
 
+        function bindEvents() {
+            ["buyerName", "buyerPhone", "buyerEmail", "buyerAddress"].forEach(function (id) {
+                byId(id).addEventListener("input", saveBuyerDraft);
+            });
+
+            byId("applyCouponBtn").addEventListener("click", applyCoupon);
+            byId("clearCartBtn").addEventListener("click", clearCart);
+            byId("recheckStockBtn").addEventListener("click", recheckStock);
+            byId("saveSnapshotBtn").addEventListener("click", saveSnapshot);
+            byId("restoreSnapshotBtn").addEventListener("click", restoreSnapshot);
+            byId("sortCart").addEventListener("change", function () {
+                renderCart();
+            });
+            byId("deliveryMode").addEventListener("change", function () {
+                state.deliveryMode = this.value === "express" ? "express" : "standard";
+                rawSet("cartDeliveryMode", state.deliveryMode);
+                renderSummary();
+            });
+            byId("checkoutBtn").addEventListener("click", checkout);
+        }
+
         function init() {
+            if (pageInitialized) return;
+            pageInitialized = true;
             state.cart = normalizeCart(read("cart", []));
             if (!state.cart.length) {
                 const recovered = recoverCartFromAnyKey();
@@ -818,34 +861,29 @@
             renderCart();
             loadBuyerForm();
             setCheckouting(false);
-
-            ["buyerName", "buyerPhone", "buyerEmail", "buyerAddress"].forEach(function (id) {
-                byId(id).addEventListener("input", saveBuyerDraft);
-            });
-
-            byId("applyCouponBtn").addEventListener("click", applyCoupon);
-            byId("clearCartBtn").addEventListener("click", clearCart);
-            byId("recheckStockBtn").addEventListener("click", recheckStock);
-            byId("saveSnapshotBtn").addEventListener("click", saveSnapshot);
-            byId("restoreSnapshotBtn").addEventListener("click", restoreSnapshot);
-            byId("sortCart").addEventListener("change", function () {
-                renderCart();
-            });
-            byId("deliveryMode").addEventListener("change", function () {
-                state.deliveryMode = this.value === "express" ? "express" : "standard";
-                rawSet("cartDeliveryMode", state.deliveryMode);
-                renderSummary();
-            });
-            byId("checkoutBtn").addEventListener("click", checkout);
+            bindEvents();
         }
 
-        window.addEventListener("load", function () {
+        function syncAfterReady() {
+            if (postReadySynced) return;
+            postReadySynced = true;
+            if (!state.cart.length) {
+                const recovered = recoverCartFromAnyKey();
+                if (recovered.length) {
+                    state.cart = recovered;
+                    persistCartNow();
+                }
+            }
+            syncCartWithStock();
+            scheduleCartRender();
+        }
+
+        window.addEventListener("DOMContentLoaded", function () {
+            init();
             const ready = window.MMStorage && window.MMStorage.ready;
             if (ready && typeof ready.then === "function") {
-                ready.finally(init);
-                return;
+                ready.finally(syncAfterReady);
             }
-            init();
         });
     </script>
     <script defer src="upgrade.js"></script>

@@ -162,6 +162,8 @@
       onlineReady: false,
       cartSource: "checkout"
     };
+    let checkoutInitialized = false;
+    let checkoutReadySynced = false;
     const BUYER_SCOPE_PREFIX = "__mm_buyer__";
     const SCOPED_EXACT_KEYS = new Set([
       "cart",
@@ -1268,7 +1270,54 @@
       }
     }
 
+    function bindEvents() {
+      byId("placeOrderBtn").addEventListener("click", placeOrder);
+      byId("clearSelectedBtn").addEventListener("click", clearSelectedProducts);
+      byId("orderList").addEventListener("click", function (event) {
+        const btn = event.target.closest("button[data-action][data-index]");
+        if (!btn) return;
+        const action = String(btn.getAttribute("data-action") || "");
+        const idx = Number(btn.getAttribute("data-index"));
+        if (!Number.isInteger(idx)) return;
+        if (action === "deselect") {
+          deselectProduct(idx);
+          return;
+        }
+        if (action === "qty-inc") {
+          updateProductQuantity(idx, 1);
+          return;
+        }
+        if (action === "qty-dec") {
+          updateProductQuantity(idx, -1);
+        }
+      });
+      byId("profileFillBtn").addEventListener("click", fillBuyerFromProfile);
+      ["buyerName", "buyerPhone", "buyerEmail", "buyerAddress", "orderNote"].forEach(function (id) {
+        byId(id).addEventListener("input", saveCheckoutDraft);
+      });
+      byId("termsCheck").addEventListener("change", validateCheckoutForm);
+      byId("deliveryOption").addEventListener("change", function () {
+        state.deliveryOption = this.value === "express" ? "express" : "standard";
+        renderSummary();
+        saveCheckoutDraft();
+      });
+      byId("deliveryWindow").addEventListener("change", saveCheckoutDraft);
+      byId("deliveryDate").addEventListener("change", function () {
+        renderSummary();
+        saveCheckoutDraft();
+      });
+      byId("paymentMethod").addEventListener("change", function () {
+        if (this.value === "cod") {
+          byId("walletInfo").textContent = "Cash on Delivery selected. Wallet will not be charged now.";
+        } else {
+          readBalance();
+        }
+      });
+    }
+
     function init() {
+      if (checkoutInitialized) return;
+      checkoutInitialized = true;
       state.onlineReady = resolveOnlineReady() || apiReady();
       applyOnlineStatusText();
       if (!state.onlineReady) {
@@ -1318,58 +1367,35 @@
         byId("walletInfo").textContent = "Seller account detected: wallet/subscription funds are blocked for purchases.";
       }
 
-      byId("placeOrderBtn").addEventListener("click", placeOrder);
-      byId("clearSelectedBtn").addEventListener("click", clearSelectedProducts);
-      byId("orderList").addEventListener("click", function (event) {
-        const btn = event.target.closest("button[data-action][data-index]");
-        if (!btn) return;
-        const action = String(btn.getAttribute("data-action") || "");
-        const idx = Number(btn.getAttribute("data-index"));
-        if (!Number.isInteger(idx)) return;
-        if (action === "deselect") {
-          deselectProduct(idx);
-          return;
-        }
-        if (action === "qty-inc") {
-          updateProductQuantity(idx, 1);
-          return;
-        }
-        if (action === "qty-dec") {
-          updateProductQuantity(idx, -1);
-        }
-      });
-      byId("profileFillBtn").addEventListener("click", fillBuyerFromProfile);
-      ["buyerName", "buyerPhone", "buyerEmail", "buyerAddress", "orderNote"].forEach(function (id) {
-        byId(id).addEventListener("input", saveCheckoutDraft);
-      });
-      byId("termsCheck").addEventListener("change", validateCheckoutForm);
-      byId("deliveryOption").addEventListener("change", function () {
-        state.deliveryOption = this.value === "express" ? "express" : "standard";
-        renderSummary();
-        saveCheckoutDraft();
-      });
-      byId("deliveryWindow").addEventListener("change", saveCheckoutDraft);
-      byId("deliveryDate").addEventListener("change", function () {
-        renderSummary();
-        saveCheckoutDraft();
-      });
-      byId("paymentMethod").addEventListener("change", function () {
-        if (this.value === "cod") {
-          byId("walletInfo").textContent = "Cash on Delivery selected. Wallet will not be charged now.";
-        } else {
-          readBalance();
-        }
-      });
+      bindEvents();
       validateCheckoutForm();
     }
 
-    window.addEventListener("load", function () {
+    function syncAfterReady() {
+      if (checkoutReadySynced) return;
+      checkoutReadySynced = true;
+      state.onlineReady = resolveOnlineReady() || apiReady();
+      applyOnlineStatusText();
+      if (!state.cart.length) {
+        const bundle = resolveInitialCartBundle();
+        state.cart = bundle.cart;
+        state.cartSource = bundle.source;
+        if (state.cart.length) {
+          persistSelectedProducts();
+          renderOrderList();
+        }
+      }
+      readBalance();
+      renderSummary();
+      validateCheckoutForm();
+    }
+
+    window.addEventListener("DOMContentLoaded", function () {
+      init();
       const ready = window.MMStorage && window.MMStorage.ready;
       if (ready && typeof ready.then === "function") {
-        ready.finally(init);
-        return;
+        ready.finally(syncAfterReady);
       }
-      init();
     });
   </script>
   <script defer src="upgrade.js"></script>

@@ -36,6 +36,7 @@
   ]);
   const NATIVE_MIRROR_PREFIX = "__mm_native__:";
   const READY_TIMEOUT_MS = 2500;
+  const FLUSH_DEBOUNCE_MS = 120;
   const pending = new Map();
   let pendingClear = false;
   let syncing = false;
@@ -45,6 +46,7 @@
   let readyDone = false;
   let readyTimedOut = false;
   let readySettled = false;
+  let flushTimer = 0;
   let db = null;
   let api = null;
 
@@ -244,7 +246,20 @@
     applyCacheMap(remoteMap);
   }
 
+  function scheduleFlush(delayMs) {
+    if (syncing || applyingRemote || !onlineWritable()) return;
+    if (flushTimer) clearTimeout(flushTimer);
+    flushTimer = window.setTimeout(function () {
+      flushTimer = 0;
+      flushPending();
+    }, Math.max(0, Number(delayMs) || 0));
+  }
+
   async function flushPending() {
+    if (flushTimer) {
+      clearTimeout(flushTimer);
+      flushTimer = 0;
+    }
     if (syncing || applyingRemote || !onlineWritable()) return;
     if (!pendingClear && pending.size === 0) return;
     syncing = true;
@@ -256,16 +271,15 @@
       }
       const entries = Array.from(pending.entries());
       pending.clear();
-      for (let i = 0; i < entries.length; i += 1) {
-        const key = entries[i][0];
-        const value = entries[i][1];
+      if (entries.length) {
+        const patch = {};
+        for (let i = 0; i < entries.length; i += 1) {
+          patch[encodeURIComponent(String(entries[i][0]))] = entries[i][1];
+        }
         if (remoteMode === "firebase") {
-          if (value === null) await api.remove(api.ref(db, keyPath(key)));
-          else await api.set(api.ref(db, keyPath(key)), value);
-        } else if (value === null) {
-          await restRequest(restKeyUrl(key), { method: "DELETE" });
+          await api.update(api.ref(db, ROOT_PATH), patch);
         } else {
-          await restRequest(restKeyUrl(key), { method: "PUT", body: JSON.stringify(value) });
+          await restRequest(restRootUrl(), { method: "PATCH", body: JSON.stringify(patch) });
         }
       }
     } catch (err) {
@@ -277,7 +291,7 @@
       // Keep app usable while offline.
     } finally {
       syncing = false;
-      if ((pendingClear || pending.size > 0) && onlineWritable()) flushPending();
+      if ((pendingClear || pending.size > 0) && onlineWritable()) scheduleFlush(FLUSH_DEBOUNCE_MS);
     }
   }
 
@@ -319,8 +333,8 @@
 
       db = firebaseDb.getDatabase(app);
       remoteMode = "firebase";
-      api = { ref: firebaseDb.ref, get: firebaseDb.get, set: firebaseDb.set, remove: firebaseDb.remove, onValue: firebaseDb.onValue };
-      window.MMFirebase = { app, auth, db, ref: api.ref, get: api.get, set: api.set, remove: api.remove, onValue: api.onValue };
+      api = { ref: firebaseDb.ref, get: firebaseDb.get, set: firebaseDb.set, update: firebaseDb.update, remove: firebaseDb.remove, onValue: firebaseDb.onValue };
+      window.MMFirebase = { app, auth, db, ref: api.ref, get: api.get, set: api.set, update: api.update, remove: api.remove, onValue: api.onValue };
 
       const rootRef = api.ref(db, ROOT_PATH);
       const first = await api.get(rootRef);
@@ -332,7 +346,7 @@
           applyingRemote = true;
           try { applyRemoteSnapshot(snap.exists() ? snap.val() : {}); }
           finally { applyingRemote = false; }
-          flushPending();
+          scheduleFlush(FLUSH_DEBOUNCE_MS);
         },
         (err) => {
           if (isPermissionDenied(err)) remoteWritable = false;
@@ -375,7 +389,7 @@
       writeNativeMirror(k, next);
       pending.set(k, next);
       if (prev !== next) dispatchStorageEvent(k, prev, next);
-      flushPending();
+      scheduleFlush(FLUSH_DEBOUNCE_MS);
     },
     removeItem(key) {
       const k = String(key);
@@ -392,7 +406,7 @@
       removeNativeMirror(k);
       pending.set(k, null);
       if (prev !== null) dispatchStorageEvent(k, prev, null);
-      flushPending();
+      scheduleFlush(FLUSH_DEBOUNCE_MS);
     },
     clear() {
       const remoteCurrent = remoteKeys();
@@ -416,7 +430,7 @@
       if (remoteCurrent.length || pending.size > 0) {
         pendingClear = true;
         pending.clear();
-        flushPending();
+        scheduleFlush(FLUSH_DEBOUNCE_MS);
       }
     },
     key(index) {
@@ -432,7 +446,7 @@
   window.MMStorage = Object.assign(storageApi, {
     ready,
     path() { return ROOT_PATH; },
-    syncNow: flushPending,
+    syncNow() { return flushPending(); },
     keys() { return keys().slice(); },
     status() { return { mode: remoteMode, writable: onlineWritable(), ready: readyDone }; },
     isOnlineReady() { const s = this.status(); return Boolean(s.ready && s.writable); }

@@ -39,6 +39,8 @@
     dbUrl: 'https://matrixmarket-f72e0-default-rtdb.firebaseio.com',
     rootPath: 'worldwideStorage'
   };
+  const REMOTE_TOKEN_KEY = 'mmRemoteProductsToken';
+  const REMOTE_TOKEN_EXPIRY_KEY = 'mmRemoteProductsTokenExpiry';
 
   const state = {
     products: [],
@@ -481,6 +483,46 @@
     return [];
   }
 
+  function readSessionText(key) {
+    try {
+      return String((window.sessionStorage && window.sessionStorage.getItem(key)) || '');
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function writeSessionText(key, value) {
+    try {
+      if (window.sessionStorage) window.sessionStorage.setItem(key, String(value == null ? '' : value));
+    } catch (_) {}
+  }
+
+  function getRemoteToken() {
+    const token = readSessionText(REMOTE_TOKEN_KEY);
+    const expiry = Number(readSessionText(REMOTE_TOKEN_EXPIRY_KEY) || 0);
+    if (!token || !expiry || (Date.now() + 30000) >= expiry) return '';
+    return token;
+  }
+
+  function storeRemoteToken(token, expiresInSeconds) {
+    if (!token) return;
+    const ttlMs = Math.max(60000, num(expiresInSeconds) * 1000 || 3300000);
+    writeSessionText(REMOTE_TOKEN_KEY, token);
+    writeSessionText(REMOTE_TOKEN_EXPIRY_KEY, Date.now() + ttlMs);
+  }
+
+  function fetchRemoteProductsWithToken(token) {
+    const productsUrl = REMOTE.dbUrl + '/' + REMOTE.rootPath + '/products.json';
+    return fetch(productsUrl + '?auth=' + encodeURIComponent(token), { cache: 'no-store' }).then(function (res) {
+      if (!res.ok) throw new Error('products_fetch_failed');
+      return res.json();
+    }).then(function (payload) {
+      const rows = normalizeRows(payload);
+      if (rows.length) write('products', rows);
+      return rows;
+    });
+  }
+
   function loadMarketplaceRows() {
     let rows = [];
     try {
@@ -520,26 +562,23 @@
     remoteFallbackBusy = true;
 
     const signupUrl = 'https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=' + encodeURIComponent(REMOTE.apiKey);
-    const productsUrl = REMOTE.dbUrl + '/' + REMOTE.rootPath + '/products.json';
+    const cachedToken = getRemoteToken();
 
-    return fetch(signupUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: '{}'
-    }).then(function (res) {
-      if (!res.ok) throw new Error('signup_failed');
-      return res.json();
-    }).then(function (auth) {
-      const token = str(auth && auth.idToken);
-      if (!token) throw new Error('missing_token');
-      return fetch(productsUrl + '?auth=' + encodeURIComponent(token), { cache: 'no-store' });
-    }).then(function (res) {
-      if (!res.ok) throw new Error('products_fetch_failed');
-      return res.json();
-    }).then(function (payload) {
-      const rows = normalizeRows(payload);
-      if (rows.length) write('products', rows);
-      return rows;
+    return Promise.resolve().then(function () {
+      if (cachedToken) return fetchRemoteProductsWithToken(cachedToken);
+      return fetch(signupUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}'
+      }).then(function (res) {
+        if (!res.ok) throw new Error('signup_failed');
+        return res.json();
+      }).then(function (auth) {
+        const token = str(auth && auth.idToken);
+        if (!token) throw new Error('missing_token');
+        storeRemoteToken(token, auth && auth.expiresIn);
+        return fetchRemoteProductsWithToken(token);
+      });
     }).catch(function () {
       return [];
     }).finally(function () {
